@@ -217,7 +217,7 @@ function Overlay({ onClose, children, wide = false }) {
 ═══════════════════════════════════════════════════════ */
 export default function App() {
   const [data, setData]     = useState(null);
-  const [tab, setTab]       = useState("board");
+  const [tab, setTab]       = useState("calendar");
   const [wk, setWk]         = useState(wKey(new Date()));
   const [mgr, setMgr]       = useState(false);
   const [modal, setModal]   = useState(null);
@@ -293,8 +293,8 @@ export default function App() {
 
   const sysColorMap = Object.fromEntries(data.systems.map((s, i) => [s, pal(i)]));
   const TABS = [
-    { id: "board",    label: "לוח שיבוצים", icon: "grid" },
     { id: "calendar", label: "לוח שבועי",    icon: "cal"  },
+    { id: "board",    label: "לוח שיבוצים", icon: "grid" },
     { id: "me",       label: "השיבוצים שלי", icon: "user" },
     { id: "settings", label: "הגדרות",       icon: "cog"  },
   ];

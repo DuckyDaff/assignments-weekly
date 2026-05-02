@@ -3,7 +3,8 @@
     "allow": [
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(npx vercel *)"
+      "Bash(npx vercel *)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" repo edit DuckyDaff/assignments-weekly --visibility private)"
     ]
   }
 }
