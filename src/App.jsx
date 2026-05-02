@@ -980,12 +980,13 @@ function ListEditor({ items, val, setVal, ph, color, onAdd, onRemove }) {
 
 /* ── PLANNER VIEW ── */
 const PLAN_COLS = [
-  { key: "sun",     label: "ראשון", short: "א׳", days: ["sun"]        },
-  { key: "mon",     label: "שני",   short: "ב׳", days: ["mon"]        },
-  { key: "tue",     label: "שלישי", short: "ג׳", days: ["tue"]        },
-  { key: "wed",     label: "רביעי", short: "ד׳", days: ["wed"]        },
-  { key: "thu",     label: "חמישי", short: "ה׳", days: ["thu"]        },
-  { key: "fri-sat", label: "ו׳-ש׳", short: "ו-ש", days: ["fri","sat"] },
+  { key: "sun", label: "ראשון", short: "א׳", days: ["sun"] },
+  { key: "mon", label: "שני",   short: "ב׳", days: ["mon"] },
+  { key: "tue", label: "שלישי", short: "ג׳", days: ["tue"] },
+  { key: "wed", label: "רביעי", short: "ד׳", days: ["wed"] },
+  { key: "thu", label: "חמישי", short: "ה׳", days: ["thu"] },
+  { key: "fri", label: "שישי",  short: "ו׳", days: ["fri"], narrow: true },
+  { key: "sat", label: "שבת",   short: "ש׳", days: ["sat"], narrow: true },
 ];
 
 function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
@@ -994,22 +995,28 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
   const initGrid = () => {
     const g = {};
     weekA.forEach(a => {
-      const days = a.days || [];
-      if (!days.length) return;
-      let col = days.includes("fri") || days.includes("sat") ? "fri-sat" : days.length === 1 ? days[0] : null;
-      if (!col) return;
-      const k = `${a.system}__${col}`;
-      g[k] = [...new Set([...(g[k] || []), ...(a.assignees || [])])];
+      const assignees = a.assignees || [];
+      if (!assignees.length) return;
+      const days = a.days?.length ? a.days : PLAN_COLS.map(c => c.key);
+      days.forEach(day => {
+        const col = PLAN_COLS.find(c => c.key === day);
+        if (!col) return;
+        const k = `${a.system}__${day}`;
+        g[k] = [...new Set([...(g[k] || []), ...assignees])];
+      });
     });
     return g;
   };
   const initTasks = () => {
     const t = {};
     weekA.forEach(a => {
-      const days = a.days || [];
-      let col = days.includes("fri") || days.includes("sat") ? "fri-sat" : days.length === 1 ? days[0] : null;
-      if (!col || !a.tasks?.length) return;
-      t[`${a.system}__${col}`] = a.tasks.join(" | ");
+      if (!a.tasks?.length) return;
+      const days = a.days?.length ? a.days : PLAN_COLS.map(c => c.key);
+      days.forEach(day => {
+        if (!PLAN_COLS.find(c => c.key === day)) return;
+        const k = `${a.system}__${day}`;
+        if (!t[k]) t[k] = a.tasks.join(" | ");
+      });
     });
     return t;
   };
@@ -1084,8 +1091,8 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
             <tr>
               <th style={{ ...PTH, textAlign: "right", paddingRight: 10, width: 110 }}>מערכת</th>
               {PLAN_COLS.map(c => (
-                <th key={c.key} style={{ ...PTH, background: c.key === "fri-sat" ? "rgba(155,89,182,0.14)" : "rgba(74,158,255,0.08)", color: c.key === "fri-sat" ? "#9b59b6" : "#4a9eff", minWidth: c.key === "fri-sat" ? 90 : 120 }}>
-                  {c.label}
+                <th key={c.key} style={{ ...PTH, background: c.narrow ? "rgba(155,89,182,0.14)" : "rgba(74,158,255,0.08)", color: c.narrow ? "#9b59b6" : "#4a9eff", minWidth: c.narrow ? 62 : 120, width: c.narrow ? 62 : undefined }}>
+                  {c.narrow ? c.short : c.label}
                 </th>
               ))}
             </tr>
@@ -1102,14 +1109,13 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
                     const task = cellTasks[k] || "";
                     const isActive = activeCell === k;
                     const isOver = dragOver === k;
-                    const isWknd = c.key === "fri-sat";
                     return (
                       <td key={c.key}
                         onDragOver={e => { e.preventDefault(); setDragOver(k); }}
                         onDragLeave={() => { if (dragOver === k) setDragOver(null); }}
                         onDrop={e => { e.preventDefault(); if (dragging) { add(sys, c.key, dragging); setDragging(null); setDragOver(null); if (!activeCell) activateCell(k); } }}
                         onClick={() => handleCellClick(sys, c.key)}
-                        style={{ ...PTD, background: isActive ? `${col.accent}18` : isOver ? `${col.accent}28` : (isWknd ? "rgba(155,89,182,0.05)" : (people.length || task ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.015)")), border: `2px solid ${isActive ? col.accent : isOver ? col.accent + "88" : (people.length || task ? col.accent + "33" : "rgba(255,255,255,0.07)")}`, verticalAlign: "top", cursor: selected ? "copy" : "pointer", minHeight: 48, transition: "background .1s,border .1s", boxShadow: isActive ? `0 0 0 1px ${col.accent}44 inset` : "none" }}>
+                        style={{ ...PTD, background: isActive ? `${col.accent}18` : isOver ? `${col.accent}28` : (c.narrow ? "rgba(155,89,182,0.05)" : (people.length || task ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.015)")), border: `2px solid ${isActive ? col.accent : isOver ? col.accent + "88" : (people.length || task ? col.accent + "33" : "rgba(255,255,255,0.07)")}`, verticalAlign: "top", cursor: selected ? "copy" : "pointer", minHeight: 48, width: c.narrow ? 62 : undefined, transition: "background .1s,border .1s", boxShadow: isActive ? `0 0 0 1px ${col.accent}44 inset` : "none" }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                           {/* Task input / display */}
                           {isActive
