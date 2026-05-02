@@ -34,6 +34,13 @@ const PALETTE = [
   { dark: "#380c0c", mid: "#581a1a", accent: "#e74c3c", soft: "#fdd0ce" },
   { dark: "#1a1040", mid: "#2c1e68", accent: "#8e44ad", soft: "#e0d0f8" },
   { dark: "#152a0c", mid: "#2a4a18", accent: "#2ecc71", soft: "#c8f8d8" },
+  { dark: "#2a1a00", mid: "#4a3000", accent: "#f1c40f", soft: "#fef9c3" },
+  { dark: "#001a2a", mid: "#003a5a", accent: "#00bcd4", soft: "#c0f4ff" },
+  { dark: "#2a000f", mid: "#4a001f", accent: "#ff4081", soft: "#ffd0e0" },
+  { dark: "#0a1a0a", mid: "#183018", accent: "#8bc34a", soft: "#dff0c8" },
+  { dark: "#1a1a00", mid: "#32320a", accent: "#cddc39", soft: "#f5fac0" },
+  { dark: "#0a0a2a", mid: "#14145a", accent: "#7986cb", soft: "#dde0ff" },
+  { dark: "#1a0a00", mid: "#3a1800", accent: "#ff7043", soft: "#ffe0d8" },
 ];
 
 const DEF_SECTIONS = [
