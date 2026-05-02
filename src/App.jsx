@@ -1061,6 +1061,7 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
   const handleCellClick = (sys, col) => {
     const k = ck(sys, col);
     if (selected) { add(sys, col, selected); return; }
+    if (activeCell === k) { setActiveCell(null); return; }
     activateCell(k);
   };
 
