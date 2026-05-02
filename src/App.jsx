@@ -9,6 +9,8 @@ const DAYS = [
   { key: "tue", short: "ג׳", long: "שלישי"  },
   { key: "wed", short: "ד׳", long: "רביעי"  },
   { key: "thu", short: "ה׳", long: "חמישי"  },
+  { key: "fri", short: "ו׳", long: "שישי"   },
+  { key: "sat", short: "ש׳", long: "שבת"    },
 ];
 const ALL_DAYS = DAYS.map(d => d.key);
 
@@ -23,15 +25,26 @@ const PALETTE = [
   { dark: "#152a0c", mid: "#2a4a18", accent: "#2ecc71", soft: "#c8f8d8" },
 ];
 
+const DEF_SECTIONS = [
+  { name: "מדור פיקוד ובקרה",     people: ["דוד לוי", "רחל כהן", "יוסי מזרחי", "מיכל אברהם"] },
+  { name: "מדור תאורת מסלולים",   people: ["אמיר שפירו", "נועה גולן", "עידו פרץ"] },
+  { name: "משמרת מסלולים",         people: ["שירה בן-דוד", "רון אלון", "תמר ביטון"] },
+];
+
 const DEF = {
   systems: ["מערכת א׳", "מערכת ב׳", "מערכת ג׳", "מערכת ד׳", "מערכת ה׳"],
-  people: [
-    "דוד לוי", "רחל כהן", "יוסי מזרחי", "מיכל אברהם", "אמיר שפירו",
-    "נועה גולן", "עידו פרץ", "שירה בן-דוד", "רון אלון", "תמר ביטון",
-  ],
+  sections: DEF_SECTIONS,
   assignments: [],
   pin: "1234",
 };
+
+function getSections(data) {
+  if (data.sections?.length) return data.sections;
+  // migrate old flat people array → first section
+  if (data.people?.length) return [{ name: "מדור פיקוד ובקרה", people: data.people }, { name: "מדור תאורת מסלולים", people: [] }, { name: "משמרת מסלולים", people: [] }];
+  return DEF_SECTIONS;
+}
+function getAllPeople(data) { return getSections(data).flatMap(s => s.people); }
 
 function wKey(date) {
   const d = new Date(date); d.setHours(0, 0, 0, 0);
@@ -58,6 +71,7 @@ function adjW(wk, d) {
 function todayDayKey() {
   return ["sun", "mon", "tue", "wed", "thu", "fri", "sat"][new Date().getDay()];
 }
+function isWorkDay(key) { return DAYS.some(d => d.key === key); }
 function pal(idx) { return PALETTE[((idx % PALETTE.length) + PALETTE.length) % PALETTE.length]; }
 
 function doExportCSV(wk, list) {
@@ -221,7 +235,16 @@ export default function App() {
   useEffect(() => {
     fetch("/api/data")
       .then(r => r.json())
-      .then(d => setData(d))
+      .then(d => {
+        // migrate old data that has people[] but no sections
+        if (!d.sections?.length && d.people?.length) {
+          const migrated = { ...d, sections: getSections(d) };
+          delete migrated.people;
+          setData(migrated);
+        } else {
+          setData(d);
+        }
+      })
       .catch(() => { setData(DEF); setSaveErr(true); });
   }, []);
 
@@ -382,6 +405,7 @@ function EmptyWeek({ mgr, prevCount, onAdd, onCopy }) {
 
 /* ── BOARD VIEW ── */
 function BoardView({ wk, setWk, weekA, prevA, data, sysMap, mgr, filterPerson, setFilterPerson, onAdd, onEdit, onDelete, onCopy, onCSV, onPrint }) {
+  const allPeople = getAllPeople(data);
   const filtered = filterPerson ? weekA.filter(a => (a.assignees || []).includes(filterPerson)) : weekA;
   return (
     <div>
@@ -390,7 +414,11 @@ function BoardView({ wk, setWk, weekA, prevA, data, sysMap, mgr, filterPerson, s
           <select value={filterPerson} onChange={e => setFilterPerson(e.target.value)}
             style={{ padding: "7px 32px 7px 12px", background: "rgba(255,255,255,0.06)", border: `1px solid ${filterPerson ? "#4a9eff55" : "rgba(255,255,255,0.12)"}`, borderRadius: 9, color: filterPerson ? "#4a9eff" : "#8892b0", fontSize: 12, cursor: "pointer", appearance: "none", paddingLeft: 30 }}>
             <option value="">כל האנשים</option>
-            {data.people.map(p => <option key={p}>{p}</option>)}
+            {getSections(data).map(sec => (
+              <optgroup key={sec.name} label={sec.name}>
+                {sec.people.map(p => <option key={p}>{p}</option>)}
+              </optgroup>
+            ))}
           </select>
           <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: filterPerson ? "#4a9eff" : "#8892b0", pointerEvents: "none" }}><I n="filter" s={12} /></span>
         </div>
@@ -556,21 +584,28 @@ const TD = { padding: "7px 9px", borderRadius: 7, fontSize: 12, minHeight: 36 };
 /* ── MY VIEW ── */
 function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName }) {
   const todayKey      = todayDayKey();
-  const isWorkDay     = ["sun", "mon", "tue", "wed", "thu"].includes(todayKey);
+  const isTodayWork   = isWorkDay(todayKey);
   const isCurrentWeek = wk === wKey(new Date());
   const mine      = myName ? weekA.filter(a => (a.assignees || []).includes(myName)) : [];
-  const todayMine = isCurrentWeek && isWorkDay ? mine.filter(a => !a.days || a.days.length === 0 || a.days.includes(todayKey)) : [];
+  const todayMine = isCurrentWeek && isTodayWork ? mine.filter(a => !a.days || a.days.length === 0 || a.days.includes(todayKey)) : [];
   const restMine  = mine.filter(a => !todayMine.includes(a));
   return (
     <div style={{ maxWidth: 640, margin: "0 auto" }}>
       <WeekNav wk={wk} setWk={setWk} />
       <div style={{ marginBottom: 20, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 13, padding: "14px 16px" }}>
-        <label style={{ ...lbl, marginBottom: 8 }}>מי אתה?</label>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {data.people.map(p => (
-            <button key={p} onClick={() => setMyName(p)} style={{ padding: "7px 14px", border: `1px solid ${myName === p ? "#4a9eff" : "rgba(255,255,255,0.1)"}`, borderRadius: 20, background: myName === p ? "rgba(74,158,255,0.15)" : "rgba(255,255,255,0.04)", color: myName === p ? "#4a9eff" : "#8892b0", fontSize: 12, cursor: "pointer", fontWeight: myName === p ? 700 : 400 }}>
-              {myName === p && "● "}{p}
-            </button>
+        <label style={{ ...lbl, marginBottom: 10 }}>מי אתה?</label>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {getSections(data).map((sec, si) => sec.people.length === 0 ? null : (
+            <div key={sec.name}>
+              <div style={{ fontSize: 10, color: pal(si).accent, fontWeight: 700, letterSpacing: .5, marginBottom: 6, textTransform: "uppercase" }}>{sec.name}</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {sec.people.map(p => (
+                  <button key={p} onClick={() => setMyName(p)} style={{ padding: "7px 14px", border: `1px solid ${myName === p ? pal(si).accent : "rgba(255,255,255,0.1)"}`, borderRadius: 20, background: myName === p ? `${pal(si).accent}22` : "rgba(255,255,255,0.04)", color: myName === p ? pal(si).accent : "#8892b0", fontSize: 12, cursor: "pointer", fontWeight: myName === p ? 700 : 400 }}>
+                    {myName === p && "● "}{p}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       </div>
@@ -585,7 +620,7 @@ function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName }) {
           {todayMine.map((a, i) => <AssignRow key={a.id} a={a} col={sysMap[a.system] || pal(i)} highlight />)}
         </div>
       )}
-      {myName && mine.length > 0 && todayMine.length === 0 && isCurrentWeek && isWorkDay && (
+      {myName && mine.length > 0 && todayMine.length === 0 && isCurrentWeek && isTodayWork && (
         <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#8892b0", textAlign: "center" }}>
           אין שיבוצים להיום ספציפית — בדוק שיבוצי השבוע למטה
         </div>
@@ -651,9 +686,7 @@ function SettingsView({ data, save, mgr, toast }) {
       {st === "sys" && <ListEditor label="מערכות" items={data.systems} val={vSys} setVal={setVSys} ph="שם המערכת החדשה" color="#4a9eff"
         onAdd={() => { if (!vSys.trim() || data.systems.includes(vSys.trim())) { toast("שם כבר קיים", "error"); return; } save({ ...data, systems: [...data.systems, vSys.trim()] }, "מערכת נוספה"); setVSys(""); }}
         onRemove={n => save({ ...data, systems: data.systems.filter(s => s !== n) }, "מערכת הוסרה")} />}
-      {st === "ppl" && <ListEditor label="אנשי צוות" items={data.people} val={vP} setVal={setVP} ph="שם מלא" color="#27ae60"
-        onAdd={() => { if (!vP.trim() || data.people.includes(vP.trim())) { toast("שם כבר קיים", "error"); return; } save({ ...data, people: [...data.people, vP.trim()] }, "איש צוות נוסף"); setVP(""); }}
-        onRemove={n => save({ ...data, people: data.people.filter(p => p !== n) }, "איש צוות הוסר")} />}
+      {st === "ppl" && <SectionsEditor data={data} save={save} toast={toast} />}
       {st === "sec" && (
         <div>
           <label style={lbl}>שנה קוד PIN של מנהל</label>
@@ -669,6 +702,55 @@ function SettingsView({ data, save, mgr, toast }) {
     </div>
   );
 }
+function SectionsEditor({ data, save, toast }) {
+  const sections = getSections(data);
+  const [vals, setVals] = useState(() => Object.fromEntries(sections.map(s => [s.name, ""])));
+
+  const addPerson = (secName) => {
+    const val = (vals[secName] || "").trim();
+    if (!val) return;
+    if (getAllPeople(data).includes(val)) { toast("שם כבר קיים", "error"); return; }
+    const newSections = sections.map(s => s.name === secName ? { ...s, people: [...s.people, val] } : s);
+    save({ ...data, sections: newSections }, "איש צוות נוסף");
+    setVals(v => ({ ...v, [secName]: "" }));
+  };
+
+  const removePerson = (secName, person) => {
+    const newSections = sections.map(s => s.name === secName ? { ...s, people: s.people.filter(p => p !== person) } : s);
+    save({ ...data, sections: newSections }, "איש צוות הוסר");
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+      {sections.map((sec, si) => {
+        const c = pal(si);
+        return (
+          <div key={sec.name} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${c.accent}22`, borderRadius: 12, padding: "14px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: c.accent, flexShrink: 0 }} />
+              <span style={{ fontWeight: 700, fontSize: 13, color: c.accent }}>{sec.name}</span>
+              <span style={{ fontSize: 11, color: "#556", marginRight: "auto" }}>{sec.people.length} אנשים</span>
+            </div>
+            <div style={{ display: "flex", gap: 7, marginBottom: 10 }}>
+              <input value={vals[sec.name] || ""} onChange={e => setVals(v => ({ ...v, [sec.name]: e.target.value }))} onKeyDown={e => e.key === "Enter" && addPerson(sec.name)} placeholder="שם מלא" style={inp} />
+              <PillBtn onClick={() => addPerson(sec.name)} color={c.accent}>הוסף</PillBtn>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {sec.people.map(person => (
+                <div key={person} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRight: `3px solid ${c.accent}`, borderRadius: 8 }} onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.07)"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}>
+                  <span style={{ fontSize: 13 }}>{person}</span>
+                  <button onClick={() => removePerson(sec.name, person)} style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", opacity: .7 }} onMouseEnter={e => e.currentTarget.style.opacity = "1"} onMouseLeave={e => e.currentTarget.style.opacity = ".7"}><I n="trash" s={14} /></button>
+                </div>
+              ))}
+              {sec.people.length === 0 && <div style={{ fontSize: 12, color: "#445", fontStyle: "italic", padding: "4px 2px" }}>אין אנשים במדור זה</div>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ListEditor({ items, val, setVal, ph, color, onAdd, onRemove }) {
   return (
     <div>
@@ -735,16 +817,23 @@ function AssignModal({ mode, a, wk, data, sysMap, onClose, onSave }) {
             </div>
           </div>
           <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
               <label style={{ ...lbl, marginBottom: 0 }}>אנשים משובצים</label>
               {form.assignees.length > 0 && <span style={{ fontSize: 11, color: col.accent, fontWeight: 600 }}>{form.assignees.length} נבחרו</span>}
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-              {data.people.map(p => { const sel = form.assignees.includes(p); return (
-                <button key={p} onClick={() => toggleP(p)} style={{ padding: "6px 13px", border: `1px solid ${sel ? col.accent : "rgba(255,255,255,0.1)"}`, borderRadius: 20, background: sel ? `${col.accent}22` : "rgba(255,255,255,0.04)", color: sel ? col.accent : "#8892b0", fontSize: 12, cursor: "pointer", fontWeight: sel ? 700 : 400 }}>
-                  {sel && "✓ "}{p}
-                </button>
-              ); })}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {getSections(data).map((sec, si) => sec.people.length === 0 ? null : (
+                <div key={sec.name}>
+                  <div style={{ fontSize: 10, color: "#8892b0", fontWeight: 700, letterSpacing: .5, marginBottom: 5, textTransform: "uppercase" }}>{sec.name}</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                    {sec.people.map(p => { const sel = form.assignees.includes(p); return (
+                      <button key={p} onClick={() => toggleP(p)} style={{ padding: "6px 13px", border: `1px solid ${sel ? col.accent : "rgba(255,255,255,0.1)"}`, borderRadius: 20, background: sel ? `${col.accent}22` : "rgba(255,255,255,0.04)", color: sel ? col.accent : "#8892b0", fontSize: 12, cursor: "pointer", fontWeight: sel ? 700 : 400 }}>
+                        {sel && "✓ "}{p}
+                      </button>
+                    ); })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
           <div>
