@@ -586,16 +586,18 @@ function CalendarView({ wk, setWk, weekA, prevA, data, sysMap, mgr, onAdd, onEdi
         </div>
         {mgr && !mob && <PillBtn onClick={onAdd}><I n="plus" s={13} />הוסף שיבוץ</PillBtn>}
       </WeekNav>
-      {weekA.length === 0 ? <EmptyWeek mgr={mgr} prevCount={prevA.length} onAdd={onAdd} onCopy={onCopy} /> : (
+      {weekA.length === 0 ? <EmptyWeek mgr={mgr} prevCount={prevA.length} onAdd={onAdd} onCopy={onCopy} /> : mob
+        ? <CalendarMobile weekA={weekA} activeSys={activeSys} activePeople={activePeople} sysMap={sysMap} todayKey={todayKey} mode={mode} onView={onView} />
+        : (
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 3, minWidth: mob ? 440 : 580 }}>
+          <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 3, minWidth: 580 }}>
             <thead>
               <tr>
-                <th style={{ ...TH, width: mob ? 80 : 130, textAlign: "right", paddingRight: mob ? 8 : 14, fontSize: mob ? 11 : 12 }}>{mode === "sys" ? "מערכת" : "שם"}</th>
+                <th style={{ ...TH, width: 130, textAlign: "right", paddingRight: 14 }}>{mode === "sys" ? "מערכת" : "שם"}</th>
                 {DAYS.map(d => {
                   const isToday = d.key === todayKey;
-                  return <th key={d.key} style={{ ...TH, background: isToday ? "rgba(74,158,255,0.18)" : "rgba(255,255,255,0.05)", color: isToday ? "#4a9eff" : "#8892b0", border: isToday ? "1px solid rgba(74,158,255,0.3)" : "1px solid transparent", fontSize: mob ? 10 : 12, padding: mob ? "6px 4px" : "8px 10px" }}>
-                    {mob ? d.short : d.long}{isToday && <span style={{ display: "block", fontSize: 8, fontWeight: 700 }}>היום</span>}
+                  return <th key={d.key} style={{ ...TH, background: isToday ? "rgba(74,158,255,0.18)" : "rgba(255,255,255,0.05)", color: isToday ? "#4a9eff" : "#8892b0", border: isToday ? "1px solid rgba(74,158,255,0.3)" : "1px solid transparent" }}>
+                    {d.long}{isToday && <span style={{ display: "block", fontSize: 8, fontWeight: 700 }}>היום</span>}
                   </th>;
                 })}
               </tr>
@@ -607,30 +609,30 @@ function CalendarView({ wk, setWk, weekA, prevA, data, sysMap, mgr, onAdd, onEdi
                 const allTasks = [...new Set(sysA.flatMap(a => a.tasks || []))];
                 return (
                   <tr key={sys}>
-                    <td style={{ ...TD, background: col.dark, borderRight: `3px solid ${col.accent}`, fontWeight: 700, fontSize: mob ? 11 : 13, color: "#fff", cursor: "pointer", padding: mob ? "6px 8px" : "7px 9px" }} onClick={() => onView(sysA[0])}>
+                    <td style={{ ...TD, background: col.dark, borderRight: `3px solid ${col.accent}`, fontWeight: 700, fontSize: 13, color: "#fff", cursor: "pointer" }} onClick={() => onView(sysA[0])}>
                       <div>{sys}</div>
-                      {allTasks.length > 0 && !mob && <div style={{ fontSize: 9, color: col.accent, fontWeight: 400, marginTop: 3, opacity: .8 }}>{allTasks.length} משימות</div>}
+                      {allTasks.length > 0 && <div style={{ fontSize: 9, color: col.accent, fontWeight: 400, marginTop: 3, opacity: .8 }}>{allTasks.length} משימות</div>}
                     </td>
                     {DAYS.map(({ key }) => {
                       const isToday = key === todayKey;
                       const dayA = sysA.filter(a => !a.days || a.days.length === 0 || a.days.includes(key));
                       const people = [...new Set(dayA.flatMap(a => a.assignees || []))];
                       const dayTasks = [...new Set(dayA.flatMap(a => a.tasks || []))];
-                      return <td key={key} onClick={() => dayA.length > 0 && onView(dayA[0])} style={{ ...TD, background: isToday ? `${col.accent}14` : (people.length ? "rgba(255,255,255,0.04)" : "transparent"), border: isToday ? `1px solid ${col.accent}33` : "1px solid transparent", verticalAlign: "top", cursor: people.length ? "pointer" : "default", padding: mob ? "5px 4px" : "7px 9px" }}>
+                      return <td key={key} onClick={() => dayA.length > 0 && onView(dayA[0])} style={{ ...TD, background: isToday ? `${col.accent}14` : (people.length ? "rgba(255,255,255,0.04)" : "transparent"), border: isToday ? `1px solid ${col.accent}33` : "1px solid transparent", verticalAlign: "top", cursor: people.length ? "pointer" : "default" }}>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>{people.map(p => <Chip key={p} label={p} color={col.accent} />)}</div>
-                        {dayTasks.length > 0 && !mob && <div style={{ marginTop: 4 }}>{dayTasks.slice(0, 2).map((t, i) => <div key={i} style={{ fontSize: 10, color: "#8892b0", marginTop: 2, display: "flex", gap: 4, alignItems: "flex-start" }}><span style={{ color: col.accent, flexShrink: 0 }}>✓</span><span style={{ lineHeight: 1.3 }}>{t.length > 28 ? t.slice(0, 26) + "…" : t}</span></div>)}{dayTasks.length > 2 && <div style={{ fontSize: 9, color: "#556", marginTop: 2 }}>+{dayTasks.length - 2} משימות</div>}</div>}
+                        {dayTasks.length > 0 && <div style={{ marginTop: 4 }}>{dayTasks.slice(0, 2).map((t, i) => <div key={i} style={{ fontSize: 10, color: "#8892b0", marginTop: 2, display: "flex", gap: 4, alignItems: "flex-start" }}><span style={{ color: col.accent, flexShrink: 0 }}>✓</span><span style={{ lineHeight: 1.3 }}>{t.length > 28 ? t.slice(0, 26) + "…" : t}</span></div>)}{dayTasks.length > 2 && <div style={{ fontSize: 9, color: "#556", marginTop: 2 }}>+{dayTasks.length - 2} משימות</div>}</div>}
                       </td>;
                     })}
                   </tr>
                 );
               }) : activePeople.map(person => (
                 <tr key={person}>
-                  <td style={{ ...TD, fontWeight: 600, fontSize: mob ? 11 : 13, color: "#ccd6f6", background: "rgba(255,255,255,0.03)", borderRight: "3px solid rgba(255,255,255,0.15)", padding: mob ? "6px 8px" : "7px 9px" }}>{person}</td>
+                  <td style={{ ...TD, fontWeight: 600, fontSize: 13, color: "#ccd6f6", background: "rgba(255,255,255,0.03)", borderRight: "3px solid rgba(255,255,255,0.15)" }}>{person}</td>
                   {DAYS.map(({ key }) => {
                     const isToday = key === todayKey;
                     const active = weekA.filter(a => (a.assignees || []).includes(person) && (!a.days || a.days.length === 0 || a.days.includes(key)));
-                    return <td key={key} onClick={() => active.length > 0 && onView(active[0])} style={{ ...TD, background: isToday && active.length ? "rgba(74,158,255,0.1)" : (active.length ? "rgba(255,255,255,0.04)" : "transparent"), border: isToday ? "1px solid rgba(74,158,255,0.25)" : "1px solid transparent", verticalAlign: "top", cursor: active.length ? "pointer" : "default", padding: mob ? "5px 4px" : "7px 9px" }}>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>{active.map(a => { const c = sysMap[a.system] || pal(0); const tasks = a.tasks || []; return <div key={a.id}><Chip label={a.system} color={c.accent} />{tasks.length > 0 && !mob && <div style={{ fontSize: 10, color: "#8892b0", marginTop: 2, paddingRight: 2 }}>{tasks.slice(0,1).map((t,i)=><span key={i} style={{ color: c.accent, fontSize: 9 }}>✓ {t.length>24?t.slice(0,22)+"…":t}</span>)}</div>}</div>; })}</div>
+                    return <td key={key} onClick={() => active.length > 0 && onView(active[0])} style={{ ...TD, background: isToday && active.length ? "rgba(74,158,255,0.1)" : (active.length ? "rgba(255,255,255,0.04)" : "transparent"), border: isToday ? "1px solid rgba(74,158,255,0.25)" : "1px solid transparent", verticalAlign: "top", cursor: active.length ? "pointer" : "default" }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>{active.map(a => { const c = sysMap[a.system] || pal(0); const tasks = a.tasks || []; return <div key={a.id}><Chip label={a.system} color={c.accent} />{tasks.length > 0 && <div style={{ fontSize: 10, color: "#8892b0", marginTop: 2, paddingRight: 2 }}>{tasks.slice(0,1).map((t,i)=><span key={i} style={{ color: c.accent, fontSize: 9 }}>✓ {t.length>24?t.slice(0,22)+"…":t}</span>)}</div>}</div>; })}</div>
                     </td>;
                   })}
                 </tr>
@@ -642,6 +644,64 @@ function CalendarView({ wk, setWk, weekA, prevA, data, sysMap, mgr, onAdd, onEdi
     </div>
   );
 }
+/* ── CALENDAR MOBILE (no horizontal scroll) ── */
+function CalendarMobile({ weekA, activeSys, activePeople, sysMap, todayKey, mode, onView }) {
+  const rows = mode === "sys" ? activeSys : activePeople;
+  return (
+    <div style={{ width: "100%" }}>
+      {/* day header row */}
+      <div style={{ display: "grid", gridTemplateColumns: "72px repeat(7,1fr)", gap: 2, marginBottom: 2 }}>
+        <div />
+        {DAYS.map(d => {
+          const isToday = d.key === todayKey;
+          return (
+            <div key={d.key} style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: isToday ? "#4a9eff" : "#556", background: isToday ? "rgba(74,158,255,0.12)" : "transparent", borderRadius: 6, padding: "5px 0" }}>
+              {d.short}
+              {isToday && <div style={{ fontSize: 8, marginTop: 1 }}>היום</div>}
+            </div>
+          );
+        })}
+      </div>
+      {/* rows */}
+      {rows.map((row, si) => {
+        const col = mode === "sys" ? (sysMap[row] || pal(si)) : null;
+        const rowA = mode === "sys"
+          ? weekA.filter(a => a.system === row)
+          : weekA.filter(a => (a.assignees || []).includes(row));
+        if (!rowA.length) return null;
+        return (
+          <div key={row} style={{ display: "grid", gridTemplateColumns: "72px repeat(7,1fr)", gap: 2, marginBottom: 3 }}>
+            <div onClick={() => onView(rowA[0])} style={{ background: col ? col.dark : "rgba(255,255,255,0.04)", borderRight: `3px solid ${col ? col.accent : "rgba(255,255,255,0.2)"}`, borderRadius: 8, padding: "6px 7px", cursor: "pointer", display: "flex", alignItems: "center" }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: col ? col.accent : "#ccd6f6", lineHeight: 1.3, wordBreak: "break-word" }}>{row}</span>
+            </div>
+            {DAYS.map(({ key }) => {
+              const isToday = key === todayKey;
+              const dayA = mode === "sys"
+                ? rowA.filter(a => !a.days || a.days.length === 0 || a.days.includes(key))
+                : rowA.filter(a => (!a.days || a.days.length === 0 || a.days.includes(key)));
+              const people = mode === "sys" ? [...new Set(dayA.flatMap(a => a.assignees || []))] : (dayA.length ? [row] : []);
+              const count = mode === "sys" ? people.length : (dayA.length > 0 ? dayA.length : 0);
+              const accent = col ? col.accent : (dayA.length > 0 ? (sysMap[dayA[0].system] || pal(0)).accent : "#4a9eff");
+              return (
+                <div key={key} onClick={() => dayA.length > 0 && onView(dayA[0])}
+                  style={{ borderRadius: 7, background: isToday ? (count > 0 ? `${accent}20` : "rgba(74,158,255,0.06)") : (count > 0 ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)"), border: isToday ? `1px solid ${count > 0 ? accent + "55" : "rgba(74,158,255,0.2)"}` : "1px solid transparent", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 38, cursor: count > 0 ? "pointer" : "default" }}>
+                  {count > 0
+                    ? <div style={{ textAlign: "center" }}>
+                        <div style={{ width: 20, height: 20, borderRadius: "50%", background: accent, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto", fontSize: 10, fontWeight: 800, color: "#fff" }}>{count}</div>
+                      </div>
+                    : <div style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }} />
+                  }
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+      <div style={{ marginTop: 10, fontSize: 11, color: "#445", textAlign: "center" }}>לחץ על עיגול לפרטי השיבוץ</div>
+    </div>
+  );
+}
+
 const TH = { padding: "8px 10px", textAlign: "center", borderRadius: 7, fontSize: 12, fontWeight: 600 };
 const TD = { padding: "7px 9px", borderRadius: 7, fontSize: 12, minHeight: 36 };
 
