@@ -996,7 +996,7 @@ function AssignModal({ mode, a, wk, data, sysMap, onClose, onSave }) {
           </div>
         </div>
         <div style={{ padding: mob ? "12px 16px calc(12px + env(safe-area-inset-bottom,0px))" : "14px 22px", borderTop: "1px solid rgba(255,255,255,0.07)", display: "flex", gap: 8 }}>
-          <button onClick={() => onSave(form)} style={{ flex: 1, padding: "13px", background: `linear-gradient(135deg,${col.accent},${col.accent}99)`, border: "none", borderRadius: 11, color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", boxShadow: `0 4px 16px ${col.accent}44` }} onMouseEnter={e => e.currentTarget.style.opacity = ".9"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+          <button onClick={() => { const final = task.trim() ? { ...form, tasks: [...form.tasks, task.trim()] } : form; onSave(final); }} style={{ flex: 1, padding: "13px", background: `linear-gradient(135deg,${col.accent},${col.accent}99)`, border: "none", borderRadius: 11, color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", boxShadow: `0 4px 16px ${col.accent}44` }} onMouseEnter={e => e.currentTarget.style.opacity = ".9"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
             {mode === "add" ? "✓  צור שיבוץ" : "✓  שמור שינויים"}
           </button>
           <button onClick={onClose} style={{ padding: "13px 18px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 11, color: "#8892b0", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>ביטול</button>
