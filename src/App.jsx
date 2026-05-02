@@ -385,7 +385,7 @@ export default function App() {
       {modal?.t === "assign" && <AssignModal mode={modal.mode} a={modal.a} wk={wk} data={data} sysMap={sysColorMap} onClose={() => setModal(null)} onSave={upsertAssign} />}
       {modal?.t === "auth"   && <AuthModal pin={data.pin} onOk={() => { setMgr(true); setModal(null); toast("ברוך הבא, מנהל", "info"); }} onClose={() => setModal(null)} />}
       {viewAssign && <AssignDetailModal a={viewAssign} sysMap={sysColorMap} mgr={mgr} onClose={() => setViewAssign(null)} onEdit={() => { setModal({ t: "assign", mode: "edit", a: viewAssign }); setViewAssign(null); }} onDelete={() => { deleteAssign(viewAssign.id); setViewAssign(null); }} />}
-      {planner && <PlannerView wk={wk} data={data} sysMap={sysColorMap} weekA={weekA} onClose={() => setPlanner(false)} onSave={assignments => { save({ ...data, assignments }, "שבוע תוכנן ✓"); setPlanner(false); }} />}
+      {planner && <PlannerView wk={wk} data={data} sysMap={sysColorMap} weekA={weekA} onClose={() => setPlanner(false)} onSave={assignments => { save({ ...data, assignments }, "שבוע תוכנן ✓"); }} />}
     </MobileCtx.Provider>
   );
 }
@@ -999,9 +999,12 @@ const PLAN_COLS = [
 function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
   const mob = useContext(MobileCtx);
 
-  const initGrid = () => {
+  const [planWk, setPlanWk] = useState(wk);
+  const planWeekA = data.assignments.filter(a => a.week === planWk);
+
+  const buildGrid = (pwa) => {
     const g = {};
-    weekA.forEach(a => {
+    pwa.forEach(a => {
       const assignees = a.assignees || [];
       if (!assignees.length) return;
       const days = a.days?.length ? a.days : PLAN_COLS.map(c => c.key);
@@ -1014,9 +1017,9 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
     });
     return g;
   };
-  const initTasks = () => {
+  const buildTasks = (pwa) => {
     const t = {};
-    weekA.forEach(a => {
+    pwa.forEach(a => {
       if (!a.tasks?.length) return;
       const days = a.days?.length ? a.days : PLAN_COLS.map(c => c.key);
       days.forEach(day => {
@@ -1028,13 +1031,23 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
     return t;
   };
 
-  const [grid, setGrid]         = useState(initGrid);
-  const [cellTasks, setCellTasks] = useState(initTasks);
+  const [grid, setGrid]           = useState(() => buildGrid(planWeekA));
+  const [cellTasks, setCellTasks] = useState(() => buildTasks(planWeekA));
   const [activeCell, setActiveCell] = useState(null);
-  const [dragging, setDragging] = useState(null);
-  const [selected, setSelected] = useState(null);
-  const [dragOver, setDragOver] = useState(null);
+  const [dragging, setDragging]   = useState(null);
+  const [selected, setSelected]   = useState(null);
+  const [dragOver, setDragOver]   = useState(null);
   const taskInputRef = useRef();
+
+  const goWeek = (delta) => {
+    const next = adjW(planWk, delta);
+    const nextA = data.assignments.filter(a => a.week === next);
+    setPlanWk(next);
+    setGrid(buildGrid(nextA));
+    setCellTasks(buildTasks(nextA));
+    setActiveCell(null);
+    setSelected(null);
+  };
 
   const ck  = (sys, col) => `${sys}__${col}`;
   const add = (sys, col, p) => setGrid(g => { const k = ck(sys,col); return { ...g, [k]: [...new Set([...(g[k]||[]),p])] }; });
@@ -1052,7 +1065,7 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
   };
 
   const handleSave = () => {
-    const otherWeeks = data.assignments.filter(a => a.week !== wk);
+    const otherWeeks = data.assignments.filter(a => a.week !== planWk);
     const newA = [];
     data.systems.forEach(sys => {
       PLAN_COLS.forEach(c => {
@@ -1061,8 +1074,8 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
         if (!people.length) return;
         const taskStr = (cellTasks[k] || "").trim();
         const tasks = taskStr ? taskStr.split("|").map(t => t.trim()).filter(Boolean) : [];
-        const existing = weekA.find(a => a.system === sys && c.days.some(d => (a.days||[]).includes(d)));
-        newA.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2), week: wk, system: sys, days: c.days, assignees: people, tasks, notes: existing?.notes || "" });
+        const existing = planWeekA.find(a => a.system === sys && c.days.some(d => (a.days||[]).includes(d)));
+        newA.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2), week: planWk, system: sys, days: c.days, assignees: people, tasks, notes: existing?.notes || "" });
       });
     });
     onSave([...otherWeeks, ...newA]);
@@ -1081,9 +1094,13 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
       {/* Header */}
       <div style={{ background: "#0f1525", borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "0 16px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, gap: 8 }}>
         <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 9, padding: "7px 12px", color: "#8892b0", cursor: "pointer", fontSize: 13 }}>✕ סגור</button>
-        <div style={{ textAlign: "center", flex: 1 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>תכנון שבוע {wk.split("-W")[1]}</div>
-          <div style={{ fontSize: 10, color: "#9b59b6" }}>{wLabel(wk)}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, justifyContent: "center" }}>
+          <button onClick={() => goWeek(-1)} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, padding: "5px 10px", color: "#8892b0", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>›</button>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>שבוע {planWk.split("-W")[1]}</div>
+            <div style={{ fontSize: 10, color: "#9b59b6" }}>{wLabel(planWk)}</div>
+          </div>
+          <button onClick={() => goWeek(1)} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, padding: "5px 10px", color: "#8892b0", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>‹</button>
         </div>
         <button onClick={handleSave} style={{ background: "linear-gradient(135deg,#4a9eff,#9b59b6)", border: "none", borderRadius: 9, padding: "8px 14px", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700, boxShadow: "0 3px 12px rgba(74,158,255,0.3)" }}>שמור ✓</button>
       </div>
