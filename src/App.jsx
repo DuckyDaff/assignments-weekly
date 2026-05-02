@@ -1157,7 +1157,7 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
                           <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                             {isActive
                               ? <input ref={taskInputRef} value={task} onChange={e => setCellTasks(t => ({ ...t, [k]: e.target.value }))}
-                                  onClick={e => e.stopPropagation()}
+                                  onClick={e => { if (!selected) e.stopPropagation(); }}
                                   placeholder="כתוב משימה..."
                                   style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: `1px solid ${col.accent}55`, borderRadius: 5, color: "#fff", fontSize: 11, padding: "4px 6px", outline: "none", fontFamily: "inherit" }} />
                               : task
@@ -1165,7 +1165,7 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
                                 : <div style={{ fontSize: 9, color: "rgba(255,255,255,0.12)", textAlign: "center", padding: "2px 0" }}>לחץ</div>
                             }
                             {people.map(p => (
-                              <div key={p} onClick={e => e.stopPropagation()} style={{ display: "flex", alignItems: "center", gap: 3, background: `${col.accent}1e`, border: `1px solid ${col.accent}44`, borderRadius: 5, padding: mob ? "2px 4px" : "3px 6px" }}>
+                              <div key={p} onClick={e => { if (!selected) e.stopPropagation(); }} style={{ display: "flex", alignItems: "center", gap: 3, background: `${col.accent}1e`, border: `1px solid ${col.accent}44`, borderRadius: 5, padding: mob ? "2px 4px" : "3px 6px" }}>
                                 <span style={{ fontSize: mob ? 10 : 11, color: col.accent, fontWeight: 600, flex: 1, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p}</span>
                                 <button onClick={e => { e.stopPropagation(); rem(sys, c.key, p); }} style={{ background: "none", border: "none", color: col.accent, cursor: "pointer", fontSize: 13, padding: "0 1px", lineHeight: 1, opacity: .55, flexShrink: 0 }}>×</button>
                               </div>
@@ -1187,27 +1187,27 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
 
       {/* ── Mobile bottom strip (horizontal scroll) ── */}
       {mob && (
-        <div style={{ flexShrink: 0, borderTop: "2px solid rgba(255,255,255,0.07)", background: "#090e1c", padding: "8px 10px 12px" }}>
-          <div style={{ fontSize: 10, color: selected ? "#4a9eff" : "#445", fontWeight: 700, marginBottom: 6 }}>
-            {selected ? `✓ ${selected} — לחץ תא` : "בחר שם ← לחץ תא"}
+        <div style={{ flexShrink: 0, borderTop: "2px solid rgba(255,255,255,0.07)", background: "#090e1c", padding: "12px 12px 18px" }}>
+          <div style={{ fontSize: 12, color: selected ? "#4a9eff" : "#667", fontWeight: 700, marginBottom: 8 }}>
+            {selected ? `✓ ${selected} — לחץ תא לשיבוץ` : "בחר שם ← לחץ על תא"}
           </div>
           <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-            <div style={{ display: "flex", gap: 6, alignItems: "center", paddingBottom: 4, width: "max-content" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", paddingBottom: 6, width: "max-content" }}>
               {getSections(data).map((sec, si) => sec.people.length === 0 ? null : (
-                <div key={sec.name} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <span style={{ fontSize: 9, color: pal(si).accent, fontWeight: 700, whiteSpace: "nowrap", opacity: .8 }}>{sec.name.replace("מדור ", "").replace("משמרת ", "")}</span>
-                  <span style={{ color: "rgba(255,255,255,0.1)", fontSize: 14 }}>|</span>
+                <div key={sec.name} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                  <span style={{ fontSize: 11, color: pal(si).accent, fontWeight: 700, whiteSpace: "nowrap", opacity: .85 }}>{sec.name.replace("מדור ", "").replace("משמרת ", "")}</span>
+                  <span style={{ color: "rgba(255,255,255,0.12)", fontSize: 16 }}>|</span>
                   {sec.people.map(p => {
                     const isSel = selected === p;
                     return (
                       <div key={p}
                         onClick={() => setSelected(isSel ? null : p)}
-                        style={{ padding: "6px 12px", border: `2px solid ${isSel ? pal(si).accent : pal(si).accent + "44"}`, borderRadius: 20, background: isSel ? `${pal(si).accent}33` : "rgba(255,255,255,0.04)", color: isSel ? pal(si).accent : "#8892b0", fontSize: 13, cursor: "pointer", fontWeight: isSel ? 700 : 400, userSelect: "none", whiteSpace: "nowrap", boxShadow: isSel ? `0 0 0 3px ${pal(si).accent}33` : "none", transition: "all .12s" }}>
+                        style={{ padding: "9px 16px", border: `2px solid ${isSel ? pal(si).accent : pal(si).accent + "44"}`, borderRadius: 22, background: isSel ? `${pal(si).accent}33` : "rgba(255,255,255,0.05)", color: isSel ? pal(si).accent : "#aab", fontSize: 15, cursor: "pointer", fontWeight: isSel ? 700 : 500, userSelect: "none", whiteSpace: "nowrap", boxShadow: isSel ? `0 0 0 3px ${pal(si).accent}33` : "none", transition: "all .12s", minHeight: 40, display: "flex", alignItems: "center" }}>
                         {isSel ? "✓ " : ""}{p}
                       </div>
                     );
                   })}
-                  <span style={{ color: "rgba(255,255,255,0.1)", fontSize: 14 }}>|</span>
+                  <span style={{ color: "rgba(255,255,255,0.12)", fontSize: 16 }}>|</span>
                 </div>
               ))}
             </div>
@@ -1403,7 +1403,7 @@ function AuthModal({ pin, onOk, onClose }) {
         <div style={{ fontSize: 38, marginBottom: 10 }}>🔐</div>
         <div style={{ fontWeight: 700, fontSize: 17, color: "#fff", marginBottom: 4 }}>כניסת מנהל</div>
         <div style={{ fontSize: 12, color: "#8892b0", marginBottom: 20 }}>הזן קוד PIN לגישה מלאה</div>
-        <input autoFocus type="password" value={v} onChange={e => { setV(e.target.value); setErr(false); }} onKeyDown={e => e.key === "Enter" && try_()}
+        <input autoFocus type="password" inputMode="numeric" pattern="[0-9]*" value={v} onChange={e => { setV(e.target.value); setErr(false); }} onKeyDown={e => e.key === "Enter" && try_()}
           placeholder="● ● ● ●"
           style={{ ...inp, textAlign: "center", fontSize: 22, letterSpacing: 8, marginBottom: 10, border: `1px solid ${err ? "#e74c3c" : "rgba(255,255,255,0.12)"}`, background: err ? "rgba(231,76,60,0.08)" : "rgba(255,255,255,0.06)" }} />
         {err && <div style={{ color: "#e74c3c", fontSize: 12, marginBottom: 8, animation: "pulse .5s ease" }}>קוד שגוי, נסה שוב</div>}
