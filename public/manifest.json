@@ -1,0 +1,14 @@
+{
+  "name": "מערכת שיבוצים",
+  "short_name": "שיבוצים",
+  "description": "Airfield Systems Integrated Planning",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080c18",
+  "theme_color": "#0f1525",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/logo.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
