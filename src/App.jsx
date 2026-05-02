@@ -646,58 +646,93 @@ function CalendarView({ wk, setWk, weekA, prevA, data, sysMap, mgr, onAdd, onEdi
 }
 /* ── CALENDAR MOBILE (no horizontal scroll) ── */
 function CalendarMobile({ weekA, activeSys, activePeople, sysMap, todayKey, mode, onView }) {
+  const [expanded, setExpanded] = useState({});
   const rows = mode === "sys" ? activeSys : activePeople;
+  const WORK = DAYS.slice(0, 5);   // ראשון–חמישי
+  const WKND = DAYS.slice(5);      // שישי–שבת
+  const firstName = n => n.split(" ")[0];
+  const MAX = 4;
+
+  const getDayData = (rowA, key) => {
+    const dayA = rowA.filter(a => !a.days || a.days.length === 0 || a.days.includes(key));
+    const people = mode === "sys" ? [...new Set(dayA.flatMap(a => a.assignees || []))] : (dayA.length ? [rows[0]] : []);
+    return { dayA, people };
+  };
+
   return (
     <div style={{ width: "100%" }}>
-      {/* day header row */}
-      <div style={{ display: "grid", gridTemplateColumns: "72px repeat(7,1fr)", gap: 2, marginBottom: 2 }}>
+      {/* header */}
+      <div style={{ display: "grid", gridTemplateColumns: "62px repeat(5,1fr) 26px 26px", gap: 2, marginBottom: 3 }}>
         <div />
-        {DAYS.map(d => {
+        {WORK.map(d => {
           const isToday = d.key === todayKey;
-          return (
-            <div key={d.key} style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: isToday ? "#4a9eff" : "#556", background: isToday ? "rgba(74,158,255,0.12)" : "transparent", borderRadius: 6, padding: "5px 0" }}>
-              {d.short}
-              {isToday && <div style={{ fontSize: 8, marginTop: 1 }}>היום</div>}
-            </div>
-          );
+          return <div key={d.key} style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: isToday ? "#4a9eff" : "#7a8499", background: isToday ? "rgba(74,158,255,0.12)" : "rgba(255,255,255,0.03)", borderRadius: 6, padding: "5px 0" }}>
+            {d.short}{isToday && <div style={{ fontSize: 8, marginTop: 1 }}>היום</div>}
+          </div>;
+        })}
+        {WKND.map(d => {
+          const isToday = d.key === todayKey;
+          return <div key={d.key} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, color: isToday ? "#4a9eff" : "#445", background: isToday ? "rgba(74,158,255,0.1)" : "transparent", borderRadius: 6, padding: "5px 0" }}>
+            {d.short}
+          </div>;
         })}
       </div>
-      {/* rows */}
+
       {rows.map((row, si) => {
         const col = mode === "sys" ? (sysMap[row] || pal(si)) : null;
         const rowA = mode === "sys"
           ? weekA.filter(a => a.system === row)
           : weekA.filter(a => (a.assignees || []).includes(row));
         if (!rowA.length) return null;
+        const rowKey = `${mode}-${row}`;
+
         return (
-          <div key={row} style={{ display: "grid", gridTemplateColumns: "72px repeat(7,1fr)", gap: 2, marginBottom: 3 }}>
-            <div onClick={() => onView(rowA[0])} style={{ background: col ? col.dark : "rgba(255,255,255,0.04)", borderRight: `3px solid ${col ? col.accent : "rgba(255,255,255,0.2)"}`, borderRadius: 8, padding: "6px 7px", cursor: "pointer", display: "flex", alignItems: "center" }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: col ? col.accent : "#ccd6f6", lineHeight: 1.3, wordBreak: "break-word" }}>{row}</span>
+          <div key={row} style={{ display: "grid", gridTemplateColumns: "62px repeat(5,1fr) 26px 26px", gap: 2, marginBottom: 3, alignItems: "stretch" }}>
+            {/* label */}
+            <div onClick={() => onView(rowA[0])} style={{ background: col ? col.dark : "rgba(255,255,255,0.04)", borderRight: `3px solid ${col ? col.accent : "rgba(255,255,255,0.2)"}`, borderRadius: 8, padding: "6px 6px", cursor: "pointer", display: "flex", alignItems: "center" }}>
+              <span style={{ fontSize: 9, fontWeight: 700, color: col ? col.accent : "#ccd6f6", lineHeight: 1.3, wordBreak: "break-word" }}>{row}</span>
             </div>
-            {DAYS.map(({ key }) => {
+
+            {/* work days: show names */}
+            {WORK.map(({ key }) => {
               const isToday = key === todayKey;
-              const dayA = mode === "sys"
-                ? rowA.filter(a => !a.days || a.days.length === 0 || a.days.includes(key))
-                : rowA.filter(a => (!a.days || a.days.length === 0 || a.days.includes(key)));
-              const people = mode === "sys" ? [...new Set(dayA.flatMap(a => a.assignees || []))] : (dayA.length ? [row] : []);
-              const count = mode === "sys" ? people.length : (dayA.length > 0 ? dayA.length : 0);
-              const accent = col ? col.accent : (dayA.length > 0 ? (sysMap[dayA[0].system] || pal(0)).accent : "#4a9eff");
+              const { dayA, people } = getDayData(rowA, key);
+              const accent = col ? col.accent : (dayA.length > 0 ? (sysMap[dayA[0]?.system] || pal(0)).accent : "#4a9eff");
+              const isExp = expanded[`${rowKey}-${key}`];
+              const shown = isExp ? people : people.slice(0, MAX);
+              const extra = people.length - MAX;
               return (
                 <div key={key} onClick={() => dayA.length > 0 && onView(dayA[0])}
-                  style={{ borderRadius: 7, background: isToday ? (count > 0 ? `${accent}20` : "rgba(74,158,255,0.06)") : (count > 0 ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)"), border: isToday ? `1px solid ${count > 0 ? accent + "55" : "rgba(74,158,255,0.2)"}` : "1px solid transparent", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 38, cursor: count > 0 ? "pointer" : "default" }}>
-                  {count > 0
-                    ? <div style={{ textAlign: "center" }}>
-                        <div style={{ width: 20, height: 20, borderRadius: "50%", background: accent, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto", fontSize: 10, fontWeight: 800, color: "#fff" }}>{count}</div>
-                      </div>
-                    : <div style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }} />
-                  }
+                  style={{ borderRadius: 7, background: isToday ? `${accent}18` : (people.length ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)"), border: isToday ? `1px solid ${accent}44` : "1px solid rgba(255,255,255,0.05)", padding: people.length ? "4px 3px" : 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, cursor: people.length ? "pointer" : "default", minHeight: 36, justifyContent: "center" }}>
+                  {shown.map(p => (
+                    <div key={p} style={{ fontSize: 9, fontWeight: 600, color: accent, lineHeight: 1.2, textAlign: "center", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%", paddingInline: 2 }}>{firstName(p)}</div>
+                  ))}
+                  {!isExp && extra > 0 && (
+                    <div onClick={e => { e.stopPropagation(); setExpanded(ex => ({ ...ex, [`${rowKey}-${key}`]: true })); }}
+                      style={{ fontSize: 9, fontWeight: 700, color: "#fff", background: accent, borderRadius: 10, padding: "1px 5px", lineHeight: 1.4 }}>+{extra}</div>
+                  )}
+                  {!people.length && <div style={{ width: 5, height: 5, borderRadius: "50%", background: "rgba(255,255,255,0.07)" }} />}
+                </div>
+              );
+            })}
+
+            {/* weekend: dot only */}
+            {WKND.map(({ key }) => {
+              const isToday = key === todayKey;
+              const { dayA, people } = getDayData(rowA, key);
+              const accent = col ? col.accent : (dayA.length > 0 ? (sysMap[dayA[0]?.system] || pal(0)).accent : "#4a9eff");
+              return (
+                <div key={key} onClick={() => dayA.length > 0 && onView(dayA[0])}
+                  style={{ borderRadius: 7, background: isToday ? "rgba(74,158,255,0.08)" : "transparent", border: isToday ? "1px solid rgba(74,158,255,0.2)" : "1px solid transparent", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 36, cursor: people.length ? "pointer" : "default" }}>
+                  {people.length > 0
+                    ? <div style={{ width: 18, height: 18, borderRadius: "50%", background: accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, color: "#fff" }}>{people.length}</div>
+                    : <div style={{ width: 5, height: 5, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }} />}
                 </div>
               );
             })}
           </div>
         );
       })}
-      <div style={{ marginTop: 10, fontSize: 11, color: "#445", textAlign: "center" }}>לחץ על עיגול לפרטי השיבוץ</div>
     </div>
   );
 }
