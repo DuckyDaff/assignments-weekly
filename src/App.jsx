@@ -1185,33 +1185,31 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
         </div>
       </div>
 
-      {/* ── Mobile bottom strip (horizontal scroll) ── */}
+      {/* ── Mobile bottom panel (multi-row wrap) ── */}
       {mob && (
-        <div style={{ flexShrink: 0, borderTop: "2px solid rgba(255,255,255,0.07)", background: "#090e1c", padding: "12px 12px 18px" }}>
-          <div style={{ fontSize: 12, color: selected ? "#4a9eff" : "#667", fontWeight: 700, marginBottom: 8 }}>
+        <div style={{ flexShrink: 0, borderTop: "2px solid rgba(255,255,255,0.1)", background: "#090e1c", padding: "12px 12px 16px", overflowY: "auto", maxHeight: "40vh" }}>
+          <div style={{ fontSize: 12, color: selected ? "#4a9eff" : "#667", fontWeight: 700, marginBottom: 10 }}>
             {selected ? `✓ ${selected} — לחץ תא לשיבוץ` : "בחר שם ← לחץ על תא"}
           </div>
-          <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", paddingBottom: 6, width: "max-content" }}>
-              {getSections(data).map((sec, si) => sec.people.length === 0 ? null : (
-                <div key={sec.name} style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                  <span style={{ fontSize: 11, color: pal(si).accent, fontWeight: 700, whiteSpace: "nowrap", opacity: .85 }}>{sec.name.replace("מדור ", "").replace("משמרת ", "")}</span>
-                  <span style={{ color: "rgba(255,255,255,0.12)", fontSize: 16 }}>|</span>
-                  {sec.people.map(p => {
-                    const isSel = selected === p;
-                    return (
-                      <div key={p}
-                        onClick={() => setSelected(isSel ? null : p)}
-                        style={{ padding: "9px 16px", border: `2px solid ${isSel ? pal(si).accent : pal(si).accent + "44"}`, borderRadius: 22, background: isSel ? `${pal(si).accent}33` : "rgba(255,255,255,0.05)", color: isSel ? pal(si).accent : "#aab", fontSize: 15, cursor: "pointer", fontWeight: isSel ? 700 : 500, userSelect: "none", whiteSpace: "nowrap", boxShadow: isSel ? `0 0 0 3px ${pal(si).accent}33` : "none", transition: "all .12s", minHeight: 40, display: "flex", alignItems: "center" }}>
-                        {isSel ? "✓ " : ""}{p}
-                      </div>
-                    );
-                  })}
-                  <span style={{ color: "rgba(255,255,255,0.12)", fontSize: 16 }}>|</span>
-                </div>
-              ))}
+          {getSections(data).map((sec, si) => sec.people.length === 0 ? null : (
+            <div key={sec.name} style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 11, color: pal(si).accent, fontWeight: 700, marginBottom: 6, opacity: .9 }}>
+                {sec.name}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {sec.people.map(p => {
+                  const isSel = selected === p;
+                  return (
+                    <div key={p}
+                      onClick={() => setSelected(isSel ? null : p)}
+                      style={{ padding: "9px 16px", border: `2px solid ${isSel ? pal(si).accent : pal(si).accent + "44"}`, borderRadius: 22, background: isSel ? `${pal(si).accent}33` : "rgba(255,255,255,0.05)", color: isSel ? pal(si).accent : "#aab", fontSize: 15, cursor: "pointer", fontWeight: isSel ? 700 : 500, userSelect: "none", boxShadow: isSel ? `0 0 0 3px ${pal(si).accent}33` : "none", transition: "all .12s", minHeight: 40, display: "flex", alignItems: "center" }}>
+                      {isSel ? "✓ " : ""}{p}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          ))}
         </div>
       )}
     </div>
