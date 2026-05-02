@@ -774,7 +774,7 @@ function ListEditor({ items, val, setVal, ph, color, onAdd, onRemove }) {
 function AssignModal({ mode, a, wk, data, sysMap, onClose, onSave }) {
   const [form, setForm] = useState(() => a
     ? { ...a, tasks: [...(a.tasks || [])], days: [...(a.days || ALL_DAYS)], assignees: [...(a.assignees || [])] }
-    : { week: wk, system: data.systems[0] || "", assignees: [], tasks: [], days: [...ALL_DAYS], notes: "" });
+    : { week: wk, system: data.systems[0] || "", assignees: [], tasks: [], days: [], notes: "" });
   const [task, setTask] = useState("");
   const taskRef = useRef();
   const toggleP = p => setForm(f => ({ ...f, assignees: f.assignees.includes(p) ? f.assignees.filter(x => x !== p) : [...f.assignees, p] }));
