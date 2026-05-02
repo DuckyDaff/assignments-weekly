@@ -1084,95 +1084,129 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
       {/* Hint */}
       <div style={{ background: "rgba(155,89,182,0.08)", borderBottom: "1px solid rgba(155,89,182,0.15)", padding: "5px 14px", fontSize: 11, color: "#9b59b6", textAlign: "center", flexShrink: 0 }}>{hintText}</div>
 
-      {/* Grid */}
-      <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", padding: "10px 10px 4px" }}>
-        <table style={{ borderCollapse: "separate", borderSpacing: 4, minWidth: 680 }}>
-          <thead>
-            <tr>
-              <th style={{ ...PTH, textAlign: "right", paddingRight: 10, width: 110 }}>מערכת</th>
-              {PLAN_COLS.map(c => (
-                <th key={c.key} style={{ ...PTH, background: c.narrow ? "rgba(155,89,182,0.14)" : "rgba(74,158,255,0.08)", color: c.narrow ? "#9b59b6" : "#4a9eff", minWidth: c.narrow ? 62 : 120, width: c.narrow ? 62 : undefined }}>
-                  {c.narrow ? c.short : c.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.systems.map(sys => {
-              const col = sysMap[sys] || pal(0);
-              return (
-                <tr key={sys}>
-                  <td style={{ ...PTD, background: col.dark, borderRight: `3px solid ${col.accent}`, fontWeight: 700, fontSize: 12, color: col.accent, maxWidth: 110, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sys}</td>
-                  {PLAN_COLS.map(c => {
-                    const k = ck(sys, c.key);
-                    const people = grid[k] || [];
-                    const task = cellTasks[k] || "";
-                    const isActive = activeCell === k;
-                    const isOver = dragOver === k;
+      {/* Body: sidebar (desktop) or grid-only (mobile) */}
+      <div style={{ flex: 1, display: "flex", flexDirection: mob ? "column" : "row", overflow: "hidden" }}>
+
+        {/* ── Desktop left sidebar ── */}
+        {!mob && (
+          <div style={{ width: 210, flexShrink: 0, overflowY: "auto", borderLeft: "2px solid rgba(255,255,255,0.07)", background: "#090e1c", padding: "14px 12px" }}>
+            <div style={{ fontSize: 10, color: "#556", fontWeight: 700, letterSpacing: .5, marginBottom: 10, textTransform: "uppercase" }}>
+              {selected ? `✓ ${selected}` : "גרור לתא ← שם"}
+            </div>
+            {getSections(data).map((sec, si) => sec.people.length === 0 ? null : (
+              <div key={sec.name} style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: pal(si).accent, fontWeight: 700, marginBottom: 6, borderBottom: `1px solid ${pal(si).accent}33`, paddingBottom: 4 }}>{sec.name}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {sec.people.map(p => {
+                    const isSel = selected === p;
                     return (
-                      <td key={c.key}
-                        onDragOver={e => { e.preventDefault(); setDragOver(k); }}
-                        onDragLeave={() => { if (dragOver === k) setDragOver(null); }}
-                        onDrop={e => { e.preventDefault(); if (dragging) { add(sys, c.key, dragging); setDragging(null); setDragOver(null); if (!activeCell) activateCell(k); } }}
-                        onClick={() => handleCellClick(sys, c.key)}
-                        style={{ ...PTD, background: isActive ? `${col.accent}18` : isOver ? `${col.accent}28` : (c.narrow ? "rgba(155,89,182,0.05)" : (people.length || task ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.015)")), border: `2px solid ${isActive ? col.accent : isOver ? col.accent + "88" : (people.length || task ? col.accent + "33" : "rgba(255,255,255,0.07)")}`, verticalAlign: "top", cursor: selected ? "copy" : "pointer", minHeight: 48, width: c.narrow ? 62 : undefined, transition: "background .1s,border .1s", boxShadow: isActive ? `0 0 0 1px ${col.accent}44 inset` : "none" }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                          {/* Task input / display */}
-                          {isActive
-                            ? <input ref={taskInputRef} value={task} onChange={e => setCellTasks(t => ({ ...t, [k]: e.target.value }))}
-                                onClick={e => e.stopPropagation()}
-                                placeholder="כתוב משימה..."
-                                style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: `1px solid ${col.accent}55`, borderRadius: 5, color: "#fff", fontSize: 11, padding: "4px 6px", outline: "none", fontFamily: "inherit" }} />
-                            : task
-                              ? <div style={{ fontSize: 10, color: col.accent, fontWeight: 600, lineHeight: 1.3, marginBottom: 2, opacity: .9 }}>✓ {task.length > 30 ? task.slice(0,28)+"…" : task}</div>
-                              : <div style={{ fontSize: 9, color: "rgba(255,255,255,0.15)", textAlign: "center", padding: "2px 0" }}>לחץ לכתיבת משימה</div>
-                          }
-                          {/* People chips */}
-                          {people.map(p => (
-                            <div key={p} onClick={e => e.stopPropagation()} style={{ display: "flex", alignItems: "center", gap: 3, background: `${col.accent}1e`, border: `1px solid ${col.accent}44`, borderRadius: 5, padding: "3px 6px" }}>
-                              <span style={{ fontSize: 11, color: col.accent, fontWeight: 600, flex: 1, lineHeight: 1.2 }}>{p}</span>
-                              <button onClick={e => { e.stopPropagation(); rem(sys, c.key, p); }} style={{ background: "none", border: "none", color: col.accent, cursor: "pointer", fontSize: 13, padding: "0 1px", lineHeight: 1, opacity: .6, flexShrink: 0 }}>×</button>
-                            </div>
-                          ))}
-                          {!people.length && !task && !isActive && (
-                            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.08)", textAlign: "center" }}>—</div>
-                          )}
-                        </div>
-                      </td>
+                      <div key={p} draggable
+                        onDragStart={() => { setDragging(p); setSelected(null); }}
+                        onDragEnd={() => setDragging(null)}
+                        onClick={() => setSelected(isSel ? null : p)}
+                        style={{ padding: "6px 10px", border: `2px solid ${isSel ? pal(si).accent : pal(si).accent + "33"}`, borderRadius: 8, background: isSel ? `${pal(si).accent}28` : "rgba(255,255,255,0.03)", color: isSel ? pal(si).accent : "#9aa0b0", fontSize: 12, cursor: "grab", fontWeight: isSel ? 700 : 400, userSelect: "none", boxShadow: isSel ? `0 0 0 2px ${pal(si).accent}33` : "none", transition: "all .12s", opacity: dragging === p ? .35 : 1 }}>
+                        {isSel ? "✓ " : "⠿ "}{p}
+                      </div>
                     );
                   })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
-      {/* People Palette */}
-      <div style={{ flexShrink: 0, maxHeight: mob ? 195 : 165, overflowY: "auto", borderTop: "2px solid rgba(255,255,255,0.07)", background: "#090e1c", padding: "10px 14px 14px" }}>
-        <div style={{ fontSize: 10, color: "#556", fontWeight: 700, letterSpacing: .5, marginBottom: 8, textTransform: "uppercase" }}>
-          {selected ? `נבחר: ${selected} — לחץ תא לשיבוץ` : "אנשי צוות — גרור לתא | לחץ לבחירה"}
-        </div>
-        {getSections(data).map((sec, si) => sec.people.length === 0 ? null : (
-          <div key={sec.name} style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 10, color: pal(si).accent, fontWeight: 700, marginBottom: 5 }}>{sec.name}</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-              {sec.people.map(p => {
-                const isSel = selected === p;
+        {/* ── Grid ── */}
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", padding: "10px 10px 4px" }}>
+          <table style={{ borderCollapse: "separate", borderSpacing: 4, minWidth: mob ? 520 : 600 }}>
+            <thead>
+              <tr>
+                <th style={{ ...PTH, textAlign: "right", paddingRight: 10, width: mob ? 80 : 110 }}>מערכת</th>
+                {PLAN_COLS.map(c => (
+                  <th key={c.key} style={{ ...PTH, background: c.narrow ? "rgba(155,89,182,0.14)" : "rgba(74,158,255,0.08)", color: c.narrow ? "#9b59b6" : "#4a9eff", minWidth: c.narrow ? 58 : (mob ? 80 : 120), width: c.narrow ? 58 : undefined }}>
+                    {c.narrow || mob ? c.short : c.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.systems.map(sys => {
+                const col = sysMap[sys] || pal(0);
                 return (
-                  <div key={p} draggable
-                    onDragStart={() => { setDragging(p); setSelected(null); }}
-                    onDragEnd={() => setDragging(null)}
-                    onClick={() => setSelected(isSel ? null : p)}
-                    style={{ padding: "5px 12px", border: `2px solid ${isSel ? pal(si).accent : pal(si).accent + "44"}`, borderRadius: 20, background: isSel ? `${pal(si).accent}33` : "rgba(255,255,255,0.04)", color: isSel ? pal(si).accent : "#8892b0", fontSize: 13, cursor: "grab", fontWeight: isSel ? 700 : 400, userSelect: "none", boxShadow: isSel ? `0 0 0 3px ${pal(si).accent}33` : "none", transition: "all .12s", opacity: dragging === p ? .4 : 1 }}>
-                    {isSel && "✓ "}{p}
-                  </div>
+                  <tr key={sys}>
+                    <td style={{ ...PTD, background: col.dark, borderRight: `3px solid ${col.accent}`, fontWeight: 700, fontSize: mob ? 10 : 12, color: col.accent, maxWidth: mob ? 80 : 110, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sys}</td>
+                    {PLAN_COLS.map(c => {
+                      const k = ck(sys, c.key);
+                      const people = grid[k] || [];
+                      const task = cellTasks[k] || "";
+                      const isActive = activeCell === k;
+                      const isOver = dragOver === k;
+                      return (
+                        <td key={c.key}
+                          onDragOver={e => { e.preventDefault(); setDragOver(k); }}
+                          onDragLeave={() => { if (dragOver === k) setDragOver(null); }}
+                          onDrop={e => { e.preventDefault(); if (dragging) { add(sys, c.key, dragging); setDragging(null); setDragOver(null); if (!activeCell) activateCell(k); } }}
+                          onClick={() => handleCellClick(sys, c.key)}
+                          style={{ ...PTD, background: isActive ? `${col.accent}18` : isOver ? `${col.accent}28` : (c.narrow ? "rgba(155,89,182,0.05)" : (people.length || task ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.015)")), border: `2px solid ${isActive ? col.accent : isOver ? col.accent + "88" : (people.length || task ? col.accent + "33" : "rgba(255,255,255,0.07)")}`, verticalAlign: "top", cursor: selected ? "copy" : "pointer", minHeight: 44, width: c.narrow ? 58 : undefined, transition: "background .1s,border .1s", boxShadow: isActive ? `0 0 0 1px ${col.accent}44 inset` : "none" }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                            {isActive
+                              ? <input ref={taskInputRef} value={task} onChange={e => setCellTasks(t => ({ ...t, [k]: e.target.value }))}
+                                  onClick={e => e.stopPropagation()}
+                                  placeholder="כתוב משימה..."
+                                  style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: `1px solid ${col.accent}55`, borderRadius: 5, color: "#fff", fontSize: 11, padding: "4px 6px", outline: "none", fontFamily: "inherit" }} />
+                              : task
+                                ? <div style={{ fontSize: 10, color: col.accent, fontWeight: 600, lineHeight: 1.3, marginBottom: 2, opacity: .9 }}>✓ {task.length > 28 ? task.slice(0,26)+"…" : task}</div>
+                                : <div style={{ fontSize: 9, color: "rgba(255,255,255,0.12)", textAlign: "center", padding: "2px 0" }}>לחץ</div>
+                            }
+                            {people.map(p => (
+                              <div key={p} onClick={e => e.stopPropagation()} style={{ display: "flex", alignItems: "center", gap: 3, background: `${col.accent}1e`, border: `1px solid ${col.accent}44`, borderRadius: 5, padding: mob ? "2px 4px" : "3px 6px" }}>
+                                <span style={{ fontSize: mob ? 10 : 11, color: col.accent, fontWeight: 600, flex: 1, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p}</span>
+                                <button onClick={e => { e.stopPropagation(); rem(sys, c.key, p); }} style={{ background: "none", border: "none", color: col.accent, cursor: "pointer", fontSize: 13, padding: "0 1px", lineHeight: 1, opacity: .55, flexShrink: 0 }}>×</button>
+                              </div>
+                            ))}
+                            {!people.length && !task && !isActive && (
+                              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.07)", textAlign: "center" }}>—</div>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
                 );
               })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── Mobile bottom strip (horizontal scroll) ── */}
+      {mob && (
+        <div style={{ flexShrink: 0, borderTop: "2px solid rgba(255,255,255,0.07)", background: "#090e1c", padding: "8px 10px 12px" }}>
+          <div style={{ fontSize: 10, color: selected ? "#4a9eff" : "#445", fontWeight: 700, marginBottom: 6 }}>
+            {selected ? `✓ ${selected} — לחץ תא` : "בחר שם ← לחץ תא"}
+          </div>
+          <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", paddingBottom: 4, width: "max-content" }}>
+              {getSections(data).map((sec, si) => sec.people.length === 0 ? null : (
+                <div key={sec.name} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <span style={{ fontSize: 9, color: pal(si).accent, fontWeight: 700, whiteSpace: "nowrap", opacity: .8 }}>{sec.name.replace("מדור ", "").replace("משמרת ", "")}</span>
+                  <span style={{ color: "rgba(255,255,255,0.1)", fontSize: 14 }}>|</span>
+                  {sec.people.map(p => {
+                    const isSel = selected === p;
+                    return (
+                      <div key={p}
+                        onClick={() => setSelected(isSel ? null : p)}
+                        style={{ padding: "6px 12px", border: `2px solid ${isSel ? pal(si).accent : pal(si).accent + "44"}`, borderRadius: 20, background: isSel ? `${pal(si).accent}33` : "rgba(255,255,255,0.04)", color: isSel ? pal(si).accent : "#8892b0", fontSize: 13, cursor: "pointer", fontWeight: isSel ? 700 : 400, userSelect: "none", whiteSpace: "nowrap", boxShadow: isSel ? `0 0 0 3px ${pal(si).accent}33` : "none", transition: "all .12s" }}>
+                        {isSel ? "✓ " : ""}{p}
+                      </div>
+                    );
+                  })}
+                  <span style={{ color: "rgba(255,255,255,0.1)", fontSize: 14 }}>|</span>
+                </div>
+              ))}
             </div>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
