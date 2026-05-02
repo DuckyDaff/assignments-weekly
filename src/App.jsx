@@ -28,7 +28,7 @@ const ALL_DAYS = DAYS.map(d => d.key);
 const PALETTE = [
   { dark: "#0c2540", mid: "#1a3a5c", accent: "#4a9eff", soft: "#d0e8ff" },
   { dark: "#0c2e1a", mid: "#1a4a2b", accent: "#27ae60", soft: "#c8f0d8" },
-  { dark: "#2a0c3f", mid: "#3e1a5e", accent: "#9b59b6", soft: "#e8d0f8" },
+  { dark: "#2a0c3f", mid: "#3e1a5e", accent: "#3d7fc4", soft: "#e8d0f8" },
   { dark: "#3a1800", mid: "#5a2800", accent: "#e67e22", soft: "#fde8c8" },
   { dark: "#0c2d3a", mid: "#1a4456", accent: "#16a085", soft: "#c0ece4" },
   { dark: "#380c0c", mid: "#581a1a", accent: "#e74c3c", soft: "#fdd0ce" },
@@ -351,8 +351,8 @@ export default function App() {
         )}
         <header style={{ background: "linear-gradient(180deg,#0f1525 0%,#0a1020 100%)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 18px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 56, position: "sticky", top: 0, zIndex: 200, boxShadow: "0 2px 24px rgba(0,0,0,.6)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 32, height: 32, background: "linear-gradient(135deg,#4a9eff,#9b59b6)", borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 14 }}>ש</div>
-            {!mob && <span style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>מערכת שיבוצים</span>}
+            <img src="/logo.png" alt="לוגו" style={{ width: 42, height: 42, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
+            {!mob && <span style={{ fontWeight: 700, fontSize: 14, color: "#fff", letterSpacing: .3 }}>מערכת שיבוצים</span>}
           </div>
           <nav className="desktop-nav" style={{ display: "flex", gap: 1 }}>
             {TABS.map(t => (
@@ -378,7 +378,7 @@ export default function App() {
 
         <BottomNav tab={tab} setTab={setTab} TABS={TABS} />
         {mgr && (tab === "board" || tab === "calendar") && (
-          <button className="fab" onClick={openAdd} style={{ position: "fixed", left: 20, bottom: 80, width: 56, height: 56, borderRadius: 28, background: "linear-gradient(135deg,#4a9eff,#9b59b6)", border: "none", color: "#fff", fontSize: 28, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 6px 24px rgba(74,158,255,.5)", cursor: "pointer", zIndex: 150 }}>+</button>
+          <button className="fab" onClick={openAdd} style={{ position: "fixed", left: 20, bottom: 80, width: 56, height: 56, borderRadius: 28, background: "linear-gradient(135deg,#4a9eff,#3d7fc4)", border: "none", color: "#fff", fontSize: 28, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 6px 24px rgba(74,158,255,.5)", cursor: "pointer", zIndex: 150 }}>+</button>
         )}
         <ToastContainer toasts={toasts} />
       </div>
@@ -441,7 +441,7 @@ function StatsRow({ weekA }) {
   const st = [
     { l: "שיבוצים", v: weekA.length, c: "#4a9eff" },
     { l: "מערכות",  v: new Set(weekA.map(a => a.system)).size, c: "#27ae60" },
-    { l: "אנשים",   v: new Set(weekA.flatMap(a => a.assignees || [])).size, c: "#9b59b6" },
+    { l: "אנשים",   v: new Set(weekA.flatMap(a => a.assignees || [])).size, c: "#3d7fc4" },
     { l: "משימות",  v: weekA.reduce((n, a) => n + (a.tasks?.length || 0), 0), c: "#e67e22" },
   ];
   return (
@@ -594,7 +594,7 @@ function CalendarView({ wk, setWk, weekA, prevA, data, sysMap, mgr, onAdd, onEdi
           ))}
         </div>
         {mgr && !mob && <PillBtn onClick={onAdd}><I n="plus" s={13} />הוסף שיבוץ</PillBtn>}
-        {mgr && <PillBtn onClick={onPlan} color="#9b59b6"><I n="grid" s={13} />תכנן שבוע</PillBtn>}
+        {mgr && <PillBtn onClick={onPlan} color="#3d7fc4"><I n="grid" s={13} />תכנן שבוע</PillBtn>}
       </WeekNav>
       {weekA.length === 0 ? <EmptyWeek mgr={mgr} prevCount={prevA.length} onAdd={onAdd} onCopy={onCopy} /> : mob
         ? <CalendarMobile weekA={weekA} activeSys={activeSys} activePeople={activePeople} sysMap={sysMap} todayKey={todayKey} mode={mode} onView={onView} />
@@ -1098,15 +1098,15 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
           <button onClick={() => goWeek(-1)} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, padding: "5px 10px", color: "#8892b0", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>›</button>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>שבוע {planWk.split("-W")[1]}</div>
-            <div style={{ fontSize: 10, color: "#9b59b6" }}>{wLabel(planWk)}</div>
+            <div style={{ fontSize: 10, color: "#3d7fc4" }}>{wLabel(planWk)}</div>
           </div>
           <button onClick={() => goWeek(1)} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, padding: "5px 10px", color: "#8892b0", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>‹</button>
         </div>
-        <button onClick={handleSave} style={{ background: "linear-gradient(135deg,#4a9eff,#9b59b6)", border: "none", borderRadius: 9, padding: "8px 14px", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700, boxShadow: "0 3px 12px rgba(74,158,255,0.3)" }}>שמור ✓</button>
+        <button onClick={handleSave} style={{ background: "linear-gradient(135deg,#4a9eff,#3d7fc4)", border: "none", borderRadius: 9, padding: "8px 14px", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700, boxShadow: "0 3px 12px rgba(74,158,255,0.3)" }}>שמור ✓</button>
       </div>
 
       {/* Hint */}
-      <div style={{ background: "rgba(155,89,182,0.08)", borderBottom: "1px solid rgba(155,89,182,0.15)", padding: "5px 14px", fontSize: 11, color: "#9b59b6", textAlign: "center", flexShrink: 0 }}>{hintText}</div>
+      <div style={{ background: "rgba(61,127,196,0.08)", borderBottom: "1px solid rgba(61,127,196,0.15)", padding: "5px 14px", fontSize: 11, color: "#3d7fc4", textAlign: "center", flexShrink: 0 }}>{hintText}</div>
 
       {/* Body: sidebar (desktop) or grid-only (mobile) */}
       <div style={{ flex: 1, display: "flex", flexDirection: mob ? "column" : "row", overflow: "hidden" }}>
@@ -1146,7 +1146,7 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
               <tr>
                 <th style={{ ...PTH, textAlign: "right", paddingRight: 10, width: mob ? 80 : 110 }}>מערכת</th>
                 {PLAN_COLS.map(c => (
-                  <th key={c.key} style={{ ...PTH, background: c.narrow ? "rgba(155,89,182,0.14)" : "rgba(74,158,255,0.08)", color: c.narrow ? "#9b59b6" : "#4a9eff", minWidth: c.narrow ? 58 : (mob ? 80 : 120), width: c.narrow ? 58 : undefined }}>
+                  <th key={c.key} style={{ ...PTH, background: c.narrow ? "rgba(61,127,196,0.14)" : "rgba(74,158,255,0.08)", color: c.narrow ? "#3d7fc4" : "#4a9eff", minWidth: c.narrow ? 58 : (mob ? 80 : 120), width: c.narrow ? 58 : undefined }}>
                     {c.narrow || mob ? c.short : c.label}
                   </th>
                 ))}
@@ -1170,7 +1170,7 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
                           onDragLeave={() => { if (dragOver === k) setDragOver(null); }}
                           onDrop={e => { e.preventDefault(); if (dragging) { add(sys, c.key, dragging); setDragging(null); setDragOver(null); if (!activeCell) activateCell(k); } }}
                           onClick={() => handleCellClick(sys, c.key)}
-                          style={{ ...PTD, background: isActive ? `${col.accent}18` : isOver ? `${col.accent}28` : (c.narrow ? "rgba(155,89,182,0.05)" : (people.length || task ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.015)")), border: `2px solid ${isActive ? col.accent : isOver ? col.accent + "88" : (people.length || task ? col.accent + "33" : "rgba(255,255,255,0.07)")}`, verticalAlign: "top", cursor: selected ? "copy" : "pointer", minHeight: 44, width: c.narrow ? 58 : undefined, transition: "background .1s,border .1s", boxShadow: isActive ? `0 0 0 1px ${col.accent}44 inset` : "none" }}>
+                          style={{ ...PTD, background: isActive ? `${col.accent}18` : isOver ? `${col.accent}28` : (c.narrow ? "rgba(61,127,196,0.05)" : (people.length || task ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.015)")), border: `2px solid ${isActive ? col.accent : isOver ? col.accent + "88" : (people.length || task ? col.accent + "33" : "rgba(255,255,255,0.07)")}`, verticalAlign: "top", cursor: selected ? "copy" : "pointer", minHeight: 44, width: c.narrow ? 58 : undefined, transition: "background .1s,border .1s", boxShadow: isActive ? `0 0 0 1px ${col.accent}44 inset` : "none" }}>
                           <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                             {isActive
                               ? <input ref={taskInputRef} value={task} onChange={e => setCellTasks(t => ({ ...t, [k]: e.target.value }))}
@@ -1422,7 +1422,7 @@ function AuthModal({ pin, onOk, onClose }) {
           placeholder="● ● ● ●"
           style={{ ...inp, textAlign: "center", fontSize: 22, letterSpacing: 8, marginBottom: 10, border: `1px solid ${err ? "#e74c3c" : "rgba(255,255,255,0.12)"}`, background: err ? "rgba(231,76,60,0.08)" : "rgba(255,255,255,0.06)" }} />
         {err && <div style={{ color: "#e74c3c", fontSize: 12, marginBottom: 8, animation: "pulse .5s ease" }}>קוד שגוי, נסה שוב</div>}
-        <button onClick={try_} style={{ width: "100%", padding: "11px", background: "linear-gradient(135deg,#4a9eff,#9b59b6)", border: "none", borderRadius: 11, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", marginBottom: 8, boxShadow: "0 4px 16px rgba(74,158,255,.3)" }}>כניסה</button>
+        <button onClick={try_} style={{ width: "100%", padding: "11px", background: "linear-gradient(135deg,#4a9eff,#3d7fc4)", border: "none", borderRadius: 11, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", marginBottom: 8, boxShadow: "0 4px 16px rgba(74,158,255,.3)" }}>כניסה</button>
         <button onClick={onClose} style={{ width: "100%", padding: "9px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 11, color: "#8892b0", cursor: "pointer", fontSize: 13 }}>ביטול</button>
         <div style={{ marginTop: 12, fontSize: 10, color: "#334" }}>ברירת מחדל: 1234 · שנה בהגדרות → אבטחה</div>
       </div>
