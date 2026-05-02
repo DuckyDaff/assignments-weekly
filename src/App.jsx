@@ -256,6 +256,7 @@ export default function App() {
   const [filterPerson, setFilterPerson] = useState("");
   const [saveErr, setSaveErr] = useState(false);
   const [viewAssign, setViewAssign] = useState(null);
+  const [planner, setPlanner]       = useState(false);
 
   const toast = useCallback((msg, type = "success") => {
     const id = Date.now();
@@ -322,7 +323,7 @@ export default function App() {
     </div>
   );
 
-  const sysColorMap = Object.fromEntries(data.systems.map((s, i) => [s, pal(i)]));
+  const sysColorMap = Object.fromEntries(data.systems.map((s, i) => [s, pal(data.systemColors?.[s] ?? i)]));
   const TABS = [
     { id: "calendar", label: "לוח שבועי",    icon: "cal"  },
     { id: "board",    label: "לוח שיבוצים", icon: "grid" },
@@ -363,7 +364,7 @@ export default function App() {
 
         <main className="main-pad" style={{ flex: 1, padding: "20px 18px", maxWidth: 1320, margin: "0 auto", width: "100%" }}>
           {tab === "board"    && <BoardView    wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} filterPerson={filterPerson} setFilterPerson={setFilterPerson} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onDelete={deleteAssign} onCopy={copyFromPrev} onCSV={() => doExportCSV(wk, weekA)} onPrint={() => doPrint(wk, weekA, data.systems)} onView={a => setViewAssign(a)} />}
-          {tab === "calendar" && <CalendarView wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onCopy={copyFromPrev} onView={a => setViewAssign(a)} />}
+          {tab === "calendar" && <CalendarView wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onCopy={copyFromPrev} onView={a => setViewAssign(a)} onPlan={() => setPlanner(true)} />}
           {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} setMyName={n => { setMyName(n); sessionStorage.setItem("myName", n); }} onView={a => setViewAssign(a)} />}
           {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} toast={toast} />}
         </main>
@@ -377,6 +378,7 @@ export default function App() {
       {modal?.t === "assign" && <AssignModal mode={modal.mode} a={modal.a} wk={wk} data={data} sysMap={sysColorMap} onClose={() => setModal(null)} onSave={upsertAssign} />}
       {modal?.t === "auth"   && <AuthModal pin={data.pin} onOk={() => { setMgr(true); setModal(null); toast("ברוך הבא, מנהל", "info"); }} onClose={() => setModal(null)} />}
       {viewAssign && <AssignDetailModal a={viewAssign} sysMap={sysColorMap} mgr={mgr} onClose={() => setViewAssign(null)} onEdit={() => { setModal({ t: "assign", mode: "edit", a: viewAssign }); setViewAssign(null); }} onDelete={() => { deleteAssign(viewAssign.id); setViewAssign(null); }} />}
+      {planner && <PlannerView wk={wk} data={data} sysMap={sysColorMap} weekA={weekA} onClose={() => setPlanner(false)} onSave={assignments => { save({ ...data, assignments }, "שבוע תוכנן ✓"); setPlanner(false); }} />}
     </MobileCtx.Provider>
   );
 }
@@ -570,7 +572,7 @@ const ActionBtn = ({ onClick, color, title, children }) => (
 );
 
 /* ── CALENDAR VIEW ── */
-function CalendarView({ wk, setWk, weekA, prevA, data, sysMap, mgr, onAdd, onEdit, onCopy, onView }) {
+function CalendarView({ wk, setWk, weekA, prevA, data, sysMap, mgr, onAdd, onEdit, onCopy, onView, onPlan }) {
   const mob = useContext(MobileCtx);
   const [mode, setMode] = useState("sys");
   const todayKey     = todayDayKey();
@@ -585,6 +587,7 @@ function CalendarView({ wk, setWk, weekA, prevA, data, sysMap, mgr, onAdd, onEdi
           ))}
         </div>
         {mgr && !mob && <PillBtn onClick={onAdd}><I n="plus" s={13} />הוסף שיבוץ</PillBtn>}
+        {mgr && <PillBtn onClick={onPlan} color="#9b59b6"><I n="grid" s={13} />תכנן שבוע</PillBtn>}
       </WeekNav>
       {weekA.length === 0 ? <EmptyWeek mgr={mgr} prevCount={prevA.length} onAdd={onAdd} onCopy={onCopy} /> : mob
         ? <CalendarMobile weekA={weekA} activeSys={activeSys} activePeople={activePeople} sysMap={sysMap} todayKey={todayKey} mode={mode} onView={onView} />
@@ -842,9 +845,7 @@ function SettingsView({ data, save, mgr, toast }) {
           <button key={t.id} onClick={() => setSt(t.id)} style={{ flex: 1, padding: "7px 0", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: st === t.id ? 700 : 400, background: st === t.id ? "rgba(74,158,255,0.2)" : "transparent", color: st === t.id ? "#4a9eff" : "#8892b0" }}>{t.l}</button>
         ))}
       </div>
-      {st === "sys" && <ListEditor label="מערכות" items={data.systems} val={vSys} setVal={setVSys} ph="שם המערכת החדשה" color="#4a9eff"
-        onAdd={() => { if (!vSys.trim() || data.systems.includes(vSys.trim())) { toast("שם כבר קיים", "error"); return; } save({ ...data, systems: [...data.systems, vSys.trim()] }, "מערכת נוספה"); setVSys(""); }}
-        onRemove={n => save({ ...data, systems: data.systems.filter(s => s !== n) }, "מערכת הוסרה")} />}
+      {st === "sys" && <SystemsEditor data={data} save={save} toast={toast} vSys={vSys} setVSys={setVSys} />}
       {st === "ppl" && <SectionsEditor data={data} save={save} toast={toast} />}
       {st === "sec" && (
         <div>
@@ -910,6 +911,54 @@ function SectionsEditor({ data, save, toast }) {
   );
 }
 
+function SystemsEditor({ data, save, toast, vSys, setVSys }) {
+  const [colorPick, setColorPick] = useState(null); // system name being color-edited
+  const sysColors = data.systemColors || {};
+  const setColor = (sys, idx) => {
+    save({ ...data, systemColors: { ...sysColors, [sys]: idx } });
+    setColorPick(null);
+  };
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 7, marginBottom: 13 }}>
+        <input value={vSys} onChange={e => setVSys(e.target.value)} onKeyDown={e => e.key === "Enter" && (() => { if (!vSys.trim() || data.systems.includes(vSys.trim())) { toast("שם כבר קיים", "error"); return; } save({ ...data, systems: [...data.systems, vSys.trim()] }, "מערכת נוספה"); setVSys(""); })()} placeholder="שם המערכת החדשה" style={inp} />
+        <PillBtn onClick={() => { if (!vSys.trim() || data.systems.includes(vSys.trim())) { toast("שם כבר קיים", "error"); return; } save({ ...data, systems: [...data.systems, vSys.trim()] }, "מערכת נוספה"); setVSys(""); }} color="#4a9eff">הוסף</PillBtn>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        {data.systems.map((sys, i) => {
+          const idx = sysColors[sys] ?? i;
+          const col = pal(idx);
+          const open = colorPick === sys;
+          return (
+            <div key={sys}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 13px", background: "rgba(255,255,255,0.04)", border: `1px solid rgba(255,255,255,0.07)`, borderRight: `3px solid ${col.accent}`, borderRadius: open ? "9px 9px 0 0" : 9 }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.07)"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}>
+                <span style={{ fontSize: 13 }}>{sys}</span>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <button onClick={() => setColorPick(open ? null : sys)} title="בחר צבע"
+                    style={{ width: 22, height: 22, borderRadius: "50%", background: col.accent, border: `2px solid ${open ? "#fff" : "transparent"}`, cursor: "pointer", flexShrink: 0, transition: "border .15s" }} />
+                  <button onClick={() => save({ ...data, systems: data.systems.filter(s => s !== sys) }, "מערכת הוסרה")}
+                    style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", opacity: .7 }}
+                    onMouseEnter={e => e.currentTarget.style.opacity = "1"} onMouseLeave={e => e.currentTarget.style.opacity = ".7"}><I n="trash" s={14} /></button>
+                </div>
+              </div>
+              {open && (
+                <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderTop: "none", borderRadius: "0 0 9px 9px", padding: "10px 13px", display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <div style={{ fontSize: 10, color: "#8892b0", width: "100%", marginBottom: 4 }}>בחר צבע למערכת:</div>
+                  {PALETTE.map((p, pi) => (
+                    <button key={pi} onClick={() => setColor(sys, pi)} title={`צבע ${pi + 1}`}
+                      style={{ width: 30, height: 30, borderRadius: "50%", background: p.accent, border: `3px solid ${idx === pi ? "#fff" : "transparent"}`, cursor: "pointer", transition: "border .15s", boxShadow: idx === pi ? `0 0 0 2px ${p.accent}` : "none" }} />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ListEditor({ items, val, setVal, ph, color, onAdd, onRemove }) {
   return (
     <div>
@@ -928,6 +977,153 @@ function ListEditor({ items, val, setVal, ph, color, onAdd, onRemove }) {
     </div>
   );
 }
+
+/* ── PLANNER VIEW ── */
+const PLAN_COLS = [
+  { key: "sun",     label: "ראשון", short: "א׳", days: ["sun"]        },
+  { key: "mon",     label: "שני",   short: "ב׳", days: ["mon"]        },
+  { key: "tue",     label: "שלישי", short: "ג׳", days: ["tue"]        },
+  { key: "wed",     label: "רביעי", short: "ד׳", days: ["wed"]        },
+  { key: "thu",     label: "חמישי", short: "ה׳", days: ["thu"]        },
+  { key: "fri-sat", label: "ו׳-ש׳", short: "ו-ש", days: ["fri","sat"] },
+];
+
+function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
+  const mob = useContext(MobileCtx);
+
+  const initGrid = () => {
+    const g = {};
+    weekA.forEach(a => {
+      const days = a.days || [];
+      if (!days.length) return;
+      let col;
+      if (days.includes("fri") || days.includes("sat")) col = "fri-sat";
+      else if (days.length === 1) col = days[0];
+      else return;
+      const k = `${a.system}__${col}`;
+      g[k] = [...new Set([...(g[k] || []), ...(a.assignees || [])])];
+    });
+    return g;
+  };
+
+  const [grid, setGrid]     = useState(initGrid);
+  const [dragging, setDragging] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const [dragOver, setDragOver] = useState(null);
+
+  const ck  = (sys, col) => `${sys}__${col}`;
+  const add = (sys, col, p) => setGrid(g => { const k = ck(sys,col); return { ...g, [k]: [...new Set([...(g[k]||[]),p])] }; });
+  const rem = (sys, col, p) => setGrid(g => { const k = ck(sys,col); return { ...g, [k]: (g[k]||[]).filter(x=>x!==p) }; });
+
+  const handleSave = () => {
+    const otherWeeks = data.assignments.filter(a => a.week !== wk);
+    const newA = [];
+    data.systems.forEach(sys => {
+      PLAN_COLS.forEach(c => {
+        const people = grid[ck(sys, c.key)] || [];
+        if (!people.length) return;
+        const existing = weekA.find(a => a.system === sys && c.days.some(d => (a.days||[]).includes(d)));
+        newA.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2), week: wk, system: sys, days: c.days, assignees: people, tasks: existing?.tasks || [], notes: existing?.notes || "" });
+      });
+    });
+    onSave([...otherWeeks, ...newA]);
+  };
+
+  return (
+    <div dir="rtl" style={{ position: "fixed", inset: 0, background: "#080c18", zIndex: 400, display: "flex", flexDirection: "column", fontFamily: "'Segoe UI','Arial Hebrew',Arial,sans-serif", color: "#dde2f0" }}>
+      {/* Header */}
+      <div style={{ background: "#0f1525", borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "0 16px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, gap: 8 }}>
+        <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 9, padding: "7px 12px", color: "#8892b0", cursor: "pointer", fontSize: 13, whiteSpace: "nowrap" }}>✕ סגור</button>
+        <div style={{ textAlign: "center", flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>תכנון שבוע {wk.split("-W")[1]}</div>
+          <div style={{ fontSize: 10, color: "#9b59b6" }}>{wLabel(wk)}</div>
+        </div>
+        <button onClick={handleSave} style={{ background: "linear-gradient(135deg,#4a9eff,#9b59b6)", border: "none", borderRadius: 9, padding: "8px 14px", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700, boxShadow: "0 3px 12px rgba(74,158,255,0.3)", whiteSpace: "nowrap" }}>שמור ✓</button>
+      </div>
+
+      {/* Hint bar */}
+      <div style={{ background: "rgba(155,89,182,0.08)", borderBottom: "1px solid rgba(155,89,182,0.15)", padding: "5px 14px", fontSize: 11, color: "#9b59b6", textAlign: "center", flexShrink: 0 }}>
+        {selected ? `✓ נבחר: ${selected} — לחץ על תא לשיבוץ | לחץ שוב על השם לביטול` : (mob ? "לחץ שם → לחץ תא לשיבוץ • × להסרה" : "גרור שמות לתוך הטבלה • לחץ × להסרה")}
+      </div>
+
+      {/* Grid */}
+      <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", padding: "10px 10px 4px" }}>
+        <table style={{ borderCollapse: "separate", borderSpacing: 3, minWidth: mob ? 400 : 680, width: "100%" }}>
+          <thead>
+            <tr>
+              <th style={{ ...PTH, textAlign: "right", paddingRight: 10, width: mob ? 65 : 110, fontSize: mob ? 10 : 12 }}>מערכת</th>
+              {PLAN_COLS.map(c => (
+                <th key={c.key} style={{ ...PTH, background: c.key === "fri-sat" ? "rgba(155,89,182,0.14)" : "rgba(74,158,255,0.08)", color: c.key === "fri-sat" ? "#9b59b6" : "#4a9eff", fontSize: mob ? 10 : 12 }}>
+                  {mob ? c.short : c.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.systems.map(sys => {
+              const col = sysMap[sys] || pal(0);
+              return (
+                <tr key={sys}>
+                  <td style={{ ...PTD, background: col.dark, borderRight: `3px solid ${col.accent}`, fontWeight: 700, fontSize: mob ? 9 : 12, color: col.accent, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: mob ? 65 : 110 }}>{sys}</td>
+                  {PLAN_COLS.map(c => {
+                    const k = ck(sys, c.key);
+                    const people = grid[k] || [];
+                    const isOver = dragOver === k;
+                    const isWknd = c.key === "fri-sat";
+                    return (
+                      <td key={c.key}
+                        onDragOver={e => { e.preventDefault(); setDragOver(k); }}
+                        onDragLeave={() => { if (dragOver === k) setDragOver(null); }}
+                        onDrop={e => { e.preventDefault(); if (dragging) { add(sys, c.key, dragging); setDragging(null); setDragOver(null); } }}
+                        onClick={() => { if (selected) add(sys, c.key, selected); }}
+                        style={{ ...PTD, background: isOver ? `${col.accent}30` : (isWknd ? "rgba(155,89,182,0.05)" : (people.length ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.015)")), border: `1px solid ${isOver ? col.accent + "99" : (people.length ? col.accent + "30" : "rgba(255,255,255,0.06)")}`, verticalAlign: "top", cursor: selected ? "copy" : "default", minHeight: 40, transition: "background .1s,border .1s" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                          {people.map(p => (
+                            <div key={p} style={{ display: "flex", alignItems: "center", gap: 2, background: `${col.accent}22`, border: `1px solid ${col.accent}44`, borderRadius: 5, padding: mob ? "2px 4px" : "3px 6px" }}>
+                              <span style={{ fontSize: mob ? 9 : 11, color: col.accent, fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.split(" ")[0]}</span>
+                              <button onClick={e => { e.stopPropagation(); rem(sys, c.key, p); }} style={{ background: "none", border: "none", color: col.accent, cursor: "pointer", fontSize: 12, padding: 0, lineHeight: 1, opacity: .6, flexShrink: 0 }}>×</button>
+                            </div>
+                          ))}
+                          {!people.length && <div style={{ fontSize: 9, color: "rgba(255,255,255,0.1)", textAlign: "center", padding: "6px 0", userSelect: "none" }}>—</div>}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* People Palette */}
+      <div style={{ flexShrink: 0, maxHeight: mob ? 200 : 175, overflowY: "auto", borderTop: "2px solid rgba(255,255,255,0.07)", background: "#090e1c", padding: "10px 14px 16px" }}>
+        <div style={{ fontSize: 10, color: "#556", fontWeight: 700, letterSpacing: .5, marginBottom: 8, textTransform: "uppercase" }}>אנשי צוות</div>
+        {getSections(data).map((sec, si) => sec.people.length === 0 ? null : (
+          <div key={sec.name} style={{ marginBottom: 9 }}>
+            <div style={{ fontSize: 10, color: pal(si).accent, fontWeight: 700, marginBottom: 5 }}>{sec.name}</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {sec.people.map(p => {
+                const isSel = selected === p;
+                return (
+                  <div key={p} draggable
+                    onDragStart={() => { setDragging(p); setSelected(null); }}
+                    onDragEnd={() => setDragging(null)}
+                    onClick={() => setSelected(isSel ? null : p)}
+                    style={{ padding: mob ? "5px 10px" : "6px 13px", border: `2px solid ${isSel ? pal(si).accent : pal(si).accent + "44"}`, borderRadius: 20, background: isSel ? `${pal(si).accent}33` : "rgba(255,255,255,0.04)", color: isSel ? pal(si).accent : "#8892b0", fontSize: mob ? 12 : 13, cursor: "grab", fontWeight: isSel ? 700 : 400, userSelect: "none", boxShadow: isSel ? `0 0 0 3px ${pal(si).accent}33` : "none", transition: "all .12s", opacity: dragging === p ? .4 : 1 }}>
+                    {isSel && "✓ "}{p}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+const PTH = { padding: "7px 6px", textAlign: "center", borderRadius: 6, fontWeight: 600, background: "rgba(255,255,255,0.04)", color: "#8892b0" };
+const PTD = { padding: "4px 4px", borderRadius: 6, fontSize: 11 };
 
 /* ── ASSIGN DETAIL MODAL ── */
 function AssignDetailModal({ a, sysMap, mgr, onClose, onEdit, onDelete }) {
