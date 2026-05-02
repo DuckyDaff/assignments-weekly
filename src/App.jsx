@@ -1,4 +1,15 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, createContext, useContext } from "react";
+
+const MobileCtx = createContext(false);
+function useMobile() {
+  const [m, setM] = useState(() => window.innerWidth <= 768);
+  useEffect(() => {
+    const fn = () => setM(window.innerWidth <= 768);
+    window.addEventListener("resize", fn);
+    return () => window.removeEventListener("resize", fn);
+  }, []);
+  return m;
+}
 
 /* ═══════════════════════════════════════════════════════
    CONSTANTS & HELPERS
@@ -173,14 +184,26 @@ const I = ({ n, s = 17 }) => {
 const CSS = `
 @keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes slideIn{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes slideUpSheet{from{transform:translateY(100%)}to{transform:translateY(0)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-*{box-sizing:border-box}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 input,select,textarea{font-family:inherit}
 input::placeholder,textarea::placeholder{color:#445!important}
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:#111}
 ::-webkit-scrollbar-thumb{background:#334;border-radius:3px}
 button:focus-visible{outline:2px solid #4a9eff;outline-offset:2px}
+button{touch-action:manipulation}
+@media(max-width:768px){
+  .desktop-nav{display:none!important}
+  .main-pad{padding:12px 12px 80px!important}
+  .week-nav-row{flex-direction:column;align-items:flex-start;gap:8px}
+  .week-nav-actions{width:100%;justify-content:flex-start}
+}
+@media(min-width:769px){
+  .bottom-nav{display:none!important}
+  .fab{display:none!important}
+}
 `;
 
 const inp = { width: "100%", padding: "10px 13px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 9, color: "#e8eaf0", fontSize: 13, outline: "none", transition: "border-color .15s" };
@@ -205,6 +228,12 @@ function PillBtn({ children, onClick, color = "#4a9eff", ghost = false, small = 
 }
 
 function Overlay({ onClose, children, wide = false }) {
+  const mob = useContext(MobileCtx);
+  if (mob) return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(5,8,18,.7)", backdropFilter: "blur(4px)", zIndex: 300, display: "flex", alignItems: "flex-end" }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ animation: "slideUpSheet .25s ease", width: "100%", maxHeight: "92dvh", overflowY: "auto", borderRadius: "20px 20px 0 0" }}>{children}</div>
+    </div>
+  );
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(5,8,18,.8)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300, padding: 16 }} onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ animation: "slideIn .2s ease", width: "100%", maxWidth: wide ? 680 : 520 }}>{children}</div>
@@ -216,6 +245,7 @@ function Overlay({ onClose, children, wide = false }) {
    MAIN APP
 ═══════════════════════════════════════════════════════ */
 export default function App() {
+  const mob = useMobile();
   const [data, setData]     = useState(null);
   const [tab, setTab]       = useState("calendar");
   const [wk, setWk]         = useState(wKey(new Date()));
@@ -225,6 +255,7 @@ export default function App() {
   const [toasts, setToasts] = useState([]);
   const [filterPerson, setFilterPerson] = useState("");
   const [saveErr, setSaveErr] = useState(false);
+  const [viewAssign, setViewAssign] = useState(null);
 
   const toast = useCallback((msg, type = "success") => {
     const id = Date.now();
@@ -299,8 +330,10 @@ export default function App() {
     { id: "settings", label: "הגדרות",       icon: "cog"  },
   ];
 
+  const openAdd = () => setModal({ t: "assign", mode: "add" });
+
   return (
-    <>
+    <MobileCtx.Provider value={mob}>
       <style>{CSS}</style>
       <div dir="rtl" style={{ minHeight: "100vh", background: "#080c18", color: "#dde2f0", fontFamily: "'Segoe UI','Arial Hebrew',Arial,sans-serif", display: "flex", flexDirection: "column" }}>
         {saveErr && (
@@ -308,12 +341,12 @@ export default function App() {
             ⚠ שגיאת חיבור לשרת — השינויים לא נשמרים
           </div>
         )}
-        <header style={{ background: "linear-gradient(180deg,#0f1525 0%,#0a1020 100%)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 18px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 58, position: "sticky", top: 0, zIndex: 200, boxShadow: "0 2px 24px rgba(0,0,0,.6)" }}>
+        <header style={{ background: "linear-gradient(180deg,#0f1525 0%,#0a1020 100%)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 18px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 56, position: "sticky", top: 0, zIndex: 200, boxShadow: "0 2px 24px rgba(0,0,0,.6)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 34, height: 34, background: "linear-gradient(135deg,#4a9eff,#9b59b6)", borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 14 }}>ש</div>
-            <span style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>מערכת שיבוצים</span>
+            <div style={{ width: 32, height: 32, background: "linear-gradient(135deg,#4a9eff,#9b59b6)", borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 14 }}>ש</div>
+            {!mob && <span style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>מערכת שיבוצים</span>}
           </div>
-          <nav style={{ display: "flex", gap: 1 }}>
+          <nav className="desktop-nav" style={{ display: "flex", gap: 1 }}>
             {TABS.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 11px", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: tab === t.id ? 700 : 400, background: tab === t.id ? "rgba(74,158,255,0.14)" : "transparent", color: tab === t.id ? "#4a9eff" : "#7a8499", transition: "all .15s", position: "relative" }}>
                 <I n={t.icon} s={13} />{t.label}
@@ -321,44 +354,72 @@ export default function App() {
               </button>
             ))}
           </nav>
+          {mob && <span style={{ fontWeight: 700, fontSize: 15, color: "#fff" }}>{TABS.find(t => t.id === tab)?.label}</span>}
           <button onClick={() => { if (mgr) setMgr(false); else setModal({ t: "auth" }); }}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 13px", border: `1px solid ${mgr ? "rgba(39,174,96,.4)" : "rgba(255,255,255,.1)"}`, borderRadius: 9, background: mgr ? "rgba(39,174,96,.1)" : "rgba(255,255,255,.04)", color: mgr ? "#2ecc71" : "#8892b0", cursor: "pointer", fontSize: 12, fontWeight: mgr ? 700 : 400, transition: "all .2s" }}>
-            <I n={mgr ? "unlock" : "lock"} s={14} />{mgr ? "מנהל פעיל" : "כניסת מנהל"}
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 11px", border: `1px solid ${mgr ? "rgba(39,174,96,.4)" : "rgba(255,255,255,.1)"}`, borderRadius: 9, background: mgr ? "rgba(39,174,96,.1)" : "rgba(255,255,255,.04)", color: mgr ? "#2ecc71" : "#8892b0", cursor: "pointer", fontSize: 12, fontWeight: mgr ? 700 : 400, transition: "all .2s", minHeight: 36 }}>
+            <I n={mgr ? "unlock" : "lock"} s={14} />{mob ? (mgr ? "מנהל" : "") : (mgr ? "מנהל פעיל" : "כניסת מנהל")}
           </button>
         </header>
 
-        <main style={{ flex: 1, padding: "20px 18px", maxWidth: 1320, margin: "0 auto", width: "100%" }}>
-          {tab === "board"    && <BoardView    wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} filterPerson={filterPerson} setFilterPerson={setFilterPerson} onAdd={() => setModal({ t: "assign", mode: "add" })} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onDelete={deleteAssign} onCopy={copyFromPrev} onCSV={() => doExportCSV(wk, weekA)} onPrint={() => doPrint(wk, weekA, data.systems)} />}
-          {tab === "calendar" && <CalendarView wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} onAdd={() => setModal({ t: "assign", mode: "add" })} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onCopy={copyFromPrev} />}
-          {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} setMyName={n => { setMyName(n); sessionStorage.setItem("myName", n); }} />}
+        <main className="main-pad" style={{ flex: 1, padding: "20px 18px", maxWidth: 1320, margin: "0 auto", width: "100%" }}>
+          {tab === "board"    && <BoardView    wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} filterPerson={filterPerson} setFilterPerson={setFilterPerson} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onDelete={deleteAssign} onCopy={copyFromPrev} onCSV={() => doExportCSV(wk, weekA)} onPrint={() => doPrint(wk, weekA, data.systems)} onView={a => setViewAssign(a)} />}
+          {tab === "calendar" && <CalendarView wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onCopy={copyFromPrev} onView={a => setViewAssign(a)} />}
+          {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} setMyName={n => { setMyName(n); sessionStorage.setItem("myName", n); }} onView={a => setViewAssign(a)} />}
           {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} toast={toast} />}
         </main>
+
+        <BottomNav tab={tab} setTab={setTab} TABS={TABS} />
+        {mgr && (tab === "board" || tab === "calendar") && (
+          <button className="fab" onClick={openAdd} style={{ position: "fixed", left: 20, bottom: 80, width: 56, height: 56, borderRadius: 28, background: "linear-gradient(135deg,#4a9eff,#9b59b6)", border: "none", color: "#fff", fontSize: 28, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 6px 24px rgba(74,158,255,.5)", cursor: "pointer", zIndex: 150 }}>+</button>
+        )}
         <ToastContainer toasts={toasts} />
       </div>
       {modal?.t === "assign" && <AssignModal mode={modal.mode} a={modal.a} wk={wk} data={data} sysMap={sysColorMap} onClose={() => setModal(null)} onSave={upsertAssign} />}
       {modal?.t === "auth"   && <AuthModal pin={data.pin} onOk={() => { setMgr(true); setModal(null); toast("ברוך הבא, מנהל", "info"); }} onClose={() => setModal(null)} />}
-    </>
+      {viewAssign && <AssignDetailModal a={viewAssign} sysMap={sysColorMap} mgr={mgr} onClose={() => setViewAssign(null)} onEdit={() => { setModal({ t: "assign", mode: "edit", a: viewAssign }); setViewAssign(null); }} onDelete={() => { deleteAssign(viewAssign.id); setViewAssign(null); }} />}
+    </MobileCtx.Provider>
+  );
+}
+
+/* ── BOTTOM NAV (mobile) ── */
+function BottomNav({ tab, setTab, TABS }) {
+  return (
+    <nav className="bottom-nav" style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#0f1525", borderTop: "1px solid rgba(255,255,255,0.09)", display: "flex", zIndex: 200, paddingBottom: "env(safe-area-inset-bottom,0px)" }}>
+      {TABS.map(t => {
+        const active = tab === t.id;
+        return (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "10px 4px 8px", border: "none", background: "transparent", color: active ? "#4a9eff" : "#556", cursor: "pointer", fontSize: 10, fontWeight: active ? 700 : 400, transition: "color .15s", minHeight: 56 }}>
+            <I n={t.icon} s={active ? 21 : 19} />
+            {t.label}
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 
 /* ── WEEK NAV ── */
 function WeekNav({ wk, setWk, children }) {
+  const mob = useContext(MobileCtx);
   const isToday = wk === wKey(new Date());
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <NavBtn onClick={() => setWk(adjW(wk, -1))}><I n="cR" s={15} /></NavBtn>
-        <div style={{ textAlign: "center", minWidth: 165 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
-            <span style={{ fontWeight: 700, fontSize: 17, color: "#fff" }}>שבוע {wk.split("-W")[1]}</span>
-            {isToday && <span style={{ background: "rgba(74,158,255,0.2)", color: "#4a9eff", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, border: "1px solid rgba(74,158,255,0.3)" }}>עכשיו</span>}
+    <div style={{ marginBottom: mob ? 12 : 18 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <NavBtn onClick={() => setWk(adjW(wk, -1))}><I n="cR" s={15} /></NavBtn>
+          <div style={{ textAlign: "center", minWidth: mob ? 120 : 165 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
+              <span style={{ fontWeight: 700, fontSize: mob ? 15 : 17, color: "#fff" }}>שבוע {wk.split("-W")[1]}</span>
+              {isToday && <span style={{ background: "rgba(74,158,255,0.2)", color: "#4a9eff", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 20, border: "1px solid rgba(74,158,255,0.3)" }}>עכשיו</span>}
+            </div>
+            <div style={{ fontSize: 10, color: "#8892b0", marginTop: 1 }}>{wLabel(wk)}</div>
           </div>
-          <div style={{ fontSize: 11, color: "#8892b0", marginTop: 1 }}>{wLabel(wk)}</div>
+          <NavBtn onClick={() => setWk(adjW(wk, 1))}><I n="cL" s={15} /></NavBtn>
+          {!isToday && <button onClick={() => setWk(wKey(new Date()))} style={{ padding: "4px 9px", border: "1px solid rgba(74,158,255,.3)", borderRadius: 8, background: "rgba(74,158,255,.1)", color: "#4a9eff", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>היום</button>}
         </div>
-        <NavBtn onClick={() => setWk(adjW(wk, 1))}><I n="cL" s={15} /></NavBtn>
-        {!isToday && <button onClick={() => setWk(wKey(new Date()))} style={{ padding: "4px 11px", border: "1px solid rgba(74,158,255,.3)", borderRadius: 8, background: "rgba(74,158,255,.1)", color: "#4a9eff", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>חזור להיום</button>}
+        {!mob && <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>{children}</div>}
       </div>
-      <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>{children}</div>
+      {mob && children && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>{children}</div>}
     </div>
   );
 }
@@ -404,8 +465,8 @@ function EmptyWeek({ mgr, prevCount, onAdd, onCopy }) {
 }
 
 /* ── BOARD VIEW ── */
-function BoardView({ wk, setWk, weekA, prevA, data, sysMap, mgr, filterPerson, setFilterPerson, onAdd, onEdit, onDelete, onCopy, onCSV, onPrint }) {
-  const allPeople = getAllPeople(data);
+function BoardView({ wk, setWk, weekA, prevA, data, sysMap, mgr, filterPerson, setFilterPerson, onAdd, onEdit, onDelete, onCopy, onCSV, onPrint, onView }) {
+  const mob = useContext(MobileCtx);
   const filtered = filterPerson ? weekA.filter(a => (a.assignees || []).includes(filterPerson)) : weekA;
   return (
     <div>
@@ -422,9 +483,9 @@ function BoardView({ wk, setWk, weekA, prevA, data, sysMap, mgr, filterPerson, s
           </select>
           <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: filterPerson ? "#4a9eff" : "#8892b0", pointerEvents: "none" }}><I n="filter" s={12} /></span>
         </div>
-        <PillBtn ghost onClick={onPrint} small><I n="print" s={13} />הדפסה</PillBtn>
-        <PillBtn ghost onClick={onCSV}   small><I n="dl"    s={13} />Excel</PillBtn>
-        {mgr && <PillBtn onClick={onAdd}><I n="plus" s={14} />הוסף שיבוץ</PillBtn>}
+        {!mob && <PillBtn ghost onClick={onPrint} small><I n="print" s={13} />הדפסה</PillBtn>}
+        {!mob && <PillBtn ghost onClick={onCSV}   small><I n="dl"    s={13} />Excel</PillBtn>}
+        {mgr && !mob && <PillBtn onClick={onAdd}><I n="plus" s={14} />הוסף שיבוץ</PillBtn>}
       </WeekNav>
       <StatsRow weekA={weekA} />
       {weekA.length === 0
@@ -436,8 +497,8 @@ function BoardView({ wk, setWk, weekA, prevA, data, sysMap, mgr, filterPerson, s
               <button onClick={() => setFilterPerson("")} style={{ background: "none", border: "none", color: "#4a9eff", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>הצג הכל ×</button>
             </div>
           )}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(290px,1fr))", gap: 12 }}>
-            {filtered.map(a => <BoardCard key={a.id} a={a} col={sysMap[a.system] || pal(0)} mgr={mgr} onEdit={() => onEdit(a)} onDelete={() => onDelete(a.id)} />)}
+          <div style={{ display: "grid", gridTemplateColumns: mob ? "1fr" : "repeat(auto-fill,minmax(290px,1fr))", gap: mob ? 8 : 12 }}>
+            {filtered.map(a => <BoardCard key={a.id} a={a} col={sysMap[a.system] || pal(0)} mgr={mgr} onEdit={() => onEdit(a)} onDelete={() => onDelete(a.id)} onView={() => onView(a)} />)}
           </div>
         </>
       }
@@ -446,7 +507,7 @@ function BoardView({ wk, setWk, weekA, prevA, data, sysMap, mgr, filterPerson, s
 }
 
 /* ── BOARD CARD ── */
-function BoardCard({ a, col, mgr, onEdit, onDelete }) {
+function BoardCard({ a, col, mgr, onEdit, onDelete, onView }) {
   const [exp, setExp]           = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const tasks    = a.tasks || [];
@@ -454,7 +515,7 @@ function BoardCard({ a, col, mgr, onEdit, onDelete }) {
   const todayKey = todayDayKey();
   const activeToday = !a.days || a.days.length === 0 || a.days.includes(todayKey);
   return (
-    <div style={{ background: "rgba(255,255,255,0.035)", border: `1px solid ${activeToday ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)"}`, borderTop: `3px solid ${col.accent}`, borderRadius: 13, overflow: "hidden", transition: "transform .15s,box-shadow .15s" }}
+    <div onClick={e => { if (!e.defaultPrevented) onView(); }} style={{ background: "rgba(255,255,255,0.035)", border: `1px solid ${activeToday ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)"}`, borderTop: `3px solid ${col.accent}`, borderRadius: 13, overflow: "hidden", transition: "transform .15s,box-shadow .15s", cursor: "pointer" }}
       onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 10px 32px rgba(0,0,0,.45)"; }}
       onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}>
       <div style={{ background: col.dark, padding: "11px 13px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -467,15 +528,15 @@ function BoardCard({ a, col, mgr, onEdit, onDelete }) {
         </div>
         {mgr && !confirmDel && (
           <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-            <ActionBtn onClick={onEdit} color={col.accent} title="עריכה"><I n="edit" s={12} /></ActionBtn>
-            <ActionBtn onClick={() => setConfirmDel(true)} color="#e74c3c" title="מחיקה"><I n="trash" s={12} /></ActionBtn>
+            <ActionBtn onClick={e => { e.preventDefault(); onEdit(); }} color={col.accent} title="עריכה"><I n="edit" s={12} /></ActionBtn>
+            <ActionBtn onClick={e => { e.preventDefault(); setConfirmDel(true); }} color="#e74c3c" title="מחיקה"><I n="trash" s={12} /></ActionBtn>
           </div>
         )}
         {confirmDel && (
-          <div style={{ display: "flex", gap: 4, alignItems: "center", flexShrink: 0 }}>
+          <div onClick={e => e.preventDefault()} style={{ display: "flex", gap: 4, alignItems: "center", flexShrink: 0 }}>
             <span style={{ fontSize: 10, color: "#e74c3c" }}>למחוק?</span>
-            <button onClick={() => { onDelete(); setConfirmDel(false); }} style={{ padding: "3px 9px", background: "#c0392b", border: "none", borderRadius: 6, color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>כן</button>
-            <button onClick={() => setConfirmDel(false)} style={{ padding: "3px 9px", background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 6, color: "#aaa", fontSize: 11, cursor: "pointer" }}>לא</button>
+            <button onClick={e => { e.preventDefault(); onDelete(); setConfirmDel(false); }} style={{ padding: "3px 9px", background: "#c0392b", border: "none", borderRadius: 6, color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>כן</button>
+            <button onClick={e => { e.preventDefault(); setConfirmDel(false); }} style={{ padding: "3px 9px", background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 6, color: "#aaa", fontSize: 11, cursor: "pointer" }}>לא</button>
           </div>
         )}
       </div>
@@ -509,7 +570,8 @@ const ActionBtn = ({ onClick, color, title, children }) => (
 );
 
 /* ── CALENDAR VIEW ── */
-function CalendarView({ wk, setWk, weekA, prevA, data, sysMap, mgr, onAdd, onEdit, onCopy }) {
+function CalendarView({ wk, setWk, weekA, prevA, data, sysMap, mgr, onAdd, onEdit, onCopy, onView }) {
+  const mob = useContext(MobileCtx);
   const [mode, setMode] = useState("sys");
   const todayKey     = todayDayKey();
   const activeSys    = [...new Set(data.systems.filter(s => weekA.some(a => a.system === s)))];
@@ -522,18 +584,18 @@ function CalendarView({ wk, setWk, weekA, prevA, data, sysMap, mgr, onAdd, onEdi
             <button key={m.id} onClick={() => setMode(m.id)} style={{ padding: "4px 12px", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: mode === m.id ? 700 : 400, background: mode === m.id ? "rgba(74,158,255,0.2)" : "transparent", color: mode === m.id ? "#4a9eff" : "#8892b0" }}>{m.l}</button>
           ))}
         </div>
-        {mgr && <PillBtn onClick={onAdd}><I n="plus" s={13} />הוסף שיבוץ</PillBtn>}
+        {mgr && !mob && <PillBtn onClick={onAdd}><I n="plus" s={13} />הוסף שיבוץ</PillBtn>}
       </WeekNav>
       {weekA.length === 0 ? <EmptyWeek mgr={mgr} prevCount={prevA.length} onAdd={onAdd} onCopy={onCopy} /> : (
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 3, minWidth: 580 }}>
+          <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 3, minWidth: mob ? 440 : 580 }}>
             <thead>
               <tr>
-                <th style={{ ...TH, width: 130, textAlign: "right", paddingRight: 14 }}>{mode === "sys" ? "מערכת" : "שם"}</th>
+                <th style={{ ...TH, width: mob ? 80 : 130, textAlign: "right", paddingRight: mob ? 8 : 14, fontSize: mob ? 11 : 12 }}>{mode === "sys" ? "מערכת" : "שם"}</th>
                 {DAYS.map(d => {
                   const isToday = d.key === todayKey;
-                  return <th key={d.key} style={{ ...TH, background: isToday ? "rgba(74,158,255,0.18)" : "rgba(255,255,255,0.05)", color: isToday ? "#4a9eff" : "#8892b0", border: isToday ? "1px solid rgba(74,158,255,0.3)" : "1px solid transparent" }}>
-                    {d.long}{isToday && <span style={{ display: "block", fontSize: 8, fontWeight: 700 }}>היום</span>}
+                  return <th key={d.key} style={{ ...TH, background: isToday ? "rgba(74,158,255,0.18)" : "rgba(255,255,255,0.05)", color: isToday ? "#4a9eff" : "#8892b0", border: isToday ? "1px solid rgba(74,158,255,0.3)" : "1px solid transparent", fontSize: mob ? 10 : 12, padding: mob ? "6px 4px" : "8px 10px" }}>
+                    {mob ? d.short : d.long}{isToday && <span style={{ display: "block", fontSize: 8, fontWeight: 700 }}>היום</span>}
                   </th>;
                 })}
               </tr>
@@ -542,31 +604,33 @@ function CalendarView({ wk, setWk, weekA, prevA, data, sysMap, mgr, onAdd, onEdi
               {mode === "sys" ? activeSys.map((sys, si) => {
                 const col = sysMap[sys] || pal(si);
                 const sysA = weekA.filter(a => a.system === sys);
+                const allTasks = [...new Set(sysA.flatMap(a => a.tasks || []))];
                 return (
                   <tr key={sys}>
-                    <td style={{ ...TD, background: col.dark, borderRight: `3px solid ${col.accent}`, fontWeight: 700, fontSize: 13, color: "#fff", cursor: mgr ? "pointer" : "default" }} onClick={mgr && sysA.length > 0 ? () => onEdit(sysA[0]) : undefined}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <span>{sys}</span>
-                        {mgr && sysA.length > 0 && <span style={{ opacity: .5 }}><I n="edit" s={11} /></span>}
-                      </div>
+                    <td style={{ ...TD, background: col.dark, borderRight: `3px solid ${col.accent}`, fontWeight: 700, fontSize: mob ? 11 : 13, color: "#fff", cursor: "pointer", padding: mob ? "6px 8px" : "7px 9px" }} onClick={() => onView(sysA[0])}>
+                      <div>{sys}</div>
+                      {allTasks.length > 0 && !mob && <div style={{ fontSize: 9, color: col.accent, fontWeight: 400, marginTop: 3, opacity: .8 }}>{allTasks.length} משימות</div>}
                     </td>
                     {DAYS.map(({ key }) => {
                       const isToday = key === todayKey;
-                      const people = [...new Set(sysA.filter(a => !a.days || a.days.length === 0 || a.days.includes(key)).flatMap(a => a.assignees || []))];
-                      return <td key={key} style={{ ...TD, background: isToday ? `${col.accent}14` : (people.length ? "rgba(255,255,255,0.04)" : "transparent"), border: isToday ? `1px solid ${col.accent}33` : "1px solid transparent", verticalAlign: "top" }}>
+                      const dayA = sysA.filter(a => !a.days || a.days.length === 0 || a.days.includes(key));
+                      const people = [...new Set(dayA.flatMap(a => a.assignees || []))];
+                      const dayTasks = [...new Set(dayA.flatMap(a => a.tasks || []))];
+                      return <td key={key} onClick={() => dayA.length > 0 && onView(dayA[0])} style={{ ...TD, background: isToday ? `${col.accent}14` : (people.length ? "rgba(255,255,255,0.04)" : "transparent"), border: isToday ? `1px solid ${col.accent}33` : "1px solid transparent", verticalAlign: "top", cursor: people.length ? "pointer" : "default", padding: mob ? "5px 4px" : "7px 9px" }}>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>{people.map(p => <Chip key={p} label={p} color={col.accent} />)}</div>
+                        {dayTasks.length > 0 && !mob && <div style={{ marginTop: 4 }}>{dayTasks.slice(0, 2).map((t, i) => <div key={i} style={{ fontSize: 10, color: "#8892b0", marginTop: 2, display: "flex", gap: 4, alignItems: "flex-start" }}><span style={{ color: col.accent, flexShrink: 0 }}>✓</span><span style={{ lineHeight: 1.3 }}>{t.length > 28 ? t.slice(0, 26) + "…" : t}</span></div>)}{dayTasks.length > 2 && <div style={{ fontSize: 9, color: "#556", marginTop: 2 }}>+{dayTasks.length - 2} משימות</div>}</div>}
                       </td>;
                     })}
                   </tr>
                 );
               }) : activePeople.map(person => (
                 <tr key={person}>
-                  <td style={{ ...TD, fontWeight: 600, fontSize: 13, color: "#ccd6f6", background: "rgba(255,255,255,0.03)", borderRight: "3px solid rgba(255,255,255,0.15)" }}>{person}</td>
+                  <td style={{ ...TD, fontWeight: 600, fontSize: mob ? 11 : 13, color: "#ccd6f6", background: "rgba(255,255,255,0.03)", borderRight: "3px solid rgba(255,255,255,0.15)", padding: mob ? "6px 8px" : "7px 9px" }}>{person}</td>
                   {DAYS.map(({ key }) => {
                     const isToday = key === todayKey;
                     const active = weekA.filter(a => (a.assignees || []).includes(person) && (!a.days || a.days.length === 0 || a.days.includes(key)));
-                    return <td key={key} style={{ ...TD, background: isToday && active.length ? "rgba(74,158,255,0.1)" : (active.length ? "rgba(255,255,255,0.04)" : "transparent"), border: isToday ? "1px solid rgba(74,158,255,0.25)" : "1px solid transparent", verticalAlign: "top" }}>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>{active.map(a => { const c = sysMap[a.system] || pal(0); return <Chip key={a.id} label={a.system} color={c.accent} />; })}</div>
+                    return <td key={key} onClick={() => active.length > 0 && onView(active[0])} style={{ ...TD, background: isToday && active.length ? "rgba(74,158,255,0.1)" : (active.length ? "rgba(255,255,255,0.04)" : "transparent"), border: isToday ? "1px solid rgba(74,158,255,0.25)" : "1px solid transparent", verticalAlign: "top", cursor: active.length ? "pointer" : "default", padding: mob ? "5px 4px" : "7px 9px" }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>{active.map(a => { const c = sysMap[a.system] || pal(0); const tasks = a.tasks || []; return <div key={a.id}><Chip label={a.system} color={c.accent} />{tasks.length > 0 && !mob && <div style={{ fontSize: 10, color: "#8892b0", marginTop: 2, paddingRight: 2 }}>{tasks.slice(0,1).map((t,i)=><span key={i} style={{ color: c.accent, fontSize: 9 }}>✓ {t.length>24?t.slice(0,22)+"…":t}</span>)}</div>}</div>; })}</div>
                     </td>;
                   })}
                 </tr>
@@ -582,7 +646,7 @@ const TH = { padding: "8px 10px", textAlign: "center", borderRadius: 7, fontSize
 const TD = { padding: "7px 9px", borderRadius: 7, fontSize: 12, minHeight: 36 };
 
 /* ── MY VIEW ── */
-function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName }) {
+function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName, onView }) {
   const todayKey      = todayDayKey();
   const isTodayWork   = isWorkDay(todayKey);
   const isCurrentWeek = wk === wKey(new Date());
@@ -600,7 +664,7 @@ function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName }) {
               <div style={{ fontSize: 10, color: pal(si).accent, fontWeight: 700, letterSpacing: .5, marginBottom: 6, textTransform: "uppercase" }}>{sec.name}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {sec.people.map(p => (
-                  <button key={p} onClick={() => setMyName(p)} style={{ padding: "7px 14px", border: `1px solid ${myName === p ? pal(si).accent : "rgba(255,255,255,0.1)"}`, borderRadius: 20, background: myName === p ? `${pal(si).accent}22` : "rgba(255,255,255,0.04)", color: myName === p ? pal(si).accent : "#8892b0", fontSize: 12, cursor: "pointer", fontWeight: myName === p ? 700 : 400 }}>
+                  <button key={p} onClick={() => setMyName(myName === p ? "" : p)} style={{ padding: "7px 14px", border: `1px solid ${myName === p ? pal(si).accent : "rgba(255,255,255,0.1)"}`, borderRadius: 20, background: myName === p ? `${pal(si).accent}22` : "rgba(255,255,255,0.04)", color: myName === p ? pal(si).accent : "#8892b0", fontSize: 12, cursor: "pointer", fontWeight: myName === p ? 700 : 400 }}>
                     {myName === p && "● "}{p}
                   </button>
                 ))}
@@ -617,7 +681,7 @@ function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName }) {
             <I n="sun" s={14} /><span style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>היום — {DAYS.find(d => d.key === todayKey)?.long}</span>
             <span style={{ background: "rgba(74,158,255,0.2)", color: "#4a9eff", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, border: "1px solid rgba(74,158,255,0.3)" }}>עכשיו</span>
           </div>
-          {todayMine.map((a, i) => <AssignRow key={a.id} a={a} col={sysMap[a.system] || pal(i)} highlight />)}
+          {todayMine.map((a, i) => <AssignRow key={a.id} a={a} col={sysMap[a.system] || pal(i)} highlight onView={() => onView(a)} />)}
         </div>
       )}
       {myName && mine.length > 0 && todayMine.length === 0 && isCurrentWeek && isTodayWork && (
@@ -628,7 +692,7 @@ function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName }) {
       {myName && restMine.length > 0 && (
         <div>
           <div style={{ fontSize: 12, color: "#8892b0", fontWeight: 600, letterSpacing: .5, marginBottom: 10, textTransform: "uppercase" }}>שאר השבוע</div>
-          {restMine.map((a, i) => <AssignRow key={a.id} a={a} col={sysMap[a.system] || pal(i + 2)} />)}
+          {restMine.map((a, i) => <AssignRow key={a.id} a={a} col={sysMap[a.system] || pal(i + 2)} onView={() => onView(a)} />)}
         </div>
       )}
     </div>
@@ -770,8 +834,79 @@ function ListEditor({ items, val, setVal, ph, color, onAdd, onRemove }) {
   );
 }
 
+/* ── ASSIGN DETAIL MODAL ── */
+function AssignDetailModal({ a, sysMap, mgr, onClose, onEdit, onDelete }) {
+  const [confirmDel, setConfirmDel] = useState(false);
+  const col = sysMap[a.system] || pal(0);
+  const days = a.days && a.days.length > 0 ? DAYS.filter(d => a.days.includes(d.key)).map(d => d.long) : DAYS.map(d => d.long);
+  return (
+    <Overlay onClose={onClose}>
+      <div style={{ background: "#0f1525", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 18, overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,.8)" }}>
+        <div style={{ background: `linear-gradient(135deg,${col.dark},#0f1525)`, borderBottom: `3px solid ${col.accent}`, padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 18, color: col.accent }}>{a.system}</div>
+            <div style={{ fontSize: 11, color: "#8892b0", marginTop: 3 }}>שבוע {a.week?.split("-W")[1]}</div>
+          </div>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 8, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#8892b0" }}><I n="x" s={16} /></button>
+        </div>
+        <div style={{ padding: "18px 20px", display: "flex", flexDirection: "column", gap: 16, maxHeight: "65dvh", overflowY: "auto" }}>
+          <div>
+            <div style={{ fontSize: 10, color: "#8892b0", fontWeight: 700, letterSpacing: .7, marginBottom: 7, textTransform: "uppercase" }}>ימי פעילות</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {days.map(d => <span key={d} style={{ background: `${col.accent}22`, color: col.accent, border: `1px solid ${col.accent}44`, borderRadius: 20, padding: "4px 11px", fontSize: 12, fontWeight: 600 }}>{d}</span>)}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: "#8892b0", fontWeight: 700, letterSpacing: .7, marginBottom: 7, textTransform: "uppercase" }}>משובצים ({(a.assignees || []).length})</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {(a.assignees || []).map(p => <Chip key={p} label={p} color={col.accent} />)}
+              {!(a.assignees || []).length && <span style={{ fontSize: 12, color: "#556", fontStyle: "italic" }}>אין אנשים</span>}
+            </div>
+          </div>
+          {(a.tasks || []).length > 0 && (
+            <div>
+              <div style={{ fontSize: 10, color: "#8892b0", fontWeight: 700, letterSpacing: .7, marginBottom: 7, textTransform: "uppercase" }}>משימות ({a.tasks.length})</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                {a.tasks.map((t, i) => (
+                  <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "8px 12px", background: "rgba(255,255,255,0.04)", borderRadius: 8, borderRight: `3px solid ${col.accent}` }}>
+                    <span style={{ color: col.accent, flexShrink: 0, marginTop: 2 }}><I n="check" s={12} /></span>
+                    <span style={{ fontSize: 13, color: "#c8d0e4", lineHeight: 1.5 }}>{t}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {a.notes && (
+            <div>
+              <div style={{ fontSize: 10, color: "#8892b0", fontWeight: 700, letterSpacing: .7, marginBottom: 7, textTransform: "uppercase" }}>הערות</div>
+              <div style={{ padding: "10px 13px", background: "rgba(255,255,255,0.04)", borderRadius: 9, borderRight: `3px solid ${col.accent}55`, fontSize: 13, color: "#a0aabb", lineHeight: 1.6 }}>{a.notes}</div>
+            </div>
+          )}
+          {!(a.tasks || []).length && !a.notes && <div style={{ fontSize: 12, color: "#445", fontStyle: "italic", textAlign: "center", padding: "8px 0" }}>אין משימות או הערות לשיבוץ זה</div>}
+        </div>
+        {mgr && (
+          <div style={{ padding: "12px 20px", borderTop: "1px solid rgba(255,255,255,0.07)", display: "flex", gap: 8 }}>
+            {confirmDel
+              ? <>
+                  <span style={{ fontSize: 13, color: "#e74c3c", display: "flex", alignItems: "center", flex: 1 }}>למחוק את השיבוץ?</span>
+                  <PillBtn onClick={onDelete} color="#e74c3c" small>מחק</PillBtn>
+                  <PillBtn ghost onClick={() => setConfirmDel(false)} small>ביטול</PillBtn>
+                </>
+              : <>
+                  <PillBtn onClick={onEdit} color={col.accent} small><I n="edit" s={13} />עריכה</PillBtn>
+                  <PillBtn ghost onClick={() => setConfirmDel(true)} small><I n="trash" s={13} />מחיקה</PillBtn>
+                </>
+            }
+          </div>
+        )}
+      </div>
+    </Overlay>
+  );
+}
+
 /* ── ASSIGN MODAL ── */
 function AssignModal({ mode, a, wk, data, sysMap, onClose, onSave }) {
+  const mob = useContext(MobileCtx);
   const [form, setForm] = useState(() => a
     ? { ...a, tasks: [...(a.tasks || [])], days: [...(a.days || ALL_DAYS)], assignees: [...(a.assignees || [])] }
     : { week: wk, system: data.systems[0] || "", assignees: [], tasks: [], days: [], notes: "" });
@@ -783,15 +918,16 @@ function AssignModal({ mode, a, wk, data, sysMap, onClose, onSave }) {
   const col = sysMap[form.system] || pal(0);
   return (
     <Overlay onClose={onClose} wide>
-      <div style={{ background: "#0f1525", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 18, overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,.8)" }}>
-        <div style={{ background: `linear-gradient(135deg,${col.dark},#0f1525)`, borderBottom: `1px solid ${col.accent}33`, padding: "18px 22px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ background: "#0f1525", border: mob ? "none" : "1px solid rgba(255,255,255,0.1)", borderRadius: mob ? "20px 20px 0 0" : 18, overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,.8)" }}>
+        {mob && <div style={{ width: 40, height: 4, background: "rgba(255,255,255,0.15)", borderRadius: 2, margin: "10px auto 0" }} />}
+        <div style={{ background: `linear-gradient(135deg,${col.dark},#0f1525)`, borderBottom: `1px solid ${col.accent}33`, padding: mob ? "14px 18px" : "18px 22px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16, color: "#fff" }}>{mode === "add" ? "שיבוץ חדש" : "עריכת שיבוץ"}</div>
+            <div style={{ fontWeight: 700, fontSize: mob ? 15 : 16, color: "#fff" }}>{mode === "add" ? "שיבוץ חדש" : "עריכת שיבוץ"}</div>
             <div style={{ fontSize: 11, color: col.accent, marginTop: 2 }}>{form.system || "בחר מערכת"}</div>
           </div>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 8, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#8892b0" }}><I n="x" s={16} /></button>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 8, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#8892b0" }}><I n="x" s={16} /></button>
         </div>
-        <div style={{ padding: "18px 22px", maxHeight: "62vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 18 }}>
+        <div style={{ padding: mob ? "14px 16px" : "18px 22px", maxHeight: mob ? "65dvh" : "62vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
             <label style={lbl}>מערכת</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -859,11 +995,11 @@ function AssignModal({ mode, a, wk, data, sysMap, onClose, onSave }) {
             <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="הערות נוספות..." rows={2} style={{ ...inp, resize: "vertical", lineHeight: 1.6 }} />
           </div>
         </div>
-        <div style={{ padding: "14px 22px", borderTop: "1px solid rgba(255,255,255,0.07)", display: "flex", gap: 8 }}>
-          <button onClick={() => onSave(form)} style={{ flex: 1, padding: "11px", background: `linear-gradient(135deg,${col.accent},${col.accent}99)`, border: "none", borderRadius: 11, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", boxShadow: `0 4px 16px ${col.accent}44` }} onMouseEnter={e => e.currentTarget.style.opacity = ".9"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+        <div style={{ padding: mob ? "12px 16px calc(12px + env(safe-area-inset-bottom,0px))" : "14px 22px", borderTop: "1px solid rgba(255,255,255,0.07)", display: "flex", gap: 8 }}>
+          <button onClick={() => onSave(form)} style={{ flex: 1, padding: "13px", background: `linear-gradient(135deg,${col.accent},${col.accent}99)`, border: "none", borderRadius: 11, color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", boxShadow: `0 4px 16px ${col.accent}44` }} onMouseEnter={e => e.currentTarget.style.opacity = ".9"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
             {mode === "add" ? "✓  צור שיבוץ" : "✓  שמור שינויים"}
           </button>
-          <button onClick={onClose} style={{ padding: "11px 18px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 11, color: "#8892b0", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>ביטול</button>
+          <button onClick={onClose} style={{ padding: "13px 18px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 11, color: "#8892b0", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>ביטול</button>
         </div>
       </div>
     </Overlay>
