@@ -55,6 +55,13 @@ export default async function handler(req, res) {
       const raw = await redis.get(REDIS_KEY);
       const plan = raw ? JSON.parse(raw) : { year: 2026, sections: [], days: {} };
 
+      // ── Sections update: { sections: [...] } ────────────────
+      if (Array.isArray(body.sections) && !body.date && !body.fromDate) {
+        plan.sections = body.sections;
+        await redis.set(REDIS_KEY, JSON.stringify(plan));
+        return res.json({ ok: true, sections: plan.sections.length });
+      }
+
       // ── Range update: { person, code, fromDate, toDate } ─────
       if (body.fromDate && body.toDate && body.person !== undefined) {
         const from = new Date(body.fromDate + "T00:00:00");

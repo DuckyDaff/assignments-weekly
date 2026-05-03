@@ -505,6 +505,21 @@ export default function App() {
 
   const [showAbsenceModal, setShowAbsenceModal] = useState(false);
 
+  // Sync sections changes from Settings into the annual plan
+  const syncAnnualSections = useCallback(async (newSections) => {
+    if (!annualData) return;
+    setAnnualData(prev => prev ? { ...prev, sections: newSections } : prev);
+    try {
+      await fetch("/api/annual", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sections: newSections }),
+      });
+    } catch (e) {
+      console.error("Failed to sync annual sections", e);
+    }
+  }, [annualData]);
+
   const save = useCallback(async (nd, msg) => {
     setData(nd);
     isSavingRef.current = true;
@@ -616,7 +631,7 @@ export default function App() {
           {tab === "calendar" && <CalendarView wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onCopy={copyFromPrev} onView={a => setViewAssign(a)} onPlan={() => setPlanner(true)} />}
           {tab === "annual"   && <AnnualView  annualData={annualData} onSaveDay={saveAnnualDay} mgr={mgr} myName={myName} />}
           {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} annualData={annualData} setMyName={n => { setMyName(n); if (n) localStorage.setItem("myName", n); else localStorage.removeItem("myName"); }} onView={a => setViewAssign(a)} onChangeName={() => setShowWelcome(true)} pushStatus={pushStatus} onEnablePush={() => registerPush(myName, remindersOn).then(() => setPushStatus(Notification?.permission || "default"))} remindersOn={remindersOn} onToggleReminders={v => { setRemindersOn(v); localStorage.setItem("remindersOn", v); updateReminderPref(v); }} />}
-          {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} mgrName={mgrName} toast={toast} />}
+          {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} mgrName={mgrName} toast={toast} onSyncAnnual={syncAnnualSections} />}
         </main>
 
         <BottomNav tab={tab} setTab={setTab} TABS={TABS} />
@@ -1421,7 +1436,7 @@ function LegendEditor() {
 }
 
 /* ── SETTINGS ── */
-function SettingsView({ data, save, mgr, mgrName, toast }) {
+function SettingsView({ data, save, mgr, mgrName, toast, onSyncAnnual }) {
   const isMaster = mgrName === "מנהל ראשי";
   const [st, setSt]     = useState("sys");
   const [vSys, setVSys] = useState("");
@@ -1448,7 +1463,7 @@ function SettingsView({ data, save, mgr, mgrName, toast }) {
         ))}
       </div>
       {st === "sys"    && <SystemsEditor data={data} save={save} toast={toast} vSys={vSys} setVSys={setVSys} />}
-      {st === "ppl"    && <SectionsEditor data={data} save={save} toast={toast} />}
+      {st === "ppl"    && <SectionsEditor data={data} save={save} toast={toast} onSyncAnnual={onSyncAnnual} />}
       {st === "legend" && <LegendEditor />}
       {st === "log"    && <ActivityLog data={data} />}
       {st === "mgrs"   && isMaster && <ManagersEditor data={data} save={save} toast={toast} />}
@@ -1534,44 +1549,104 @@ function ActivityLog({ data }) {
     </div>
   );
 }
-function SectionsEditor({ data, save, toast }) {
+function SectionsEditor({ data, save, toast, onSyncAnnual }) {
   const sections = getSections(data);
-  const [vals, setVals] = useState(() => Object.fromEntries(sections.map(s => [s.name, ""])));
+  const [vals,       setVals]       = useState(() => Object.fromEntries(sections.map(s => [s.name, ""])));
+  const [newSecName, setNewSecName] = useState("");
+
+  // Save weekly assignments + sync annual plan sections
+  const saveAndSync = (newSections, msg) => {
+    save({ ...data, sections: newSections }, msg);
+    onSyncAnnual?.(newSections);
+  };
 
   const addPerson = (secName) => {
     const val = (vals[secName] || "").trim();
     if (!val) return;
     if (getAllPeople(data).includes(val)) { toast("שם כבר קיים", "error"); return; }
     const newSections = sections.map(s => s.name === secName ? { ...s, people: [...s.people, val] } : s);
-    save({ ...data, sections: newSections }, "איש צוות נוסף");
+    saveAndSync(newSections, `${val} נוסף/ה ל${secName}`);
     setVals(v => ({ ...v, [secName]: "" }));
   };
 
   const removePerson = (secName, person) => {
     const newSections = sections.map(s => s.name === secName ? { ...s, people: s.people.filter(p => p !== person) } : s);
-    save({ ...data, sections: newSections }, "איש צוות הוסר");
+    saveAndSync(newSections, `${person} הוסר/ה`);
+  };
+
+  const movePerson = (person, fromSec, toSec) => {
+    if (fromSec === toSec) return;
+    const newSections = sections.map(s => {
+      if (s.name === fromSec) return { ...s, people: s.people.filter(p => p !== person) };
+      if (s.name === toSec)   return { ...s, people: [...s.people, person] };
+      return s;
+    });
+    saveAndSync(newSections, `${person} הועבר/ה ל${toSec}`);
+  };
+
+  const addSection = () => {
+    const name = newSecName.trim();
+    if (!name) return;
+    if (sections.some(s => s.name === name)) { toast("מדור כבר קיים", "error"); return; }
+    const newSections = [...sections, { name, people: [] }];
+    saveAndSync(newSections, `מדור "${name}" נוסף`);
+    setNewSecName("");
+    setVals(v => ({ ...v, [name]: "" }));
+  };
+
+  const removeSection = (secName) => {
+    const sec = sections.find(s => s.name === secName);
+    if (sec?.people.length > 0) { toast("העבר את כל האנשים לפני מחיקת המדור", "error"); return; }
+    saveAndSync(sections.filter(s => s.name !== secName), `מדור "${secName}" נמחק`);
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       {sections.map((sec, si) => {
         const c = secPal(data, sec.name, si);
         return (
           <div key={sec.name} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${c.accent}22`, borderRadius: 12, padding: "14px 16px" }}>
+            {/* Header */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
               <div style={{ width: 8, height: 8, borderRadius: "50%", background: c.accent, flexShrink: 0 }} />
               <span style={{ fontWeight: 700, fontSize: 13, color: c.accent }}>{sec.name}</span>
               <span style={{ fontSize: 11, color: "#556", marginRight: "auto" }}>{sec.people.length} אנשים</span>
+              <button onClick={() => removeSection(sec.name)} title="מחק מדור (רק אם ריק)"
+                style={{ background: "none", border: "none", color: "#445", cursor: "pointer", opacity: .5, padding: 2, display: "flex", alignItems: "center" }}
+                onMouseEnter={e => e.currentTarget.style.opacity = "1"} onMouseLeave={e => e.currentTarget.style.opacity = ".5"}>
+                <I n="trash" s={13} />
+              </button>
             </div>
+            {/* Add person */}
             <div style={{ display: "flex", gap: 7, marginBottom: 10 }}>
               <input value={vals[sec.name] || ""} onChange={e => setVals(v => ({ ...v, [sec.name]: e.target.value }))} onKeyDown={e => e.key === "Enter" && addPerson(sec.name)} placeholder="שם מלא" style={inp} />
               <PillBtn onClick={() => addPerson(sec.name)} color={c.accent}>הוסף</PillBtn>
             </div>
+            {/* People list */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {sec.people.map(person => (
-                <div key={person} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRight: `3px solid ${c.accent}`, borderRadius: 8 }} onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.07)"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}>
-                  <span style={{ fontSize: 13 }}>{person}</span>
-                  <button onClick={() => removePerson(sec.name, person)} style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", opacity: .7 }} onMouseEnter={e => e.currentTarget.style.opacity = "1"} onMouseLeave={e => e.currentTarget.style.opacity = ".7"}><I n="trash" s={14} /></button>
+                <div key={person} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRight: `3px solid ${c.accent}`, borderRadius: 8 }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.07)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}>
+                  <span style={{ fontSize: 13, flex: 1 }}>{person}</span>
+                  <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                    {/* Move to another section */}
+                    {sections.length > 1 && (
+                      <select onChange={e => { if (e.target.value) movePerson(person, sec.name, e.target.value); e.target.value = ""; }}
+                        defaultValue=""
+                        style={{ ...inp, padding: "3px 6px", fontSize: 10, width: "auto", cursor: "pointer", color: "#8892b0" }}>
+                        <option value="">העבר ל…</option>
+                        {sections.filter(s => s.name !== sec.name).map(s => (
+                          <option key={s.name} value={s.name}>{s.name}</option>
+                        ))}
+                      </select>
+                    )}
+                    <button onClick={() => removePerson(sec.name, person)}
+                      style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", opacity: .7 }}
+                      onMouseEnter={e => e.currentTarget.style.opacity = "1"} onMouseLeave={e => e.currentTarget.style.opacity = ".7"}>
+                      <I n="trash" s={14} />
+                    </button>
+                  </div>
                 </div>
               ))}
               {sec.people.length === 0 && <div style={{ fontSize: 12, color: "#445", fontStyle: "italic", padding: "4px 2px" }}>אין אנשים במדור זה</div>}
@@ -1579,6 +1654,17 @@ function SectionsEditor({ data, save, toast }) {
           </div>
         );
       })}
+
+      {/* Add new section */}
+      <div style={{ border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 12, padding: "14px 16px" }}>
+        <div style={{ fontSize: 12, color: "#8892b0", fontWeight: 600, marginBottom: 10 }}>➕ הוסף מדור חדש</div>
+        <div style={{ display: "flex", gap: 7 }}>
+          <input value={newSecName} onChange={e => setNewSecName(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && addSection()}
+            placeholder="שם המדור החדש" style={inp} />
+          <PillBtn onClick={addSection} color="#4a9eff">+ מדור</PillBtn>
+        </div>
+      </div>
     </div>
   );
 }
