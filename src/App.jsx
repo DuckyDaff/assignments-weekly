@@ -43,6 +43,43 @@ const PALETTE = [
   { dark: "#1a0a00", mid: "#3a1800", accent: "#ff7043", soft: "#ffe0d8" },
 ];
 
+/* ═══════════════════════════════════════════════════════
+   PUSH NOTIFICATIONS
+═══════════════════════════════════════════════════════ */
+const VAPID_PUBLIC_KEY = "BG5WU-Uxc8ogOxG9y3zsZJMuELLXXDMy3b-UaocLta1aSxtSdolfIQmmrVorHAupg7P_Ya7p1QiOEprJilT9hfg";
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+async function registerPush(name) {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+  try {
+    const reg = await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return null;
+
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+
+    await fetch("/api/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscription: sub.toJSON(), name }),
+    });
+    return sub;
+  } catch (e) {
+    console.warn("Push registration failed:", e);
+    return null;
+  }
+}
+
 const DEF_SECTIONS = [
   { name: "מדור פיקוד ובקרה",     people: ["דוד לוי", "רחל כהן", "יוסי מזרחי", "מיכל אברהם"] },
   { name: "מדור תאורת מסלולים",   people: ["אמיר שפירו", "נועה גולן", "עידו פרץ"] },
@@ -270,6 +307,7 @@ export default function App() {
   const [modal, setModal]   = useState(null);
   const [myName, setMyName] = useState(() => localStorage.getItem("myName") || "");
   const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem("myName"));
+  const [pushStatus, setPushStatus] = useState(() => Notification?.permission || "default"); // "default"|"granted"|"denied"
   const [mgrName, setMgrName] = useState("");     // שם המנהל הנוכחי
   const mgrNameRef = useRef("");
   useEffect(() => { mgrNameRef.current = mgrName; }, [mgrName]);
@@ -284,6 +322,29 @@ export default function App() {
     setToasts(t => [...t, { id, msg, type }]);
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3200);
   }, []);
+
+  // Register SW on load (needed even before permission granted, for offline support)
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+  }, []);
+
+  // When myName is set and permission is "default", auto-ask
+  useEffect(() => {
+    if (!myName) return;
+    if (Notification?.permission !== "default") {
+      setPushStatus(Notification?.permission);
+      return;
+    }
+    // Wait a moment before asking so it doesn't pop up immediately on first load
+    const t = setTimeout(() => {
+      registerPush(myName).then(sub => {
+        setPushStatus(Notification?.permission || "default");
+      });
+    }, 3000);
+    return () => clearTimeout(t);
+  }, [myName]);
 
   useEffect(() => {
     fetch("/api/data")
@@ -403,7 +464,7 @@ export default function App() {
         <main className="main-pad" style={{ flex: 1, padding: "20px 18px", maxWidth: 1320, margin: "0 auto", width: "100%" }}>
           {tab === "board"    && <BoardView    wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} filterPerson={filterPerson} setFilterPerson={setFilterPerson} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onDelete={deleteAssign} onCopy={copyFromPrev} onCSV={() => doExportCSV(wk, weekA)} onPrint={() => doPrint(wk, weekA, data.systems)} onView={a => setViewAssign(a)} />}
           {tab === "calendar" && <CalendarView wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onCopy={copyFromPrev} onView={a => setViewAssign(a)} onPlan={() => setPlanner(true)} />}
-          {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} setMyName={n => { setMyName(n); if (n) localStorage.setItem("myName", n); else localStorage.removeItem("myName"); }} onView={a => setViewAssign(a)} onChangeName={() => setShowWelcome(true)} />}
+          {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} setMyName={n => { setMyName(n); if (n) localStorage.setItem("myName", n); else localStorage.removeItem("myName"); }} onView={a => setViewAssign(a)} onChangeName={() => setShowWelcome(true)} pushStatus={pushStatus} onEnablePush={() => registerPush(myName).then(() => setPushStatus(Notification?.permission || "default"))} />}
           {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} mgrName={mgrName} toast={toast} />}
         </main>
 
@@ -871,7 +932,7 @@ const TH = { padding: "8px 10px", textAlign: "center", borderRadius: 7, fontSize
 const TD = { padding: "7px 9px", borderRadius: 7, fontSize: 12, minHeight: 36 };
 
 /* ── MY VIEW ── */
-function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName, onView, onChangeName }) {
+function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName, onView, onChangeName, pushStatus, onEnablePush }) {
   const todayKey      = todayDayKey();
   const isTodayWork   = isWorkDay(todayKey);
   const isCurrentWeek = wk === wKey(new Date());
@@ -929,7 +990,19 @@ function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName, onView, onC
               <div style={{ fontSize: 11, color: "#8892b0" }}>השיבוצים שלי</div>
             </div>
           </div>
-          <button onClick={onChangeName} style={{ padding: "6px 12px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, color: "#8892b0", fontSize: 12, cursor: "pointer" }}>שנה שם</button>
+          <div style={{ display: "flex", gap: 6, flexDirection: "column", alignItems: "flex-end" }}>
+            <button onClick={onChangeName} style={{ padding: "6px 12px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, color: "#8892b0", fontSize: 12, cursor: "pointer" }}>שנה שם</button>
+            {"Notification" in window && pushStatus !== "denied" && (
+              <button
+                onClick={pushStatus === "granted" ? undefined : onEnablePush}
+                style={{ padding: "5px 10px", background: pushStatus === "granted" ? "rgba(39,174,96,0.12)" : "rgba(74,158,255,0.1)", border: `1px solid ${pushStatus === "granted" ? "rgba(39,174,96,0.3)" : "rgba(74,158,255,0.3)"}`, borderRadius: 8, color: pushStatus === "granted" ? "#27ae60" : "#4a9eff", fontSize: 11, cursor: pushStatus === "granted" ? "default" : "pointer", fontWeight: 600 }}>
+                {pushStatus === "granted" ? "🔔 פעיל" : "🔔 הפעל התראות"}
+              </button>
+            )}
+            {"Notification" in window && pushStatus === "denied" && (
+              <div style={{ fontSize: 10, color: "#8892b0", textAlign: "center" }}>🔕 התראות חסומות</div>
+            )}
+          </div>
         </div>
       )}
       {mode === "me" && !myName && (
