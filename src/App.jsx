@@ -1282,8 +1282,7 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
     : (mob ? "לחץ תא → כתוב משימה → בחר אנשים מלמטה" : "לחץ תא → כתוב משימה → גרור אנשים לתוכו");
 
   return (
-    <div dir="rtl" style={{ position: "fixed", inset: 0, background: "#080c18", zIndex: 400, display: "flex", flexDirection: "column", fontFamily: "'Segoe UI','Arial Hebrew',Arial,sans-serif", color: "#dde2f0" }}
-      onClick={e => { if (e.target.dataset.outside) { setActiveCell(null); setSelected(null); } }}>
+    <div dir="rtl" style={{ position: "fixed", inset: 0, background: "#080c18", zIndex: 400, display: "flex", flexDirection: "column", fontFamily: "'Segoe UI','Arial Hebrew',Arial,sans-serif", color: "#dde2f0" }}>
 
       {/* Header */}
       <div style={{ background: "#0f1525", borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "0 16px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, gap: 8 }}>
@@ -1303,7 +1302,8 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
       <div style={{ background: "rgba(61,127,196,0.08)", borderBottom: "1px solid rgba(61,127,196,0.15)", padding: "5px 14px", fontSize: 11, color: "#3d7fc4", textAlign: "center", flexShrink: 0 }}>{hintText}</div>
 
       {/* Body: sidebar (desktop) or grid-only (mobile) */}
-      <div style={{ flex: 1, display: "flex", flexDirection: mob ? "column" : "row", overflow: "hidden" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: mob ? "column" : "row", overflow: "hidden" }}
+        onClick={e => { if (e.target === e.currentTarget) { setActiveCell(null); setSelected(null); } }}>
 
         {/* ── Desktop left sidebar ── */}
         {!mob && (
@@ -1334,7 +1334,8 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
         )}
 
         {/* ── Grid ── */}
-        <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", padding: "10px 10px 4px" }}>
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", padding: "10px 10px 4px" }}
+          onClick={e => { if (e.target === e.currentTarget) { setActiveCell(null); setSelected(null); } }}>
           <table style={{ borderCollapse: "separate", borderSpacing: 4, minWidth: mob ? 520 : 600 }}>
             <thead>
               <tr>
