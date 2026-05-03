@@ -2778,13 +2778,19 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                 <thead>
                   <tr style={{ background: `${sc.accent}30` }}>
                     <th style={{ padding: '8px 10px', fontSize: 12, color: sc.accent, textAlign: 'right', borderBottom: `2px solid ${sc.accent}66`, borderLeft: `1px solid rgba(255,255,255,0.1)`, width: 64, position: 'sticky', right: 0, background: `${sc.accent}30`, zIndex: 2 }}>יום</th>
-                    {people.map((person, pi) => (
-                      <th key={person} style={{ padding: '6px 4px 8px', fontSize: 10, color: person === myName ? '#4a9eff' : '#dde8ff', borderBottom: `2px solid ${sc.accent}66`, borderRight: `1px solid rgba(255,255,255,0.1)`, textAlign: 'center', minWidth: 36, fontWeight: person === myName ? 700 : 600 }}>
-                        <div style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', transform: 'rotate(180deg)', whiteSpace: 'nowrap', fontSize: 10, lineHeight: 1 }}>
-                          {person}
-                        </div>
-                      </th>
-                    ))}
+                    {people.map((person) => {
+                      const [firstName, ...rest] = person.split(' ');
+                      const lastName = rest.join(' ');
+                      const isMe = person === myName;
+                      return (
+                        <th key={person} style={{ padding: '7px 5px', fontSize: 11, color: isMe ? '#4a9eff' : '#dde8ff', borderBottom: `2px solid ${sc.accent}66`, borderRight: `1px solid rgba(255,255,255,0.1)`, textAlign: 'center', minWidth: 52, fontWeight: isMe ? 700 : 600, verticalAlign: 'middle' }}>
+                          <div style={{ lineHeight: 1.4 }}>
+                            <div>{firstName}</div>
+                            {lastName && <div style={{ opacity: 0.75, fontSize: 10 }}>{lastName}</div>}
+                          </div>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
@@ -2800,7 +2806,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                         style={{ cursor: 'pointer', background: rowBg, borderBottom: `1px solid rgba(255,255,255,${isSat ? '0.12' : '0.06'})` }}
                         onMouseEnter={e => e.currentTarget.style.background = 'rgba(74,158,255,0.07)'}
                         onMouseLeave={e => e.currentTarget.style.background = rowBg}>
-                        <td style={{ padding: '4px 8px', position: 'sticky', right: 0, background: stickyBg, zIndex: 1, whiteSpace: 'nowrap', borderLeft: `1px solid rgba(255,255,255,0.1)`, borderBottom: `1px solid rgba(255,255,255,${isSat ? '0.12' : '0.06'})` }}>
+                        <td style={{ padding: '4px 8px', position: 'sticky', right: 0, background: stickyBg, zIndex: 1, whiteSpace: 'nowrap', verticalAlign: 'middle', borderLeft: `1px solid rgba(255,255,255,0.1)`, borderBottom: `1px solid rgba(255,255,255,${isSat ? '0.12' : '0.06'})` }}>
                           <span style={{ fontWeight: isToday ? 700 : isSat ? 600 : 400, color: isToday ? '#4a9eff' : isSat ? '#7788aa' : '#c0cce0', fontSize: 13 }}>{num}</span>
                           <span style={{ fontSize: 9, color: isSat ? '#556' : '#445', marginRight: 4 }}>{DAY_SHORT[dow]}</span>
                           {dayData.notes && <span style={{ fontSize: 9 }}>📝</span>}
@@ -2809,7 +2815,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                           const code = dayData.statuses?.[person] || '';
                           const st   = statusStyle(code);
                           return (
-                            <td key={person} style={{ padding: '3px 2px', textAlign: 'center', borderRight: `1px solid rgba(255,255,255,0.07)`, background: code && st ? `${st.bg}28` : 'transparent' }}>
+                            <td key={person} style={{ padding: '4px 3px', textAlign: 'center', verticalAlign: 'middle', borderRight: `1px solid rgba(255,255,255,0.07)`, background: code && st ? `${st.bg}28` : 'transparent' }}>
                               {code && <StatusBadge code={code} small />}
                             </td>
                           );
