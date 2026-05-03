@@ -11,7 +11,7 @@ async function getClient() {
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "POST, PATCH, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.status(200).end();
 
@@ -20,26 +20,47 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "db connect failed" });
   }
 
-  // Save subscription
+  const loadSubs = async () => {
+    try {
+      const raw = await redis.get("push_subscriptions");
+      return raw ? JSON.parse(raw) : [];
+    } catch (_) { return []; }
+  };
+  const saveSubs = async (arr) => {
+    await redis.set("push_subscriptions", JSON.stringify(arr.slice(-500)));
+  };
+
+  // Save / update subscription
   if (req.method === "POST") {
-    const { subscription, name } = req.body || {};
+    const { subscription, name, reminders } = req.body || {};
     if (!subscription || !subscription.endpoint) {
       return res.status(400).json({ error: "missing subscription" });
     }
 
-    let subs = [];
-    try {
-      const raw = await redis.get("push_subscriptions");
-      subs = raw ? JSON.parse(raw) : [];
-    } catch (_) {}
-
-    // Remove old entry for same endpoint, then add new
+    const subs = await loadSubs();
     const filtered = subs.filter(s => s.subscription?.endpoint !== subscription.endpoint);
-    filtered.push({ subscription, name: name || "", savedAt: Date.now() });
+    filtered.push({
+      subscription,
+      name: name || "",
+      reminders: reminders !== false,   // default true
+      savedAt: Date.now(),
+    });
+    await saveSubs(filtered);
+    return res.status(200).json({ ok: true });
+  }
 
-    // Keep max 500
-    const trimmed = filtered.slice(-500);
-    await redis.set("push_subscriptions", JSON.stringify(trimmed));
+  // Update preferences (reminders toggle) without re-subscribing
+  if (req.method === "PATCH") {
+    const { endpoint, reminders } = req.body || {};
+    if (!endpoint) return res.status(400).json({ error: "missing endpoint" });
+
+    const subs = await loadSubs();
+    const updated = subs.map(s =>
+      s.subscription?.endpoint === endpoint
+        ? { ...s, reminders: Boolean(reminders) }
+        : s
+    );
+    await saveSubs(updated);
     return res.status(200).json({ ok: true });
   }
 
@@ -48,14 +69,8 @@ export default async function handler(req, res) {
     const { endpoint } = req.body || {};
     if (!endpoint) return res.status(400).json({ error: "missing endpoint" });
 
-    let subs = [];
-    try {
-      const raw = await redis.get("push_subscriptions");
-      subs = raw ? JSON.parse(raw) : [];
-    } catch (_) {}
-
-    const filtered = subs.filter(s => s.subscription?.endpoint !== endpoint);
-    await redis.set("push_subscriptions", JSON.stringify(filtered));
+    const subs = await loadSubs();
+    await saveSubs(subs.filter(s => s.subscription?.endpoint !== endpoint));
     return res.status(200).json({ ok: true });
   }
 

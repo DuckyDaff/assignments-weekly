@@ -55,7 +55,7 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
 }
 
-async function registerPush(name) {
+async function registerPush(name, reminders = true) {
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
   try {
     const reg = await navigator.serviceWorker.register("/sw.js");
@@ -71,12 +71,28 @@ async function registerPush(name) {
     await fetch("/api/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subscription: sub.toJSON(), name }),
+      body: JSON.stringify({ subscription: sub.toJSON(), name, reminders }),
     });
     return sub;
   } catch (e) {
     console.warn("Push registration failed:", e);
     return null;
+  }
+}
+
+async function updateReminderPref(reminders) {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return;
+    await fetch("/api/subscribe", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: sub.endpoint, reminders }),
+    });
+  } catch (e) {
+    console.warn("Failed to update reminder pref:", e);
   }
 }
 
@@ -308,6 +324,7 @@ export default function App() {
   const [myName, setMyName] = useState(() => localStorage.getItem("myName") || "");
   const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem("myName"));
   const [pushStatus, setPushStatus] = useState(() => Notification?.permission || "default"); // "default"|"granted"|"denied"
+  const [remindersOn, setRemindersOn] = useState(() => localStorage.getItem("remindersOn") !== "false"); // default true
   const [mgrName, setMgrName] = useState("");     // שם המנהל הנוכחי
   const mgrNameRef = useRef("");
   useEffect(() => { mgrNameRef.current = mgrName; }, [mgrName]);
@@ -464,7 +481,7 @@ export default function App() {
         <main className="main-pad" style={{ flex: 1, padding: "20px 18px", maxWidth: 1320, margin: "0 auto", width: "100%" }}>
           {tab === "board"    && <BoardView    wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} filterPerson={filterPerson} setFilterPerson={setFilterPerson} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onDelete={deleteAssign} onCopy={copyFromPrev} onCSV={() => doExportCSV(wk, weekA)} onPrint={() => doPrint(wk, weekA, data.systems)} onView={a => setViewAssign(a)} />}
           {tab === "calendar" && <CalendarView wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onCopy={copyFromPrev} onView={a => setViewAssign(a)} onPlan={() => setPlanner(true)} />}
-          {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} setMyName={n => { setMyName(n); if (n) localStorage.setItem("myName", n); else localStorage.removeItem("myName"); }} onView={a => setViewAssign(a)} onChangeName={() => setShowWelcome(true)} pushStatus={pushStatus} onEnablePush={() => registerPush(myName).then(() => setPushStatus(Notification?.permission || "default"))} />}
+          {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} setMyName={n => { setMyName(n); if (n) localStorage.setItem("myName", n); else localStorage.removeItem("myName"); }} onView={a => setViewAssign(a)} onChangeName={() => setShowWelcome(true)} pushStatus={pushStatus} onEnablePush={() => registerPush(myName, remindersOn).then(() => setPushStatus(Notification?.permission || "default"))} remindersOn={remindersOn} onToggleReminders={v => { setRemindersOn(v); localStorage.setItem("remindersOn", v); updateReminderPref(v); }} />}
           {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} mgrName={mgrName} toast={toast} />}
         </main>
 
@@ -932,7 +949,7 @@ const TH = { padding: "8px 10px", textAlign: "center", borderRadius: 7, fontSize
 const TD = { padding: "7px 9px", borderRadius: 7, fontSize: 12, minHeight: 36 };
 
 /* ── MY VIEW ── */
-function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName, onView, onChangeName, pushStatus, onEnablePush }) {
+function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName, onView, onChangeName, pushStatus, onEnablePush, remindersOn, onToggleReminders }) {
   const todayKey      = todayDayKey();
   const isTodayWork   = isWorkDay(todayKey);
   const isCurrentWeek = wk === wKey(new Date());
@@ -1000,8 +1017,40 @@ function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName, onView, onC
               </button>
             )}
             {"Notification" in window && pushStatus === "denied" && (
-              <div style={{ fontSize: 10, color: "#8892b0", textAlign: "center" }}>🔕 התראות חסומות</div>
+              <div style={{ fontSize: 10, color: "#8892b0", textAlign: "center" }}>🔕 חסומות</div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Notification preferences panel — shown when push is active */}
+      {"Notification" in window && pushStatus === "granted" && mode === "me" && myName && (
+        <div style={{ marginBottom: 16, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "14px 16px" }}>
+          <div style={{ fontSize: 12, color: "#ccd6f6", fontWeight: 700, marginBottom: 12 }}>⚙️ הגדרות התראות</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {/* Reminder toggle */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontSize: 13, color: "#ccd6f6", fontWeight: 600 }}>תזכורת בוקר</div>
+                <div style={{ fontSize: 11, color: "#8892b0", marginTop: 2 }}>קבל תזכורת ב-07:00 על שיבוצים להיום</div>
+              </div>
+              <button
+                onClick={() => onToggleReminders(!remindersOn)}
+                style={{
+                  width: 44, height: 24, borderRadius: 12, border: "none", cursor: "pointer",
+                  background: remindersOn ? "#27ae60" : "rgba(255,255,255,0.12)",
+                  position: "relative", transition: "background .2s", flexShrink: 0,
+                }}>
+                <span style={{
+                  position: "absolute", top: 2, width: 20, height: 20, borderRadius: 10,
+                  background: "#fff", transition: "right .2s",
+                  right: remindersOn ? 2 : 22,
+                }} />
+              </button>
+            </div>
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 8 }}>
+              + התראה אוטומטית כשמנהל משבץ אותך
+            </div>
           </div>
         </div>
       )}
