@@ -2244,6 +2244,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
   const [selDate,   setSelDate]   = useState(() => new Date().toISOString().slice(0, 10));
   const [selMonth,  setSelMonth]  = useState(() => new Date().getMonth());
   const [selPerson, setSelPerson] = useState(myName || '');
+  const [selSecIdx, setSelSecIdx] = useState(0);
   const [editCell,  setEditCell]  = useState(null);
 
   if (!annualData) {
@@ -2529,12 +2530,15 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
           const iso = `${year}-${String(selMonth + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
           return { num: i + 1, iso, dow: new Date(year, selMonth, i + 1).getDay() };
         });
-        const MIN_DAY = 3, MIN_NIGHT = 2;
+
+        const sec    = sections[selSecIdx] || sections[0];
+        const sc     = sec ? secPal(null, sec.name, selSecIdx) : { accent: '#4a9eff' };
+        const people = sec?.people || [];
 
         return (
           <div>
             {/* Month nav */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 14 }}>
               <NavBtn onClick={() => setSelMonth(m => (m + 11) % 12)}><I n="cR" s={14} /></NavBtn>
               <div style={{ textAlign: 'center', minWidth: 130 }}>
                 <div style={{ fontWeight: 700, fontSize: 18, color: '#fff' }}>{MONTHS_HE[selMonth]}</div>
@@ -2543,66 +2547,74 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
               <NavBtn onClick={() => setSelMonth(m => (m + 1) % 12)}><I n="cL" s={14} /></NavBtn>
             </div>
 
-            {/* Coverage legend */}
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
-              {[['#27ae60','כיסוי מלא'],['#f39c12','כיסוי חלקי'],['#e74c3c','כיסוי נמוך']].map(([bg, lbl]) => (
-                <span key={lbl} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#8892b0' }}>
-                  <span style={{ width: 12, height: 12, background: bg, borderRadius: 3, display: 'inline-block' }} /> {lbl}
-                </span>
-              ))}
-            </div>
-
-            {/* Coverage table */}
-            <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '52px 1fr 1fr 1fr 1fr 1fr', background: '#0f1525', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.07)', direction: 'rtl' }}>
-                <span style={{ fontSize: 10, color: '#4a9eff' }}>יום</span>
-                <span style={{ fontSize: 10, color: '#27ae60', textAlign: 'center' }}>☀ יום</span>
-                <span style={{ fontSize: 10, color: '#2980b9', textAlign: 'center' }}>🌙 לילה</span>
-                <span style={{ fontSize: 10, color: '#e67e22', textAlign: 'center' }}>🔶 כוננות</span>
-                <span style={{ fontSize: 10, color: '#e74c3c', textAlign: 'center' }}>🔴 חסרים</span>
-                <span style={{ fontSize: 10, color: '#8892b0', textAlign: 'center' }}>הערות</span>
-              </div>
-              {monthDays.map(({ num, iso, dow }) => {
-                const dayData      = days[iso] || {};
-                const g            = buildDayGroups(dayData, sections);
-                const dayCount     = g.day.length;
-                const nightCount   = g.night.length;
-                const oncallCount  = g.oncall.length;
-                const unavailCount = g.unavail.length;
-                const isToday = iso === today;
-                const isSat   = dow === 6;
-                const dayBg   = dayCount   >= MIN_DAY   ? '#27ae60' : dayCount   > 0 ? '#f39c12' : '#e74c3c';
-                const nightBg = nightCount >= MIN_NIGHT ? '#27ae60' : nightCount > 0 ? '#f39c12' : '#e74c3c';
+            {/* Section tabs */}
+            <div style={{ display: 'flex', marginBottom: 14, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+              {sections.map((s, si) => {
+                const c    = secPal(null, s.name, si);
+                const isSel = si === selSecIdx;
                 return (
-                  <div key={iso}
-                    onClick={() => { setSelDate(iso); setLens('daily'); }}
-                    style={{ display: 'grid', gridTemplateColumns: '52px 1fr 1fr 1fr 1fr 1fr', padding: '7px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', direction: 'rtl', background: isToday ? 'rgba(74,158,255,0.08)' : isSat ? 'rgba(255,255,255,0.015)' : 'transparent', alignItems: 'center' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(74,158,255,0.05)'}
-                    onMouseLeave={e => e.currentTarget.style.background = isToday ? 'rgba(74,158,255,0.08)' : isSat ? 'rgba(255,255,255,0.015)' : 'transparent'}>
-                    <div style={{ display: 'flex', gap: 4, alignItems: 'baseline' }}>
-                      <span style={{ fontSize: 13, fontWeight: isToday ? 700 : 400, color: isToday ? '#4a9eff' : isSat ? '#557' : '#aab' }}>{num}</span>
-                      <span style={{ fontSize: 9, color: '#334' }}>{DAY_SHORT[dow]}</span>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <span style={{ background: `${dayBg}22`, color: dayBg, borderRadius: 6, padding: '2px 8px', fontSize: 12, fontWeight: 700 }}>{dayCount}</span>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <span style={{ background: `${nightBg}22`, color: nightBg, borderRadius: 6, padding: '2px 8px', fontSize: 12, fontWeight: 700 }}>{nightCount}</span>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      {oncallCount > 0
-                        ? <span style={{ background: 'rgba(230,126,34,0.15)', color: '#e67e22', borderRadius: 6, padding: '2px 8px', fontSize: 12, fontWeight: 700 }}>{oncallCount}</span>
-                        : <span style={{ color: '#334', fontSize: 12 }}>—</span>}
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      {unavailCount > 0
-                        ? <span style={{ background: 'rgba(231,76,60,0.15)', color: '#e74c3c', borderRadius: 6, padding: '2px 8px', fontSize: 12, fontWeight: 700 }}>⚠{unavailCount}</span>
-                        : <span style={{ color: '#334', fontSize: 12 }}>—</span>}
-                    </div>
-                    <div style={{ textAlign: 'center', fontSize: 13 }}>{dayData.notes ? '📝' : ''}</div>
-                  </div>
+                  <button key={s.name} onClick={() => setSelSecIdx(si)}
+                    style={{ flex: 1, padding: '8px 4px', border: 'none', background: isSel ? `${c.accent}22` : 'transparent', color: isSel ? c.accent : '#556', fontSize: 10, fontWeight: isSel ? 700 : 400, cursor: 'pointer', borderBottom: `2px solid ${isSel ? c.accent : 'transparent'}`, transition: 'all .15s' }}>
+                    {s.name.replace('מדור ', '').replace('משמרת ', 'משמרת ')}
+                  </button>
                 );
               })}
+            </div>
+
+            {/* People × Days grid */}
+            <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${sc.accent}33` }}>
+              <table style={{ borderCollapse: 'collapse', width: '100%', direction: 'rtl', minWidth: Math.max(320, people.length * 46 + 64) }}>
+                <thead>
+                  {/* Section title row */}
+                  <tr style={{ background: `${sc.accent}18` }}>
+                    <th style={{ padding: '6px 10px', fontSize: 11, color: sc.accent, textAlign: 'right', borderBottom: `1px solid ${sc.accent}33`, width: 60, position: 'sticky', right: 0, background: `${sc.accent}18`, zIndex: 2 }}>יום</th>
+                    {people.map(person => (
+                      <th key={person} style={{ padding: '5px 3px', fontSize: 9, color: person === myName ? '#4a9eff' : sc.accent, borderBottom: `1px solid ${sc.accent}33`, textAlign: 'center', minWidth: 38, maxWidth: 54, fontWeight: person === myName ? 700 : 500 }} title={person}>
+                        {person.split(' ')[0]}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthDays.map(({ num, iso, dow }) => {
+                    const dayData = days[iso] || {};
+                    const isToday = iso === today;
+                    const isSat   = dow === 6;
+                    return (
+                      <tr key={iso}
+                        onClick={() => { setSelDate(iso); setLens('daily'); }}
+                        style={{ cursor: 'pointer', background: isToday ? 'rgba(74,158,255,0.07)' : isSat ? 'rgba(255,255,255,0.015)' : 'transparent' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(74,158,255,0.05)'}
+                        onMouseLeave={e => e.currentTarget.style.background = isToday ? 'rgba(74,158,255,0.07)' : isSat ? 'rgba(255,255,255,0.015)' : 'transparent'}>
+                        <td style={{ padding: '3px 8px', position: 'sticky', right: 0, background: isToday ? '#0c1830' : '#080c18', zIndex: 1, borderBottom: '1px solid rgba(255,255,255,0.04)', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontWeight: isToday ? 700 : 400, color: isToday ? '#4a9eff' : isSat ? '#556' : '#aab', fontSize: 12 }}>{num}</span>
+                          <span style={{ fontSize: 9, color: '#334', marginRight: 3 }}>{DAY_SHORT[dow]}</span>
+                          {dayData.notes && <span style={{ fontSize: 9 }}>📝</span>}
+                        </td>
+                        {people.map(person => {
+                          const code = dayData.statuses?.[person] || '';
+                          const st   = statusStyle(code);
+                          return (
+                            <td key={person} style={{ padding: '2px 2px', textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.04)', background: code && st ? `${st.bg}18` : 'transparent' }}>
+                              {code && <StatusBadge code={code} small />}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Status legend */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12, justifyContent: 'center' }}>
+              {[['י','יום'],['ל','לילה'],['כ','כוננות'],['ח','חופשה'],['מיל','מילואים'],['מ','מחלה'],['פ','פנוי'],['ק','קורס']].map(([code, lbl]) => (
+                <span key={code} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#8892b0' }}>
+                  <span style={{ width: 18, height: 12, background: statusStyle(code)?.bg || '#333', borderRadius: 2, display: 'inline-block' }} />
+                  {lbl}
+                </span>
+              ))}
             </div>
           </div>
         );
