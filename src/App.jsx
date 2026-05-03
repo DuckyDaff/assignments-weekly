@@ -490,7 +490,7 @@ function WeekNav({ wk, setWk, children }) {
               <span style={{ fontWeight: 700, fontSize: mob ? 15 : 17, color: "#fff" }}>שבוע {wk.split("-W")[1]}</span>
               {isToday && <span style={{ background: "rgba(74,158,255,0.2)", color: "#4a9eff", fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 20, border: "1px solid rgba(74,158,255,0.3)" }}>עכשיו</span>}
             </div>
-            <div style={{ fontSize: 10, color: "#8892b0", marginTop: 1 }}>{wLabel(wk)}</div>
+            <div style={{ fontSize: 14, color: "#ccd6f6", marginTop: 2, fontWeight: 600, letterSpacing: 0.2 }}>{wLabel(wk)}</div>
           </div>
           <NavBtn onClick={() => setWk(adjW(wk, 1))}><I n="cL" s={15} /></NavBtn>
           {!isToday && <button onClick={() => setWk(wKey(new Date()))} style={{ padding: "4px 9px", border: "1px solid rgba(74,158,255,.3)", borderRadius: 8, background: "rgba(74,158,255,.1)", color: "#4a9eff", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>היום</button>}
@@ -711,7 +711,7 @@ function CalendarView({ wk, setWk, weekA, prevA, data, sysMap, mgr, onAdd, onEdi
                     const isToday = key === todayKey;
                     const active = weekA.filter(a => (a.assignees || []).includes(person) && (!a.days || a.days.length === 0 || a.days.includes(key)));
                     return <td key={key} onClick={() => active.length > 0 && onView(active[0])} style={{ ...TD, background: isToday && active.length ? "rgba(74,158,255,0.1)" : (active.length ? "rgba(255,255,255,0.04)" : "transparent"), border: isToday ? "1px solid rgba(74,158,255,0.25)" : "1px solid transparent", verticalAlign: "top", cursor: active.length ? "pointer" : "default" }}>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>{active.map(a => { const c = sysMap[a.system] || pal(0); const tasks = a.tasks || []; return <div key={a.id}><Chip label={a.system} color={c.accent} />{tasks.length > 0 && <div style={{ fontSize: 10, color: "#8892b0", marginTop: 2, paddingRight: 2 }}>{tasks.slice(0,1).map((t,i)=><span key={i} style={{ color: c.accent, fontSize: 9 }}>✓ {t.length>24?t.slice(0,22)+"…":t}</span>)}</div>}</div>; })}</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>{active.map(a => { const c = sysMap[a.system] || pal(0); const tasks = a.tasks || []; return <div key={a.id}><Chip label={a.system} color={c.accent} />{tasks.length > 0 && <div style={{ fontSize: 11, color: "#8892b0", marginTop: 2, paddingRight: 2 }}>{tasks.slice(0,1).map((t,i)=><span key={i} style={{ color: c.accent, fontSize: 11, fontWeight: 600 }}>✓ {t.length>32?t.slice(0,30)+"…":t}</span>)}</div>}</div>; })}</div>
                     </td>;
                   })}
                 </tr>
@@ -1456,7 +1456,7 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
                                   placeholder="כתוב משימה..."
                                   style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: `1px solid ${col.accent}55`, borderRadius: 5, color: "#fff", fontSize: 11, padding: "4px 6px", outline: "none", fontFamily: "inherit" }} />
                               : task
-                                ? <div style={{ fontSize: 10, color: col.accent, fontWeight: 600, lineHeight: 1.3, marginBottom: 2, opacity: .9 }}>✓ {task.length > 28 ? task.slice(0,26)+"…" : task}</div>
+                                ? <div style={{ fontSize: 13, color: col.accent, fontWeight: 600, lineHeight: 1.3, marginBottom: 2, opacity: .9 }}>✓ {task.length > 40 ? task.slice(0,38)+"…" : task}</div>
                                 : <div style={{ fontSize: 9, color: "rgba(255,255,255,0.12)", textAlign: "center", padding: "2px 0" }}>לחץ</div>
                             }
                             {people.map(p => (
