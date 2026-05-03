@@ -260,6 +260,9 @@ export default function App() {
   const [modal, setModal]   = useState(null);
   const [myName, setMyName] = useState(() => localStorage.getItem("myName") || "");
   const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem("myName"));
+  const [mgrName, setMgrName] = useState("");     // שם המנהל הנוכחי
+  const mgrNameRef = useRef("");
+  useEffect(() => { mgrNameRef.current = mgrName; }, [mgrName]);
   const [toasts, setToasts] = useState([]);
   const [filterPerson, setFilterPerson] = useState("");
   const [saveErr, setSaveErr] = useState(false);
@@ -305,23 +308,39 @@ export default function App() {
     if (msg) toast(msg);
   }, [toast]);
 
+  // ── Activity log helper ──
+  const addLog = (nd, action, detail = "") => {
+    const who = mgrNameRef.current;
+    if (!who) return nd;
+    const entry = { ts: Date.now(), manager: who, action, detail };
+    const log = [...(nd.activityLog || []), entry].slice(-300);
+    return { ...nd, activityLog: log };
+  };
+
   const weekA = data ? data.assignments.filter(a => a.week === wk) : [];
   const prevA  = data ? data.assignments.filter(a => a.week === adjW(wk, -1)) : [];
 
   const copyFromPrev = () => {
     if (!prevA.length) { toast("אין שיבוצים בשבוע הקודם", "info"); return; }
     const copied = prevA.map(a => ({ ...a, id: Date.now() + Math.random(), week: wk }));
-    save({ ...data, assignments: [...data.assignments, ...copied] }, `הועתקו ${copied.length} שיבוצים`);
+    const nd = addLog({ ...data, assignments: [...data.assignments, ...copied] }, "העתיק שבוע קודם", `${copied.length} שיבוצים → שבוע ${wk}`);
+    save(nd, `הועתקו ${copied.length} שיבוצים`);
   };
 
-  const deleteAssign = id => save({ ...data, assignments: data.assignments.filter(a => a.id !== id) }, "השיבוץ נמחק");
+  const deleteAssign = id => {
+    const a = data.assignments.find(x => x.id === id);
+    const nd = addLog({ ...data, assignments: data.assignments.filter(x => x.id !== id) }, "מחק שיבוץ", a ? `${a.system} · שבוע ${a.week}` : "");
+    save(nd, "השיבוץ נמחק");
+  };
 
   const upsertAssign = a => {
     const isEdit = data.assignments.some(x => x.id === a.id);
     const assignments = isEdit
       ? data.assignments.map(x => x.id === a.id ? a : x)
       : [...data.assignments, { ...a, id: Date.now().toString() }];
-    save({ ...data, assignments }, isEdit ? "השיבוץ עודכן ✓" : "שיבוץ נוסף ✓");
+    const dayStr = (a.days||[]).map(d => DAYS.find(x=>x.key===d)?.short||d).join(", ");
+    const nd = addLog({ ...data, assignments }, isEdit ? "עדכן שיבוץ" : "הוסיף שיבוץ", `${a.system}${dayStr ? " · "+dayStr : ""}`);
+    save(nd, isEdit ? "השיבוץ עודכן ✓" : "שיבוץ נוסף ✓");
     setModal(null);
   };
 
@@ -365,9 +384,9 @@ export default function App() {
             ))}
           </nav>
           {mob && <span style={{ fontWeight: 700, fontSize: 15, color: "#fff" }}>{TABS.find(t => t.id === tab)?.label}</span>}
-          <button onClick={() => { if (mgr) setMgr(false); else setModal({ t: "auth" }); }}
+          <button onClick={() => { if (mgr) { setMgr(false); setMgrName(""); } else setModal({ t: "auth" }); }}
             style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 11px", border: `1px solid ${mgr ? "rgba(39,174,96,.4)" : "rgba(255,255,255,.1)"}`, borderRadius: 9, background: mgr ? "rgba(39,174,96,.1)" : "rgba(255,255,255,.04)", color: mgr ? "#2ecc71" : "#8892b0", cursor: "pointer", fontSize: 12, fontWeight: mgr ? 700 : 400, transition: "all .2s", minHeight: 36 }}>
-            <I n={mgr ? "unlock" : "lock"} s={14} />{mob ? (mgr ? "מנהל" : "") : (mgr ? "מנהל פעיל" : "כניסת מנהל")}
+            <I n={mgr ? "unlock" : "lock"} s={14} />{mob ? (mgr ? (mgrName.split(" ")[0]||"מנהל") : "") : (mgr ? mgrName : "כניסת מנהל")}
           </button>
         </header>
 
@@ -375,7 +394,7 @@ export default function App() {
           {tab === "board"    && <BoardView    wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} filterPerson={filterPerson} setFilterPerson={setFilterPerson} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onDelete={deleteAssign} onCopy={copyFromPrev} onCSV={() => doExportCSV(wk, weekA)} onPrint={() => doPrint(wk, weekA, data.systems)} onView={a => setViewAssign(a)} />}
           {tab === "calendar" && <CalendarView wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onCopy={copyFromPrev} onView={a => setViewAssign(a)} onPlan={() => setPlanner(true)} />}
           {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} setMyName={n => { setMyName(n); if (n) localStorage.setItem("myName", n); else localStorage.removeItem("myName"); }} onView={a => setViewAssign(a)} onChangeName={() => setShowWelcome(true)} />}
-          {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} toast={toast} />}
+          {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} mgrName={mgrName} toast={toast} />}
         </main>
 
         <BottomNav tab={tab} setTab={setTab} TABS={TABS} />
@@ -385,9 +404,9 @@ export default function App() {
         <ToastContainer toasts={toasts} />
       </div>
       {modal?.t === "assign" && <AssignModal mode={modal.mode} a={modal.a} wk={wk} data={data} sysMap={sysColorMap} onClose={() => setModal(null)} onSave={upsertAssign} />}
-      {modal?.t === "auth"   && <AuthModal pin={data.pin} onOk={() => { setMgr(true); setModal(null); toast("ברוך הבא, מנהל", "info"); }} onClose={() => setModal(null)} />}
+      {modal?.t === "auth"   && <AuthModal pin={data.pin} managers={data.managers||[]} onOk={(name) => { setMgr(true); setMgrName(name); setModal(null); toast(`ברוך הבא, ${name}`, "info"); }} onClose={() => setModal(null)} />}
       {viewAssign && <AssignDetailModal a={viewAssign} sysMap={sysColorMap} mgr={mgr} onClose={() => setViewAssign(null)} onEdit={() => { setModal({ t: "assign", mode: "edit", a: viewAssign }); setViewAssign(null); }} onDelete={() => { deleteAssign(viewAssign.id); setViewAssign(null); }} />}
-      {planner && <PlannerView wk={wk} data={data} sysMap={sysColorMap} weekA={weekA} onClose={() => setPlanner(false)} onSave={assignments => { save({ ...data, assignments }, "שבוע תוכנן ✓"); }} />}
+      {planner && <PlannerView wk={wk} data={data} sysMap={sysColorMap} weekA={weekA} onClose={() => setPlanner(false)} onSave={(assignments, planWk) => { const nd = addLog({ ...data, assignments }, "תכנן שבוע", `שבוע ${planWk||wk}`); save(nd, "שבוע תוכנן ✓"); }} />}
       {showWelcome && data && <WelcomeModal data={data} myName={myName} onSelect={n => { setMyName(n); localStorage.setItem("myName", n); setShowWelcome(false); }} onSkip={() => setShowWelcome(false)} />}
     </MobileCtx.Provider>
   );
@@ -795,14 +814,53 @@ function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName, onView, onC
   const todayKey      = todayDayKey();
   const isTodayWork   = isWorkDay(todayKey);
   const isCurrentWeek = wk === wKey(new Date());
-  const mine      = myName ? weekA.filter(a => (a.assignees || []).includes(myName)) : [];
-  const todayMine = isCurrentWeek && isTodayWork ? mine.filter(a => !a.days || a.days.length === 0 || a.days.includes(todayKey)) : [];
-  const restMine  = mine.filter(a => !todayMine.includes(a));
+  const [mode, setMode]         = useState("me");   // "me" | "all"
+  const [filterName, setFilterName] = useState(null); // null = הכל, string = מסונן
+
+  const allPeople = getAllPeople(data);
+  const shownA = mode === "me"
+    ? (myName ? weekA.filter(a => (a.assignees || []).includes(myName)) : [])
+    : (filterName ? weekA.filter(a => (a.assignees || []).includes(filterName)) : weekA);
+  const todayShown = isCurrentWeek && isTodayWork
+    ? shownA.filter(a => !a.days || a.days.length === 0 || a.days.includes(todayKey)) : [];
+  const restShown  = shownA.filter(a => !todayShown.includes(a));
+
   return (
     <div style={{ maxWidth: 640, margin: "0 auto" }}>
       <WeekNav wk={wk} setWk={setWk} />
-      {myName ? (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, background: "rgba(74,158,255,0.07)", border: "1px solid rgba(74,158,255,0.2)", borderRadius: 13, padding: "12px 16px" }}>
+
+      {/* Mode toggle */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+        <button onClick={() => setMode("me")} style={{ flex: 1, padding: "9px", border: `2px solid ${mode==="me" ? "#4a9eff" : "rgba(255,255,255,0.1)"}`, borderRadius: 10, background: mode==="me" ? "rgba(74,158,255,0.12)" : "rgba(255,255,255,0.03)", color: mode==="me" ? "#4a9eff" : "#8892b0", fontWeight: mode==="me" ? 700 : 400, fontSize: 13, cursor: "pointer" }}>
+          {myName ? myName.split(" ")[0] : "שלי"}
+        </button>
+        <button onClick={() => { setMode("all"); setFilterName(null); }} style={{ flex: 1, padding: "9px", border: `2px solid ${mode==="all" ? "#3d7fc4" : "rgba(255,255,255,0.1)"}`, borderRadius: 10, background: mode==="all" ? "rgba(61,127,196,0.12)" : "rgba(255,255,255,0.03)", color: mode==="all" ? "#7ab3e8" : "#8892b0", fontWeight: mode==="all" ? 700 : 400, fontSize: 13, cursor: "pointer" }}>
+          הכל {mode==="all" && weekA.length > 0 ? `(${weekA.length})` : ""}
+        </button>
+      </div>
+
+      {/* "הכל" mode — name filter chips */}
+      {mode === "all" && (
+        <div style={{ marginBottom: 16, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "12px 14px" }}>
+          <div style={{ fontSize: 11, color: "#556", fontWeight: 700, marginBottom: 8 }}>סנן לפי שם</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {allPeople.map(p => {
+              const isSel = filterName === p;
+              const c = sysMap[weekA.find(a=>(a.assignees||[]).includes(p))?.system] || pal(0);
+              return (
+                <button key={p} onClick={() => setFilterName(isSel ? null : p)}
+                  style={{ padding: "5px 12px", border: `1px solid ${isSel ? c.accent : "rgba(255,255,255,0.12)"}`, borderRadius: 20, background: isSel ? `${c.accent}22` : "rgba(255,255,255,0.04)", color: isSel ? c.accent : "#8892b0", fontSize: 12, fontWeight: isSel ? 700 : 400, cursor: "pointer" }}>
+                  {isSel ? "✕ " : ""}{p}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* "שלי" mode — identity card */}
+      {mode === "me" && myName && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, background: "rgba(74,158,255,0.07)", border: "1px solid rgba(74,158,255,0.2)", borderRadius: 13, padding: "12px 16px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ width: 38, height: 38, borderRadius: "50%", background: "linear-gradient(135deg,#4a9eff,#3d7fc4)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 16, color: "#fff", flexShrink: 0 }}>{myName[0]}</div>
             <div>
@@ -812,7 +870,8 @@ function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName, onView, onC
           </div>
           <button onClick={onChangeName} style={{ padding: "6px 12px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, color: "#8892b0", fontSize: 12, cursor: "pointer" }}>שנה שם</button>
         </div>
-      ) : (
+      )}
+      {mode === "me" && !myName && (
         <div style={{ marginBottom: 20, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 13, padding: "14px 16px" }}>
           <label style={{ ...lbl, marginBottom: 10 }}>מי אתה?</label>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -821,9 +880,7 @@ function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName, onView, onC
                 <div style={{ fontSize: 10, color: pal(si).accent, fontWeight: 700, letterSpacing: .5, marginBottom: 6, textTransform: "uppercase" }}>{sec.name}</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {sec.people.map(p => (
-                    <button key={p} onClick={() => { setMyName(p); localStorage.setItem("myName", p); }} style={{ padding: "7px 14px", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 20, background: "rgba(255,255,255,0.04)", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>
-                      {p}
-                    </button>
+                    <button key={p} onClick={() => { setMyName(p); localStorage.setItem("myName", p); }} style={{ padding: "7px 14px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 20, background: "rgba(255,255,255,0.04)", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>{p}</button>
                   ))}
                 </div>
               </div>
@@ -831,26 +888,34 @@ function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName, onView, onC
           </div>
         </div>
       )}
-      {!myName && <div style={{ textAlign: "center", padding: "48px 24px", opacity: .5 }}><div style={{ fontSize: 40, marginBottom: 10 }}>👆</div><div style={{ fontSize: 15, fontWeight: 600, color: "#ccd6f6" }}>בחר את שמך למעלה</div></div>}
-      {myName && mine.length === 0 && <div style={{ textAlign: "center", padding: "48px 24px", opacity: .5 }}><div style={{ fontSize: 40, marginBottom: 10 }}>📭</div><div style={{ fontSize: 15, fontWeight: 600, color: "#ccd6f6" }}>אין שיבוצים ל{myName} בשבוע זה</div></div>}
-      {todayMine.length > 0 && (
+
+      {/* Empty states */}
+      {mode === "me" && !myName && <div style={{ textAlign: "center", padding: "40px 24px", opacity: .5 }}><div style={{ fontSize: 36, marginBottom: 8 }}>👆</div><div style={{ fontSize: 14, color: "#ccd6f6" }}>בחר את שמך למעלה</div></div>}
+      {shownA.length === 0 && (mode === "all" || myName) && <div style={{ textAlign: "center", padding: "40px 24px", opacity: .5 }}><div style={{ fontSize: 36, marginBottom: 8 }}>📭</div><div style={{ fontSize: 14, color: "#ccd6f6" }}>{filterName ? `אין שיבוצים ל${filterName}` : "אין שיבוצים בשבוע זה"}</div></div>}
+
+      {/* Today */}
+      {todayShown.length > 0 && (
         <div style={{ marginBottom: 18 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <I n="sun" s={14} /><span style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>היום — {DAYS.find(d => d.key === todayKey)?.long}</span>
             <span style={{ background: "rgba(74,158,255,0.2)", color: "#4a9eff", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, border: "1px solid rgba(74,158,255,0.3)" }}>עכשיו</span>
           </div>
-          {todayMine.map((a, i) => <AssignRow key={a.id} a={a} col={sysMap[a.system] || pal(i)} highlight onView={() => onView(a)} />)}
+          {todayShown.map((a, i) => <AssignRow key={a.id} a={a} col={sysMap[a.system] || pal(i)} highlight onView={() => onView(a)} />)}
         </div>
       )}
-      {myName && mine.length > 0 && todayMine.length === 0 && isCurrentWeek && isTodayWork && (
+      {shownA.length > 0 && todayShown.length === 0 && isCurrentWeek && isTodayWork && mode === "me" && (
         <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#8892b0", textAlign: "center" }}>
           אין שיבוצים להיום ספציפית — בדוק שיבוצי השבוע למטה
         </div>
       )}
-      {myName && restMine.length > 0 && (
+
+      {/* Rest of week */}
+      {restShown.length > 0 && (
         <div>
-          <div style={{ fontSize: 12, color: "#8892b0", fontWeight: 600, letterSpacing: .5, marginBottom: 10, textTransform: "uppercase" }}>שאר השבוע</div>
-          {restMine.map((a, i) => <AssignRow key={a.id} a={a} col={sysMap[a.system] || pal(i + 2)} onView={() => onView(a)} />)}
+          <div style={{ fontSize: 12, color: "#8892b0", fontWeight: 600, letterSpacing: .5, marginBottom: 10, textTransform: "uppercase" }}>
+            {todayShown.length > 0 ? "שאר השבוע" : "שיבוצי השבוע"}
+          </div>
+          {restShown.map((a, i) => <AssignRow key={a.id} a={a} col={sysMap[a.system] || pal(i + 2)} onView={() => onView(a)} />)}
         </div>
       )}
     </div>
@@ -886,10 +951,10 @@ function AssignRow({ a, col, highlight }) {
 }
 
 /* ── SETTINGS ── */
-function SettingsView({ data, save, mgr, toast }) {
+function SettingsView({ data, save, mgr, mgrName, toast }) {
+  const isMaster = mgrName === "מנהל ראשי";
   const [st, setSt]     = useState("sys");
   const [vSys, setVSys] = useState("");
-  const [vP, setVP]     = useState("");
   const [vPin, setVPin] = useState("");
   if (!mgr) return (
     <div style={{ textAlign: "center", padding: "80px 24px", opacity: .4 }}>
@@ -898,27 +963,102 @@ function SettingsView({ data, save, mgr, toast }) {
       <div style={{ fontSize: 12, color: "#8892b0" }}>לחץ על ״כניסת מנהל״ למעלה</div>
     </div>
   );
+  const tabs = [
+    { id: "sys", l: "מערכות" },
+    { id: "ppl", l: "אנשי צוות" },
+    { id: "log", l: "יומן פעילות" },
+    ...(isMaster ? [{ id: "mgrs", l: "מנהלים" }, { id: "sec", l: "אבטחה" }] : []),
+  ];
   return (
     <div style={{ maxWidth: 540, margin: "0 auto" }}>
-      <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: 4 }}>
-        {[{ id: "sys", l: "מערכות" }, { id: "ppl", l: "אנשי צוות" }, { id: "sec", l: "אבטחה" }].map(t => (
-          <button key={t.id} onClick={() => setSt(t.id)} style={{ flex: 1, padding: "7px 0", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: st === t.id ? 700 : 400, background: st === t.id ? "rgba(74,158,255,0.2)" : "transparent", color: st === t.id ? "#4a9eff" : "#8892b0" }}>{t.l}</button>
+      <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: 4, flexWrap: "wrap" }}>
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setSt(t.id)} style={{ flex: 1, minWidth: 70, padding: "7px 4px", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: st === t.id ? 700 : 400, background: st === t.id ? "rgba(74,158,255,0.2)" : "transparent", color: st === t.id ? "#4a9eff" : "#8892b0" }}>{t.l}</button>
         ))}
       </div>
-      {st === "sys" && <SystemsEditor data={data} save={save} toast={toast} vSys={vSys} setVSys={setVSys} />}
-      {st === "ppl" && <SectionsEditor data={data} save={save} toast={toast} />}
-      {st === "sec" && (
+      {st === "sys"  && <SystemsEditor data={data} save={save} toast={toast} vSys={vSys} setVSys={setVSys} />}
+      {st === "ppl"  && <SectionsEditor data={data} save={save} toast={toast} />}
+      {st === "log"  && <ActivityLog data={data} />}
+      {st === "mgrs" && isMaster && <ManagersEditor data={data} save={save} toast={toast} />}
+      {st === "sec"  && isMaster && (
         <div>
-          <label style={lbl}>שנה קוד PIN של מנהל</label>
+          <label style={lbl}>שנה קוד PIN ראשי</label>
           <div style={{ display: "flex", gap: 8 }}>
-            <input value={vPin} onChange={e => setVPin(e.target.value)} type="password" placeholder="קוד PIN חדש (לפחות 4 תווים)" style={inp} />
+            <input value={vPin} onChange={e => setVPin(e.target.value)} type="password" inputMode="numeric" placeholder="קוד PIN חדש (לפחות 4 ספרות)" style={inp} />
             <PillBtn onClick={() => { if (vPin.length < 4) { toast("קוד חייב להיות לפחות 4 תווים", "error"); return; } save({ ...data, pin: vPin }, "קוד PIN עודכן ✓"); setVPin(""); }}>עדכן</PillBtn>
           </div>
           <div style={{ marginTop: 12, padding: "10px 14px", background: "rgba(255,165,0,0.08)", border: "1px solid rgba(255,165,0,0.2)", borderRadius: 9, fontSize: 12, color: "#e67e22" }}>
-            PIN נוכחי: {data.pin} · שמור את הקוד במקום בטוח
+            PIN ראשי נוכחי: {data.pin} · שמור במקום בטוח
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── MANAGERS EDITOR ── */
+function ManagersEditor({ data, save, toast }) {
+  const [name, setName] = useState("");
+  const [pin, setPin]   = useState("");
+  const managers = data.managers || [];
+  const add = () => {
+    if (!name.trim()) { toast("הכנס שם", "error"); return; }
+    if (pin.length < 4) { toast("קוד חייב להיות לפחות 4 ספרות", "error"); return; }
+    if (managers.some(m => m.pin === pin) || pin === data.pin) { toast("קוד כבר בשימוש", "error"); return; }
+    save({ ...data, managers: [...managers, { id: Date.now().toString(36), name: name.trim(), pin }] }, `מנהל נוסף: ${name.trim()}`);
+    setName(""); setPin("");
+  };
+  const remove = id => save({ ...data, managers: managers.filter(m => m.id !== id) }, "מנהל הוסר");
+  return (
+    <div>
+      <div style={{ marginBottom: 16, padding: "14px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12 }}>
+        <label style={{ ...lbl, marginBottom: 10 }}>הוסף מנהל חדש</label>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="שם מלא" style={{ ...inp, flex: 2 }} />
+          <input value={pin} onChange={e => setPin(e.target.value)} type="password" inputMode="numeric" placeholder="קוד PIN" style={{ ...inp, flex: 1 }} />
+        </div>
+        <PillBtn onClick={add} color="#4a9eff">הוסף מנהל</PillBtn>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {managers.length === 0 && <div style={{ fontSize: 13, color: "#445", textAlign: "center", padding: 20 }}>אין מנהלים מוגדרים עדיין</div>}
+        {managers.map(m => (
+          <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRight: "3px solid #4a9eff", borderRadius: 10 }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>{m.name}</div>
+              <div style={{ fontSize: 11, color: "#556" }}>PIN: {"●".repeat(m.pin.length)}</div>
+            </div>
+            <button onClick={() => remove(m.id)} style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", opacity: .7, padding: 6 }} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=.7}><I n="trash" s={15} /></button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── ACTIVITY LOG ── */
+function ActivityLog({ data }) {
+  const log = [...(data.activityLog || [])].reverse();
+  const fmt = ts => {
+    const d = new Date(ts);
+    return d.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" }) + " " + d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+  };
+  const actionColor = a => a.includes("מחק") ? "#e74c3c" : a.includes("הוסיף") ? "#2ecc71" : a.includes("תכנן") ? "#3d7fc4" : "#4a9eff";
+  if (!log.length) return <div style={{ textAlign: "center", padding: "48px 24px", opacity: .4 }}><div style={{ fontSize: 32, marginBottom: 8 }}>📋</div><div style={{ fontSize: 14, color: "#8892b0" }}>אין פעילות מתועדת עדיין</div></div>;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ fontSize: 11, color: "#556", marginBottom: 6 }}>{log.length} רשומות · המוצגות מהאחרונה לראשונה</div>
+      {log.map((e, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "9px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRight: `3px solid ${actionColor(e.action)}`, borderRadius: 9 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+              <span style={{ fontWeight: 700, fontSize: 13, color: "#ccd6f6" }}>{e.manager}</span>
+              <span style={{ fontSize: 11, color: actionColor(e.action), fontWeight: 600 }}>{e.action}</span>
+            </div>
+            {e.detail && <div style={{ fontSize: 11, color: "#8892b0" }}>{e.detail}</div>}
+          </div>
+          <div style={{ fontSize: 10, color: "#445", whiteSpace: "nowrap", marginTop: 2 }}>{fmt(e.ts)}</div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -1132,7 +1272,7 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
         newA.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2), week: planWk, system: sys, days: c.days, assignees: people, tasks, notes: existing?.notes || "" });
       });
     });
-    onSave([...otherWeeks, ...newA]);
+    onSave([...otherWeeks, ...newA], planWk);
   };
 
   const hintText = selected
@@ -1462,10 +1602,15 @@ function AssignModal({ mode, a, wk, data, sysMap, onClose, onSave }) {
 }
 
 /* ── AUTH MODAL ── */
-function AuthModal({ pin, onOk, onClose }) {
+function AuthModal({ pin, managers, onOk, onClose }) {
   const [v, setV]     = useState("");
   const [err, setErr] = useState(false);
-  const try_ = () => { if (v === pin) { onOk(); } else { setErr(true); setV(""); setTimeout(() => setErr(false), 1500); } };
+  const try_ = () => {
+    if (v === pin) { onOk("מנהל ראשי"); return; }
+    const mgr = (managers||[]).find(m => m.pin === v);
+    if (mgr) { onOk(mgr.name); return; }
+    setErr(true); setV(""); setTimeout(() => setErr(false), 1500);
+  };
   return (
     <Overlay onClose={onClose}>
       <div dir="rtl" style={{ background: "#0f1525", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 18, padding: "28px 26px", textAlign: "center", boxShadow: "0 32px 80px rgba(0,0,0,.8)" }}>
