@@ -609,7 +609,7 @@ function WeekNav({ wk, setWk, children }) {
     <div style={{ marginBottom: mob ? 12 : 18 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <NavBtn onClick={() => setWk(adjW(wk, 1))}><I n="cR" s={15} /></NavBtn>
+          <NavBtn onClick={() => setWk(adjW(wk, -1))}><I n="cR" s={15} /></NavBtn>
           <div style={{ textAlign: "center", minWidth: mob ? 120 : 165 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
               <span style={{ fontWeight: 700, fontSize: mob ? 15 : 17, color: "#fff" }}>שבוע {wk.split("-W")[1]}</span>
@@ -617,7 +617,7 @@ function WeekNav({ wk, setWk, children }) {
             </div>
             <div style={{ fontSize: 14, color: "#ccd6f6", marginTop: 2, fontWeight: 600, letterSpacing: 0.2 }}>{wLabel(wk)}</div>
           </div>
-          <NavBtn onClick={() => setWk(adjW(wk, -1))}><I n="cL" s={15} /></NavBtn>
+          <NavBtn onClick={() => setWk(adjW(wk, 1))}><I n="cL" s={15} /></NavBtn>
           {!isToday && <button onClick={() => setWk(wKey(new Date()))} style={{ padding: "4px 9px", border: "1px solid rgba(74,158,255,.3)", borderRadius: 8, background: "rgba(74,158,255,.1)", color: "#4a9eff", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>היום</button>}
         </div>
         {!mob && <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>{children}</div>}
