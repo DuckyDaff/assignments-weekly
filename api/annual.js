@@ -47,19 +47,41 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── PATCH: update one day's data (in-app edits) ───────────────
+  // ── PATCH: update one day OR a date range ────────────────────
   if (req.method === "PATCH") {
     try {
       const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-      // body: { date: "2026-01-15", statuses, notes, vehicles, workDay, workNight }
-      if (!body?.date) return res.status(400).json({ error: "missing date" });
 
       const raw = await redis.get(REDIS_KEY);
       const plan = raw ? JSON.parse(raw) : { year: 2026, sections: [], days: {} };
 
+      // ── Range update: { person, code, fromDate, toDate } ─────
+      if (body.fromDate && body.toDate && body.person !== undefined) {
+        const from = new Date(body.fromDate + "T00:00:00");
+        const to   = new Date(body.toDate   + "T00:00:00");
+        if (isNaN(from) || isNaN(to) || from > to)
+          return res.status(400).json({ error: "invalid date range" });
+
+        let count = 0;
+        for (const d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+          const iso = d.toISOString().slice(0, 10);
+          const dayData  = plan.days[iso] || {};
+          const statuses = { ...(dayData.statuses || {}) };
+          if (body.code) statuses[body.person] = body.code;
+          else           delete statuses[body.person];
+          plan.days[iso] = { ...dayData, statuses };
+          count++;
+        }
+        await redis.set(REDIS_KEY, JSON.stringify(plan));
+        return res.json({ ok: true, days: count });
+      }
+
+      // ── Single-day update: { date, statuses?, notes?, … } ────
+      if (!body?.date) return res.status(400).json({ error: "missing date or range" });
+
       const existing = plan.days[body.date] || {};
       plan.days[body.date] = { ...existing, ...body };
-      delete plan.days[body.date].date; // don't store date twice
+      delete plan.days[body.date].date;
 
       await redis.set(REDIS_KEY, JSON.stringify(plan));
       return res.json({ ok: true, date: body.date });

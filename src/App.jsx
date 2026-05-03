@@ -468,7 +468,6 @@ export default function App() {
     fetch("/api/annual").then(r => r.ok ? r.json() : null).then(d => { if (d) setAnnualData(d); }).catch(() => {});
   }, []);
   const saveAnnualDay = useCallback(async patch => {
-    // Optimistic update
     setAnnualData(prev => {
       if (!prev) return prev;
       const existing = prev.days[patch.date] || {};
@@ -480,6 +479,31 @@ export default function App() {
       body: JSON.stringify(patch),
     }).catch(() => {});
   }, []);
+
+  const saveAbsenceRange = useCallback(async ({ person, code, fromDate, toDate }) => {
+    // Optimistic update: apply to every day in range
+    setAnnualData(prev => {
+      if (!prev) return prev;
+      const days = { ...prev.days };
+      const from = new Date(fromDate + "T00:00:00");
+      const to   = new Date(toDate   + "T00:00:00");
+      for (const d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+        const iso = d.toISOString().slice(0, 10);
+        const dayData  = days[iso] || {};
+        const statuses = { ...(dayData.statuses || {}) };
+        if (code) statuses[person] = code; else delete statuses[person];
+        days[iso] = { ...dayData, statuses };
+      }
+      return { ...prev, days };
+    });
+    await fetch("/api/annual", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ person, code, fromDate, toDate }),
+    }).catch(() => {});
+  }, []);
+
+  const [showAbsenceModal, setShowAbsenceModal] = useState(false);
 
   const save = useCallback(async (nd, msg) => {
     setData(nd);
@@ -599,6 +623,11 @@ export default function App() {
         {mgr && (tab === "board" || tab === "calendar") && (
           <button className="fab" onClick={openAdd} style={{ position: "fixed", left: 20, bottom: 80, width: 56, height: 56, borderRadius: 28, background: "linear-gradient(135deg,#4a9eff,#3d7fc4)", border: "none", color: "#fff", fontSize: 28, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 6px 24px rgba(74,158,255,.5)", cursor: "pointer", zIndex: 150 }}>+</button>
         )}
+        {mgr && (
+          <button onClick={() => setShowAbsenceModal(true)}
+            title="רשום היעדרות"
+            style={{ position: "fixed", left: 20, bottom: mob ? 144 : 24, width: 48, height: 48, borderRadius: 24, background: "linear-gradient(135deg,#e67e22,#c0392b)", border: "none", color: "#fff", fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 18px rgba(231,76,60,.5)", cursor: "pointer", zIndex: 150 }}>📋</button>
+        )}
         <ToastContainer toasts={toasts} />
       </div>
       {modal?.t === "assign" && <AssignModal mode={modal.mode} a={modal.a} wk={wk} data={data} sysMap={sysColorMap} onClose={() => setModal(null)} onSave={upsertAssign} />}
@@ -606,6 +635,7 @@ export default function App() {
       {viewAssign && <AssignDetailModal a={viewAssign} sysMap={sysColorMap} mgr={mgr} onClose={() => setViewAssign(null)} onEdit={() => { setModal({ t: "assign", mode: "edit", a: viewAssign }); setViewAssign(null); }} onDelete={() => { deleteAssign(viewAssign.id); setViewAssign(null); }} />}
       {planner && <PlannerView wk={wk} data={data} sysMap={sysColorMap} weekA={weekA} annualData={annualData} onClose={() => setPlanner(false)} onSave={(assignments, planWk) => { const nd = addLog({ ...data, assignments }, "תכנן שבוע", `שבוע ${planWk||wk}`); save(nd, "שבוע תוכנן ✓"); }} />}
       {showWelcome && data && <WelcomeModal data={data} myName={myName} onSelect={n => { setMyName(n); localStorage.setItem("myName", n); setShowWelcome(false); }} onSkip={() => setShowWelcome(false)} />}
+      {showAbsenceModal && <AbsenceModal data={data} annualData={annualData} onClose={() => setShowAbsenceModal(false)} onSave={async (range) => { await saveAbsenceRange(range); setShowAbsenceModal(false); toast(`✓ עודכן ${range.person} — ${range.fromDate} עד ${range.toDate}`); }} />}
     </MobileCtx.Provider>
   );
 }
@@ -1632,9 +1662,23 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
     setSelected(null);
   };
 
-  const ck  = (sys, col) => `${sys}__${col}`;
-  const add = (sys, col, p) => setGrid(g => { const k = ck(sys,col); return { ...g, [k]: [...new Set([...(g[k]||[]),p])] }; });
-  const rem = (sys, col, p) => setGrid(g => { const k = ck(sys,col); return { ...g, [k]: (g[k]||[]).filter(x=>x!==p) }; });
+  const [conflict, setConflict] = useState(null); // { sys, col, person, code, label, iso }
+
+  const ck      = (sys, col) => `${sys}__${col}`;
+  const doAdd   = (sys, col, p) => setGrid(g => { const k = ck(sys,col); return { ...g, [k]: [...new Set([...(g[k]||[]),p])] }; });
+  const rem     = (sys, col, p) => setGrid(g => { const k = ck(sys,col); return { ...g, [k]: (g[k]||[]).filter(x=>x!==p) }; });
+
+  const add = (sys, col, p) => {
+    // Check annual plan availability for that specific day
+    const iso  = wkDayToDate(planWk, col);
+    const code = iso ? (annualData?.days?.[iso]?.statuses?.[p] || "") : "";
+    if (code && UNAVAILABLE_CODES.has(code)) {
+      const st = statusStyle(code);
+      setConflict({ sys, col, person: p, code, label: st?.label || code, iso });
+      return;
+    }
+    doAdd(sys, col, p);
+  };
 
   const activateCell = (k) => {
     setActiveCell(k);
@@ -1673,6 +1717,33 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
 
   return (
     <div dir="rtl" style={{ position: "fixed", inset: 0, background: "#080c18", zIndex: 400, display: "flex", flexDirection: "column", fontFamily: "'Segoe UI','Arial Hebrew',Arial,sans-serif", color: "#dde2f0" }}>
+
+      {/* ── Conflict warning overlay ── */}
+      {conflict && (
+        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(4px)" }}>
+          <div dir="rtl" style={{ background: "#0f1525", border: "1px solid rgba(231,76,60,0.4)", borderRadius: 18, padding: "26px 24px", maxWidth: 380, width: "100%", boxShadow: "0 24px 60px rgba(0,0,0,0.8)" }}>
+            <div style={{ fontSize: 32, textAlign: "center", marginBottom: 10 }}>⚠️</div>
+            <div style={{ fontWeight: 700, fontSize: 16, color: "#fff", textAlign: "center", marginBottom: 6 }}>עובד לא זמין</div>
+            <div style={{ textAlign: "center", marginBottom: 16 }}>
+              <span style={{ fontWeight: 700, color: "#4a9eff" }}>{conflict.person}</span>
+              <span style={{ color: "#8892b0" }}> מסומן/ת כ</span>
+              <span style={{ display: "inline-block", background: statusStyle(conflict.code)?.bg || "#e74c3c", color: "#fff", borderRadius: 6, padding: "2px 10px", fontSize: 13, fontWeight: 700, margin: "0 4px" }}>{conflict.label}</span>
+              <div style={{ fontSize: 12, color: "#556", marginTop: 6 }}>{conflict.iso}</div>
+            </div>
+            <div style={{ fontSize: 13, color: "#8892b0", textAlign: "center", marginBottom: 20 }}>האם לשבץ בכל זאת?</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => { doAdd(conflict.sys, conflict.col, conflict.person); setConflict(null); }}
+                style={{ flex: 1, padding: "11px", background: "rgba(231,76,60,0.15)", border: "1px solid rgba(231,76,60,0.4)", borderRadius: 10, color: "#e74c3c", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                שבץ בכל זאת
+              </button>
+              <button onClick={() => setConflict(null)}
+                style={{ flex: 1, padding: "11px", background: "linear-gradient(135deg,#4a9eff,#3d7fc4)", border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                ביטול
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div style={{ background: "#0f1525", borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "0 16px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, gap: 8 }}>
@@ -2394,6 +2465,150 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
         );
       })}
     </div>
+  );
+}
+
+/* ── ABSENCE REGISTRATION MODAL ── */
+const ABSENCE_TYPES = [
+  { code: "ח",   label: "חופש",              color: "#e74c3c" },
+  { code: "מיל", label: "מילואים",           color: "#922b21" },
+  { code: "מ",   label: "מחלה",              color: "#c0392b" },
+  { code: "פ",   label: "יום פנוי",          color: "#7f8c8d" },
+  { code: "מנוחה", label: "מנוחה",           color: "#7f8c8d" },
+  { code: "ק",   label: "קורס",              color: "#8e44ad" },
+  { code: "השתלמות", label: "השתלמות",       color: "#6c3483" },
+  { code: "כ",   label: "כוננות",            color: "#e67e22" },
+  { code: "כמ",  label: "כוננות מסלולים",   color: "#f39c12" },
+  { code: "כש",  label: "כוננות שבת",        color: "#d35400" },
+];
+
+function AbsenceModal({ data, annualData, onClose, onSave }) {
+  const mob = useContext(MobileCtx);
+  const allPeople = getAllPeople(data);
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [person,   setPerson]   = useState("");
+  const [code,     setCode]     = useState("ח");
+  const [fromDate, setFromDate] = useState(today);
+  const [toDate,   setToDate]   = useState(today);
+  const [saving,   setSaving]   = useState(false);
+
+  // Count how many days in range
+  const dayCount = (() => {
+    if (!fromDate || !toDate) return 0;
+    const d1 = new Date(fromDate), d2 = new Date(toDate);
+    if (d2 < d1) return 0;
+    return Math.round((d2 - d1) / 86400000) + 1;
+  })();
+
+  // Preview: existing status in range for this person
+  const preview = (() => {
+    if (!person || !fromDate || !toDate || !annualData) return [];
+    const from = new Date(fromDate + "T00:00:00");
+    const to   = new Date(toDate   + "T00:00:00");
+    const out  = [];
+    for (const d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+      const iso      = d.toISOString().slice(0, 10);
+      const existing = annualData.days?.[iso]?.statuses?.[person] || "";
+      if (existing && existing !== code) out.push({ iso, existing });
+    }
+    return out.slice(0, 5);
+  })();
+
+  const selType = ABSENCE_TYPES.find(t => t.code === code) || ABSENCE_TYPES[0];
+
+  const handleSave = async () => {
+    if (!person)    return;
+    if (!fromDate || !toDate) return;
+    if (new Date(toDate) < new Date(fromDate)) return;
+    setSaving(true);
+    await onSave({ person, code, fromDate, toDate });
+    setSaving(false);
+  };
+
+  return (
+    <Overlay onClose={onClose}>
+      <div dir="rtl" style={{ background: "linear-gradient(160deg,#0f1a35,#0a1220)", border: "1px solid rgba(231,76,60,0.25)", borderRadius: 20, overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,.8)", maxHeight: "90dvh", display: "flex", flexDirection: "column" }}>
+        {/* Header */}
+        <div style={{ background: "rgba(231,76,60,0.1)", borderBottom: "1px solid rgba(231,76,60,0.2)", padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 16, color: "#fff" }}>📋 רישום היעדרות</div>
+            <div style={{ fontSize: 11, color: "#8892b0", marginTop: 2 }}>עדכון תוכנית שנתית + אזהרה בשיבוצים</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#556", fontSize: 20, cursor: "pointer", padding: 4 }}>✕</button>
+        </div>
+
+        <div style={{ padding: "20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Person */}
+          <div>
+            <label style={lbl}>עובד</label>
+            <select value={person} onChange={e => setPerson(e.target.value)}
+              style={{ ...inp, cursor: "pointer" }}>
+              <option value="">— בחר עובד —</option>
+              {getSections(data).map(sec => (
+                <optgroup key={sec.name} label={sec.name}>
+                  {sec.people.map(p => <option key={p} value={p}>{p}</option>)}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+
+          {/* Absence type */}
+          <div>
+            <label style={lbl}>סוג היעדרות</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {ABSENCE_TYPES.map(t => (
+                <button key={t.code} onClick={() => setCode(t.code)}
+                  style={{ padding: "7px 13px", borderRadius: 20, border: `2px solid ${t.code === code ? t.color : t.color + "44"}`, background: t.code === code ? `${t.color}22` : "rgba(255,255,255,0.04)", color: t.code === code ? t.color : "#8892b0", fontSize: 12, fontWeight: t.code === code ? 700 : 400, cursor: "pointer", transition: "all .12s" }}>
+                  {t.label}
+                  <span style={{ marginRight: 5, fontSize: 10, opacity: 0.7 }}>{t.code}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Date range */}
+          <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={lbl}>מתאריך</label>
+              <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); if (e.target.value > toDate) setToDate(e.target.value); }}
+                style={inp} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={lbl}>עד תאריך</label>
+              <input type="date" value={toDate} min={fromDate} onChange={e => setToDate(e.target.value)}
+                style={inp} />
+            </div>
+          </div>
+
+          {/* Summary */}
+          {person && fromDate && toDate && dayCount > 0 && (
+            <div style={{ background: `${selType.color}11`, border: `1px solid ${selType.color}33`, borderRadius: 10, padding: "12px 14px" }}>
+              <div style={{ fontSize: 13, color: "#ccd6f6", fontWeight: 600, marginBottom: 4 }}>
+                <span style={{ color: "#4a9eff" }}>{person}</span> — <span style={{ background: selType.color, color: "#fff", borderRadius: 5, padding: "1px 8px", fontSize: 12, fontWeight: 700 }}>{selType.label}</span>
+              </div>
+              <div style={{ fontSize: 12, color: "#8892b0" }}>
+                {fromDate === toDate ? `יום אחד: ${fromDate}` : `${dayCount} ימים: ${fromDate} עד ${toDate}`}
+              </div>
+              {preview.length > 0 && (
+                <div style={{ marginTop: 8, fontSize: 11, color: "#e67e22" }}>
+                  ⚠ ידרוס סטטוסים קיימים: {preview.map(p => `${p.iso} (${p.existing})`).join(", ")}{preview.length === 5 ? "..." : ""}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div style={{ padding: "14px 20px", borderTop: "1px solid rgba(255,255,255,0.07)", display: "flex", gap: 8 }}>
+          <button onClick={handleSave} disabled={!person || dayCount === 0 || saving}
+            style={{ flex: 1, padding: "12px", background: person && dayCount > 0 ? `linear-gradient(135deg,${selType.color},${selType.color}cc)` : "rgba(255,255,255,0.06)", border: "none", borderRadius: 11, color: person && dayCount > 0 ? "#fff" : "#445", fontWeight: 700, fontSize: 14, cursor: person && dayCount > 0 ? "pointer" : "default", boxShadow: person && dayCount > 0 ? `0 4px 14px ${selType.color}44` : "none", transition: "all .15s" }}>
+            {saving ? "שומר..." : `✓ שמור${dayCount > 1 ? ` (${dayCount} ימים)` : ""}`}
+          </button>
+          <button onClick={onClose} style={{ padding: "12px 16px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 11, color: "#8892b0", cursor: "pointer", fontSize: 14 }}>ביטול</button>
+        </div>
+      </div>
+    </Overlay>
   );
 }
 
