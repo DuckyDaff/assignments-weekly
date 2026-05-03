@@ -2864,21 +2864,24 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                     <tbody>
                       {monthDays.map(({ num, iso, dow }, ri) => {
                         const dayData   = days[iso] || {};
-                        const statuses2 = dayData.statuses2 || {};
-                        const isToday   = iso === today;
-                        const isSat     = dow === 6;
-                        const rowBg     = isToday ? 'rgba(74,158,255,0.1)' : isSat ? 'rgba(255,255,255,0.025)' : ri % 2 === 0 ? 'rgba(255,255,255,0.018)' : 'rgba(0,0,0,0.15)';
-                        const stickyBg  = isToday ? '#0d1e3a' : isSat ? '#0b0f1e' : ri % 2 === 0 ? '#0c1022' : '#090d1a';
+                        const statuses2  = dayData.statuses2 || {};
+                        const isToday    = iso === today;
+                        const isSat      = dow === 6;
+                        const isFri      = dow === 5;
+                        const isWeekend  = isFri || isSat;
+                        const rowBg      = isToday ? 'rgba(74,158,255,0.1)' : isWeekend ? 'rgba(100,100,130,0.18)' : ri % 2 === 0 ? 'rgba(255,255,255,0.018)' : 'rgba(0,0,0,0.15)';
+                        const stickyBg   = isToday ? '#0d1e3a' : isWeekend ? '#0d0f1c' : ri % 2 === 0 ? '#0c1022' : '#090d1a';
+                        const emptyCellBg = isWeekend ? 'rgba(100,100,130,0.1)' : 'transparent';
                         return (
                           <tr key={iso}
-                            style={{ background: rowBg, borderBottom: `1px solid rgba(255,255,255,${isSat ? '0.12' : '0.06'})` }}>
+                            style={{ background: rowBg, borderBottom: `1px solid rgba(255,255,255,${isWeekend ? '0.1' : '0.06'})` }}>
                             {/* Date cell — only this navigates to daily lens */}
                             <td onClick={() => { setSelDate(iso); setLens('daily'); }}
-                              style={{ padding: '5px 8px', position: 'sticky', right: 0, background: stickyBg, zIndex: 1, whiteSpace: 'nowrap', verticalAlign: 'middle', borderLeft: `1px solid rgba(255,255,255,0.1)`, borderBottom: `1px solid rgba(255,255,255,${isSat ? '0.12' : '0.06'})`, cursor: 'pointer' }}
+                              style={{ padding: '5px 8px', position: 'sticky', right: 0, background: stickyBg, zIndex: 1, whiteSpace: 'nowrap', verticalAlign: 'middle', borderLeft: `1px solid rgba(255,255,255,0.1)`, borderBottom: `1px solid rgba(255,255,255,${isWeekend ? '0.1' : '0.06'})`, cursor: 'pointer' }}
                               onMouseEnter={e => e.currentTarget.style.background = '#1a2a4a'}
                               onMouseLeave={e => e.currentTarget.style.background = stickyBg}>
-                              <span style={{ fontWeight: isToday ? 700 : isSat ? 600 : 400, color: isToday ? '#4a9eff' : isSat ? '#7788aa' : '#c0cce0', fontSize: 13 }}>{num}</span>
-                              <span style={{ fontSize: 10, color: isSat ? '#556' : '#445', marginRight: 4 }}>{DAY_SHORT[dow]}</span>
+                              <span style={{ fontWeight: isToday ? 700 : isWeekend ? 600 : 400, color: isToday ? '#4a9eff' : isWeekend ? '#8899bb' : '#c0cce0', fontSize: 13 }}>{num}</span>
+                              <span style={{ fontSize: 10, color: isWeekend ? '#667' : '#445', marginRight: 4 }}>{DAY_SHORT[dow]}</span>
                               {dayData.notes && <span style={{ fontSize: 10 }}>📝</span>}
                             </td>
                             {people.map((person) => {
@@ -2912,10 +2915,10 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                               });
                               return (
                                 <Fragment key={person}>
-                                  <td {...makeTd(key1, 1, code1, st1, hover1, 44, '3px', '3px solid rgba(255,255,255,0.55)', 'transparent')}>
+                                  <td {...makeTd(key1, 1, code1, st1, hover1, 44, '3px', '3px solid rgba(255,255,255,0.55)', emptyCellBg)}>
                                     {code1 ? <StatusBadge code={code1} /> : (hover1 ? <span style={{ fontSize: 13, opacity: 0.5 }}>+</span> : null)}
                                   </td>
-                                  <td {...makeTd(key2, 2, code2, st2, hover2, 22, '2px', '1px solid rgba(255,255,255,0.13)', 'rgba(0,0,0,0.1)')}>
+                                  <td {...makeTd(key2, 2, code2, st2, hover2, 22, '2px', '1px solid rgba(255,255,255,0.13)', isWeekend ? 'rgba(100,100,130,0.15)' : 'rgba(0,0,0,0.1)')}>
                                     {code2 ? <StatusBadge code={code2} small /> : (hover2 ? <span style={{ fontSize: 11, opacity: 0.5 }}>+</span> : null)}
                                   </td>
                                 </Fragment>
