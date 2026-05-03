@@ -2507,11 +2507,18 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
     onSaveDay({ date: selDate, statuses: newStatuses });
   }
 
-  function saveStatusForDate(iso, person, code) {
+  // slot: 1 = main (statuses), 2 = secondary (statuses2)
+  function saveStatusForDate(iso, person, code, slot = 1) {
     const dayData = days[iso] || {};
-    const newStatuses = { ...(dayData.statuses || {}) };
-    if (code) newStatuses[person] = code; else delete newStatuses[person];
-    onSaveDay({ date: iso, statuses: newStatuses });
+    if (slot === 2) {
+      const newStatuses2 = { ...(dayData.statuses2 || {}) };
+      if (code) newStatuses2[person] = code; else delete newStatuses2[person];
+      onSaveDay({ date: iso, statuses2: newStatuses2 });
+    } else {
+      const newStatuses = { ...(dayData.statuses || {}) };
+      if (code) newStatuses[person] = code; else delete newStatuses[person];
+      onSaveDay({ date: iso, statuses: newStatuses });
+    }
   }
 
   // ── Lens tabs ─────────────────────────────────────────────────
@@ -2823,16 +2830,17 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
               {/* ── People × Days grid ── */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${sc.accent}55`, boxShadow: `0 0 0 1px rgba(0,0,0,0.4)` }}>
-                  <table style={{ borderCollapse: 'collapse', width: '100%', direction: 'rtl', minWidth: Math.max(320, people.length * 58 + 72) }}>
+                  <table style={{ borderCollapse: 'collapse', width: '100%', direction: 'rtl', minWidth: Math.max(320, people.length * 66 + 72) }}>
                     <thead>
+                      {/* Person name headers — colSpan=2 (main 2/3 + secondary 1/3) */}
                       <tr style={{ background: `${sc.accent}30` }}>
-                        <th style={{ padding: '8px 10px', fontSize: 12, color: sc.accent, textAlign: 'right', borderBottom: `2px solid ${sc.accent}66`, borderLeft: `1px solid rgba(255,255,255,0.1)`, width: 68, position: 'sticky', right: 0, background: `${sc.accent}30`, zIndex: 2 }}>יום</th>
+                        <th rowSpan={2} style={{ padding: '8px 10px', fontSize: 12, color: sc.accent, textAlign: 'right', borderBottom: `2px solid ${sc.accent}66`, borderLeft: `1px solid rgba(255,255,255,0.1)`, width: 68, position: 'sticky', right: 0, background: `${sc.accent}30`, zIndex: 2 }}>יום</th>
                         {people.map((person) => {
                           const [firstName, ...rest] = person.split(' ');
                           const lastName = rest.join(' ');
                           const isMe = person === myName;
                           return (
-                            <th key={person} style={{ padding: '8px 6px', fontSize: 12, color: isMe ? '#4a9eff' : '#dde8ff', borderBottom: `2px solid ${sc.accent}66`, borderRight: `1px solid rgba(255,255,255,0.1)`, textAlign: 'center', minWidth: 58, fontWeight: isMe ? 700 : 600, verticalAlign: 'middle' }}>
+                            <th key={person} colSpan={2} style={{ padding: '6px 4px 2px', fontSize: 12, color: isMe ? '#4a9eff' : '#dde8ff', borderBottom: `1px solid ${sc.accent}33`, borderRight: `2px solid ${sc.accent}55`, textAlign: 'center', fontWeight: isMe ? 700 : 600, verticalAlign: 'bottom' }}>
                               <div style={{ lineHeight: 1.4 }}>
                                 <div>{firstName}</div>
                                 {lastName && <div style={{ opacity: 0.75, fontSize: 10 }}>{lastName}</div>}
@@ -2841,14 +2849,24 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                           );
                         })}
                       </tr>
+                      {/* Slot sub-headers */}
+                      <tr style={{ background: `${sc.accent}22` }}>
+                        {people.map((person) => (
+                          <React.Fragment key={person}>
+                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#556', fontWeight: 600, borderBottom: `2px solid ${sc.accent}66`, textAlign: 'center', minWidth: 44, letterSpacing: 0.3 }}>ראשי</th>
+                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#445', fontWeight: 600, borderBottom: `2px solid ${sc.accent}66`, borderRight: `2px solid ${sc.accent}55`, textAlign: 'center', minWidth: 22, letterSpacing: 0.3 }}>מש׳</th>
+                          </React.Fragment>
+                        ))}
+                      </tr>
                     </thead>
                     <tbody>
                       {monthDays.map(({ num, iso, dow }, ri) => {
-                        const dayData  = days[iso] || {};
-                        const isToday  = iso === today;
-                        const isSat    = dow === 6;
-                        const rowBg    = isToday ? 'rgba(74,158,255,0.1)' : isSat ? 'rgba(255,255,255,0.025)' : ri % 2 === 0 ? 'rgba(255,255,255,0.018)' : 'rgba(0,0,0,0.15)';
-                        const stickyBg = isToday ? '#0d1e3a' : isSat ? '#0b0f1e' : ri % 2 === 0 ? '#0c1022' : '#090d1a';
+                        const dayData   = days[iso] || {};
+                        const statuses2 = dayData.statuses2 || {};
+                        const isToday   = iso === today;
+                        const isSat     = dow === 6;
+                        const rowBg     = isToday ? 'rgba(74,158,255,0.1)' : isSat ? 'rgba(255,255,255,0.025)' : ri % 2 === 0 ? 'rgba(255,255,255,0.018)' : 'rgba(0,0,0,0.15)';
+                        const stickyBg  = isToday ? '#0d1e3a' : isSat ? '#0b0f1e' : ri % 2 === 0 ? '#0c1022' : '#090d1a';
                         return (
                           <tr key={iso}
                             onClick={() => { setSelDate(iso); setLens('daily'); }}
@@ -2861,23 +2879,33 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                               {dayData.notes && <span style={{ fontSize: 10 }}>📝</span>}
                             </td>
                             {people.map((person) => {
-                              const code     = dayData.statuses?.[person] || '';
-                              const st       = statusStyle(code);
-                              const cellKey  = `${iso}|${person}`;
-                              const isHover  = hoverCell === cellKey;
+                              const code1   = dayData.statuses?.[person] || '';
+                              const code2   = statuses2[person] || '';
+                              const st1     = statusStyle(code1);
+                              const st2     = statusStyle(code2);
+                              const key1    = `${iso}|${person}|1`;
+                              const key2    = `${iso}|${person}|2`;
+                              const hover1  = hoverCell === key1;
+                              const hover2  = hoverCell === key2;
+                              const makeDrop = (key, slot) => mgr ? {
+                                onDragOver:  e => { e.preventDefault(); e.stopPropagation(); setHoverCell(key); },
+                                onDragLeave: () => setHoverCell(h => h === key ? null : h),
+                                onDrop:      e => { e.preventDefault(); e.stopPropagation(); setHoverCell(null); if (dragCode.current !== null) saveStatusForDate(iso, person, dragCode.current, slot); },
+                                onClick:     e => e.stopPropagation(),
+                              } : { onClick: e => e.stopPropagation() };
                               return (
-                                <td key={person}
-                                  onDragOver={mgr ? (e => { e.preventDefault(); e.stopPropagation(); setHoverCell(cellKey); }) : undefined}
-                                  onDragLeave={mgr ? (() => setHoverCell(h => h === cellKey ? null : h)) : undefined}
-                                  onDrop={mgr ? (e => {
-                                    e.preventDefault(); e.stopPropagation();
-                                    setHoverCell(null);
-                                    if (dragCode.current !== null) saveStatusForDate(iso, person, dragCode.current);
-                                  }) : undefined}
-                                  onClick={e => e.stopPropagation()}
-                                  style={{ padding: '4px 4px', textAlign: 'center', verticalAlign: 'middle', borderRight: `1px solid rgba(255,255,255,0.07)`, background: isHover ? 'rgba(74,158,255,0.25)' : (code && st ? `${st.bg}33` : 'transparent'), outline: isHover ? '2px dashed #4a9eff' : 'none', transition: 'background .1s', minWidth: 58 }}>
-                                  {code ? <StatusBadge code={code} /> : (isHover ? <span style={{ fontSize: 14, opacity: 0.6 }}>+</span> : null)}
-                                </td>
+                                <React.Fragment key={person}>
+                                  {/* Slot 1 — main (2/3 width) */}
+                                  <td {...makeDrop(key1, 1)}
+                                    style={{ padding: '4px 3px', textAlign: 'center', verticalAlign: 'middle', borderRight: `1px solid rgba(255,255,255,0.04)`, background: hover1 ? 'rgba(74,158,255,0.25)' : (code1 && st1 ? `${st1.bg}33` : 'transparent'), outline: hover1 ? '2px dashed #4a9eff' : 'none', transition: 'background .1s', minWidth: 44 }}>
+                                    {code1 ? <StatusBadge code={code1} /> : (hover1 ? <span style={{ fontSize: 13, opacity: 0.5 }}>+</span> : null)}
+                                  </td>
+                                  {/* Slot 2 — secondary (1/3 width) */}
+                                  <td {...makeDrop(key2, 2)}
+                                    style={{ padding: '4px 2px', textAlign: 'center', verticalAlign: 'middle', borderRight: `2px solid ${sc.accent}44`, background: hover2 ? 'rgba(74,158,255,0.25)' : (code2 && st2 ? `${st2.bg}28` : 'rgba(0,0,0,0.08)'), outline: hover2 ? '2px dashed #4a9eff' : 'none', transition: 'background .1s', minWidth: 22 }}>
+                                    {code2 ? <StatusBadge code={code2} small /> : (hover2 ? <span style={{ fontSize: 11, opacity: 0.5 }}>+</span> : null)}
+                                  </td>
+                                </React.Fragment>
                               );
                             })}
                           </tr>
