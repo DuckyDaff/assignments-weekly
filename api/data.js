@@ -78,26 +78,38 @@ function findNewAssignees(oldData, newData) {
   return notifications;
 }
 
-// Send push notifications in background (fire-and-forget)
 async function sendPushNotifications(redis, notifications) {
-  if (!notifications.length) return;
-  if (!setupVapid()) return;
+  if (!notifications.length) return { sent: 0 };
+  if (!setupVapid()) {
+    console.error("[push] VAPID not configured — skipping notifications");
+    return { sent: 0 };
+  }
 
   let subs = [];
   try {
     const raw = await redis.get("push_subscriptions");
     subs = raw ? JSON.parse(raw) : [];
-  } catch (_) { return; }
+  } catch (e) {
+    console.error("[push] Failed to load subscriptions:", e.message);
+    return { sent: 0 };
+  }
 
-  if (!subs.length) return;
+  if (!subs.length) {
+    console.log("[push] No subscriptions found");
+    return { sent: 0 };
+  }
 
   const deadEndpoints = [];
+  let sent = 0;
 
   for (const notif of notifications) {
-    // Find all subscriptions for this person
+    // Trim whitespace to avoid name mismatch
+    const normName = notif.name?.trim();
     const targets = subs.filter(s =>
-      s.name && s.name === notif.name && s.subscription?.endpoint
+      s.subscription?.endpoint && s.name?.trim() === normName
     );
+
+    console.log(`[push] "${normName}" → ${targets.length} device(s)`);
 
     for (const target of targets) {
       try {
@@ -105,8 +117,10 @@ async function sendPushNotifications(redis, notifications) {
           target.subscription,
           JSON.stringify({ title: notif.title, body: notif.body, tag: "shibutz" })
         );
+        sent++;
+        console.log(`[push] ✓ sent to "${normName}"`);
       } catch (err) {
-        // 410 Gone = subscription expired, remove it
+        console.error(`[push] ✗ failed for "${normName}":`, err.statusCode, err.message);
         if (err.statusCode === 410 || err.statusCode === 404) {
           deadEndpoints.push(target.subscription.endpoint);
         }
@@ -114,11 +128,14 @@ async function sendPushNotifications(redis, notifications) {
     }
   }
 
-  // Clean up dead subscriptions
+  // Clean up expired subscriptions
   if (deadEndpoints.length) {
     const cleaned = subs.filter(s => !deadEndpoints.includes(s.subscription?.endpoint));
     await redis.set("push_subscriptions", JSON.stringify(cleaned)).catch(() => {});
+    console.log(`[push] Removed ${deadEndpoints.length} expired subscription(s)`);
   }
+
+  return { sent };
 }
 
 export default async function handler(req, res) {
@@ -158,10 +175,14 @@ export default async function handler(req, res) {
       // Save new data
       await redis.set("assignments_main", JSON.stringify(body));
 
-      // Send push notifications for new assignees (non-blocking)
+      // Send push notifications for new assignees — must await before returning!
+      // Vercel kills the function the moment res.json() is called,
+      // so fire-and-forget would silently drop every notification.
       if (oldData) {
         const notifications = findNewAssignees(oldData, body);
-        sendPushNotifications(redis, notifications).catch(() => {});
+        if (notifications.length) {
+          await sendPushNotifications(redis, notifications);
+        }
       }
 
       return res.json({ ok: true });
