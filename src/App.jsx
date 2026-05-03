@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, createContext, useContext } from "react";
+import { useState, useEffect, useCallback, useRef, createContext, useContext, Fragment } from "react";
 
 const MobileCtx = createContext(false);
 function useMobile() {
@@ -2852,10 +2852,10 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                       {/* Slot sub-headers */}
                       <tr style={{ background: `${sc.accent}22` }}>
                         {people.map((person) => (
-                          <React.Fragment key={person}>
+                          <Fragment key={person}>
                             <th style={{ padding: '3px 2px', fontSize: 9, color: '#778', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, textAlign: 'center', minWidth: 44, letterSpacing: 0.3 }}>ראשי</th>
                             <th style={{ padding: '3px 2px', fontSize: 9, color: '#667', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `3px solid rgba(255,255,255,0.55)`, textAlign: 'center', minWidth: 22, letterSpacing: 0.3 }}>מש׳</th>
-                          </React.Fragment>
+                          </Fragment>
                         ))}
                       </tr>
                     </thead>
@@ -2894,7 +2894,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                                 onClick:     e => e.stopPropagation(),
                               } : { onClick: e => e.stopPropagation() };
                               return (
-                                <React.Fragment key={person}>
+                                <Fragment key={person}>
                                   {/* Slot 1 — main (2/3 width) */}
                                   <td {...makeDrop(key1, 1)}
                                     style={{ padding: '4px 3px', textAlign: 'center', verticalAlign: 'middle', borderRight: `1px solid rgba(255,255,255,0.13)`, background: hover1 ? 'rgba(74,158,255,0.25)' : (code1 && st1 ? `${st1.bg}33` : 'transparent'), outline: hover1 ? '2px dashed #4a9eff' : 'none', transition: 'background .1s', minWidth: 44 }}>
