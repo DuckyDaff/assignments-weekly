@@ -36,41 +36,52 @@ function setupVapid() {
   return false;
 }
 
-// Find new assignees compared to previous data
-function findNewAssignees(oldData, newData) {
+// Diff assignments and return notifications for added/removed assignees
+function diffAssignments(oldData, newData) {
   const oldAssignments = oldData?.assignments || [];
   const newAssignments = newData?.assignments || [];
+  const newIds = new Set(newAssignments.map(a => a.id));
   const oldIds = new Set(oldAssignments.map(a => a.id));
 
   const notifications = [];
 
+  // ── Added / modified assignments ──
   for (const a of newAssignments) {
-    // Brand new assignment
-    if (!oldIds.has(a.id)) {
-      const assignees = a.assignees || [];
-      for (const name of assignees) {
-        notifications.push({
-          name,
-          title: "שיבוץ חדש 📋",
-          body: `שובצת ל${a.system}${a.tasks?.[0] ? ` — ${a.tasks[0]}` : ""}`,
-        });
-      }
-      continue;
-    }
+    const label = `${a.system}${a.tasks?.[0] ? ` — ${a.tasks[0]}` : ""}`;
 
-    // Existing assignment — find newly added people
-    const oldA = oldAssignments.find(o => o.id === a.id);
-    if (oldA) {
-      const oldPeople = new Set(oldA.assignees || []);
-      const newPeople = a.assignees || [];
-      for (const name of newPeople) {
-        if (!oldPeople.has(name)) {
-          notifications.push({
-            name,
-            title: "שיבוץ חדש 📋",
-            body: `שובצת ל${a.system}${a.tasks?.[0] ? ` — ${a.tasks[0]}` : ""}`,
-          });
+    if (!oldIds.has(a.id)) {
+      // Brand-new assignment — notify all assignees
+      for (const name of (a.assignees || [])) {
+        notifications.push({ name, title: "שיבוץ חדש 📋", body: `שובצת ל${label}`, url: "/?tab=me" });
+      }
+    } else {
+      // Existing assignment — find people added or removed
+      const oldA = oldAssignments.find(o => o.id === a.id);
+      if (oldA) {
+        const oldPeople = new Set(oldA.assignees || []);
+        const newPeople = new Set(a.assignees || []);
+        // Added to existing assignment
+        for (const name of newPeople) {
+          if (!oldPeople.has(name)) {
+            notifications.push({ name, title: "שיבוץ חדש 📋", body: `שובצת ל${label}`, url: "/?tab=me" });
+          }
         }
+        // Removed from existing assignment
+        for (const name of oldPeople) {
+          if (!newPeople.has(name)) {
+            notifications.push({ name, title: "שיבוץ בוטל ❌", body: `השיבוץ שלך ל${label} בוטל`, url: "/?tab=me" });
+          }
+        }
+      }
+    }
+  }
+
+  // ── Deleted assignments entirely ──
+  for (const oldA of oldAssignments) {
+    if (!newIds.has(oldA.id)) {
+      const label = `${oldA.system}${oldA.tasks?.[0] ? ` — ${oldA.tasks[0]}` : ""}`;
+      for (const name of (oldA.assignees || [])) {
+        notifications.push({ name, title: "שיבוץ בוטל ❌", body: `השיבוץ שלך ל${label} בוטל`, url: "/?tab=me" });
       }
     }
   }
@@ -179,7 +190,7 @@ export default async function handler(req, res) {
       // Vercel kills the function the moment res.json() is called,
       // so fire-and-forget would silently drop every notification.
       if (oldData) {
-        const notifications = findNewAssignees(oldData, body);
+        const notifications = diffAssignments(oldData, body);
         if (notifications.length) {
           await sendPushNotifications(redis, notifications);
         }
