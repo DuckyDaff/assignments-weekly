@@ -2905,7 +2905,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                                     style={{ padding: '4px 2px', textAlign: 'center', verticalAlign: 'middle', borderRight: `3px solid rgba(255,255,255,0.55)`, background: hover2 ? 'rgba(74,158,255,0.25)' : (code2 && st2 ? `${st2.bg}28` : 'rgba(0,0,0,0.1)'), outline: hover2 ? '2px dashed #4a9eff' : 'none', transition: 'background .1s', minWidth: 22 }}>
                                     {code2 ? <StatusBadge code={code2} small /> : (hover2 ? <span style={{ fontSize: 11, opacity: 0.5 }}>+</span> : null)}
                                   </td>
-                                </React.Fragment>
+                                </Fragment>
                               );
                             })}
                           </tr>
