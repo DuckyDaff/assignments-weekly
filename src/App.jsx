@@ -2457,6 +2457,11 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
   const [selPerson, setSelPerson] = useState(myName || '');
   const [selSecIdx, setSelSecIdx] = useState(0);
   const [editCell,  setEditCell]  = useState(null);
+  const [hoverCell, setHoverCell] = useState(null); // "iso|person" for drag feedback
+  const dragCode = useRef(null);
+  const [legendGroups] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("legendGroups")) || DEFAULT_LEGEND; } catch { return DEFAULT_LEGEND; }
+  });
 
   if (!annualData) {
     return (
@@ -2500,6 +2505,13 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
     const newStatuses = { ...(dayData.statuses || {}) };
     if (code) newStatuses[person] = code; else delete newStatuses[person];
     onSaveDay({ date: selDate, statuses: newStatuses });
+  }
+
+  function saveStatusForDate(iso, person, code) {
+    const dayData = days[iso] || {};
+    const newStatuses = { ...(dayData.statuses || {}) };
+    if (code) newStatuses[person] = code; else delete newStatuses[person];
+    onSaveDay({ date: iso, statuses: newStatuses });
   }
 
   // ── Lens tabs ─────────────────────────────────────────────────
@@ -2772,69 +2784,145 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
               })}
             </div>
 
-            {/* People × Days grid */}
-            <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${sc.accent}55`, boxShadow: `0 0 0 1px rgba(0,0,0,0.4)` }}>
-              <table style={{ borderCollapse: 'collapse', width: '100%', direction: 'rtl', minWidth: Math.max(320, people.length * 48 + 68) }}>
-                <thead>
-                  <tr style={{ background: `${sc.accent}30` }}>
-                    <th style={{ padding: '8px 10px', fontSize: 12, color: sc.accent, textAlign: 'right', borderBottom: `2px solid ${sc.accent}66`, borderLeft: `1px solid rgba(255,255,255,0.1)`, width: 64, position: 'sticky', right: 0, background: `${sc.accent}30`, zIndex: 2 }}>יום</th>
-                    {people.map((person) => {
-                      const [firstName, ...rest] = person.split(' ');
-                      const lastName = rest.join(' ');
-                      const isMe = person === myName;
-                      return (
-                        <th key={person} style={{ padding: '7px 5px', fontSize: 11, color: isMe ? '#4a9eff' : '#dde8ff', borderBottom: `2px solid ${sc.accent}66`, borderRight: `1px solid rgba(255,255,255,0.1)`, textAlign: 'center', minWidth: 52, fontWeight: isMe ? 700 : 600, verticalAlign: 'middle' }}>
-                          <div style={{ lineHeight: 1.4 }}>
-                            <div>{firstName}</div>
-                            {lastName && <div style={{ opacity: 0.75, fontSize: 10 }}>{lastName}</div>}
-                          </div>
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {monthDays.map(({ num, iso, dow }, ri) => {
-                    const dayData  = days[iso] || {};
-                    const isToday  = iso === today;
-                    const isSat    = dow === 6;
-                    const rowBg    = isToday ? 'rgba(74,158,255,0.1)' : isSat ? 'rgba(255,255,255,0.025)' : ri % 2 === 0 ? 'rgba(255,255,255,0.018)' : 'rgba(0,0,0,0.15)';
-                    const stickyBg = isToday ? '#0d1e3a' : isSat ? '#0b0f1e' : ri % 2 === 0 ? '#0c1022' : '#090d1a';
-                    return (
-                      <tr key={iso}
-                        onClick={() => { setSelDate(iso); setLens('daily'); }}
-                        style={{ cursor: 'pointer', background: rowBg, borderBottom: `1px solid rgba(255,255,255,${isSat ? '0.12' : '0.06'})` }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(74,158,255,0.07)'}
-                        onMouseLeave={e => e.currentTarget.style.background = rowBg}>
-                        <td style={{ padding: '4px 8px', position: 'sticky', right: 0, background: stickyBg, zIndex: 1, whiteSpace: 'nowrap', verticalAlign: 'middle', borderLeft: `1px solid rgba(255,255,255,0.1)`, borderBottom: `1px solid rgba(255,255,255,${isSat ? '0.12' : '0.06'})` }}>
-                          <span style={{ fontWeight: isToday ? 700 : isSat ? 600 : 400, color: isToday ? '#4a9eff' : isSat ? '#7788aa' : '#c0cce0', fontSize: 13 }}>{num}</span>
-                          <span style={{ fontSize: 9, color: isSat ? '#556' : '#445', marginRight: 4 }}>{DAY_SHORT[dow]}</span>
-                          {dayData.notes && <span style={{ fontSize: 9 }}>📝</span>}
-                        </td>
-                        {people.map((person, pi) => {
-                          const code = dayData.statuses?.[person] || '';
-                          const st   = statusStyle(code);
+            {/* Main area: legend sidebar (manager) + grid */}
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+
+              {/* ── Legend drag-palette (manager only, right side in RTL) ── */}
+              {mgr && !mob && (
+                <div style={{ width: 108, flexShrink: 0, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, padding: '10px 8px' }}>
+                  <div style={{ fontSize: 10, color: '#4a9eff', fontWeight: 700, marginBottom: 10, textAlign: 'center', letterSpacing: 0.5 }}>גרור לתא ←</div>
+                  {legendGroups.map(group => (
+                    <div key={group.id} style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 9, color: '#556', fontWeight: 600, marginBottom: 4, textAlign: 'right', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 3 }}>{group.name}</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        {group.codes.map(code => {
+                          const st = statusStyle(code);
                           return (
-                            <td key={person} style={{ padding: '4px 3px', textAlign: 'center', verticalAlign: 'middle', borderRight: `1px solid rgba(255,255,255,0.07)`, background: code && st ? `${st.bg}28` : 'transparent' }}>
-                              {code && <StatusBadge code={code} small />}
-                            </td>
+                            <div key={code} draggable
+                              onDragStart={() => { dragCode.current = code; }}
+                              onDragEnd={() => { dragCode.current = null; }}
+                              style={{ background: st?.bg || '#1a2a3a', color: '#fff', borderRadius: 5, padding: '4px 6px', fontSize: 11, fontWeight: 700, cursor: 'grab', textAlign: 'center', userSelect: 'none', boxShadow: '0 1px 4px rgba(0,0,0,0.3)', transition: 'opacity .15s' }}
+                              title={st?.label || code}>
+                              {code}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                  {/* Clear cell */}
+                  <div draggable
+                    onDragStart={() => { dragCode.current = ''; }}
+                    onDragEnd={() => { dragCode.current = null; }}
+                    style={{ background: 'rgba(231,76,60,0.2)', border: '1px dashed rgba(231,76,60,0.5)', color: '#e74c3c', borderRadius: 5, padding: '4px 6px', fontSize: 10, fontWeight: 700, cursor: 'grab', textAlign: 'center', userSelect: 'none', marginTop: 6 }}>
+                    🗑 מחק
+                  </div>
+                </div>
+              )}
+
+              {/* ── People × Days grid ── */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${sc.accent}55`, boxShadow: `0 0 0 1px rgba(0,0,0,0.4)` }}>
+                  <table style={{ borderCollapse: 'collapse', width: '100%', direction: 'rtl', minWidth: Math.max(320, people.length * 58 + 72) }}>
+                    <thead>
+                      <tr style={{ background: `${sc.accent}30` }}>
+                        <th style={{ padding: '8px 10px', fontSize: 12, color: sc.accent, textAlign: 'right', borderBottom: `2px solid ${sc.accent}66`, borderLeft: `1px solid rgba(255,255,255,0.1)`, width: 68, position: 'sticky', right: 0, background: `${sc.accent}30`, zIndex: 2 }}>יום</th>
+                        {people.map((person) => {
+                          const [firstName, ...rest] = person.split(' ');
+                          const lastName = rest.join(' ');
+                          const isMe = person === myName;
+                          return (
+                            <th key={person} style={{ padding: '8px 6px', fontSize: 12, color: isMe ? '#4a9eff' : '#dde8ff', borderBottom: `2px solid ${sc.accent}66`, borderRight: `1px solid rgba(255,255,255,0.1)`, textAlign: 'center', minWidth: 58, fontWeight: isMe ? 700 : 600, verticalAlign: 'middle' }}>
+                              <div style={{ lineHeight: 1.4 }}>
+                                <div>{firstName}</div>
+                                {lastName && <div style={{ opacity: 0.75, fontSize: 10 }}>{lastName}</div>}
+                              </div>
+                            </th>
                           );
                         })}
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                    </thead>
+                    <tbody>
+                      {monthDays.map(({ num, iso, dow }, ri) => {
+                        const dayData  = days[iso] || {};
+                        const isToday  = iso === today;
+                        const isSat    = dow === 6;
+                        const rowBg    = isToday ? 'rgba(74,158,255,0.1)' : isSat ? 'rgba(255,255,255,0.025)' : ri % 2 === 0 ? 'rgba(255,255,255,0.018)' : 'rgba(0,0,0,0.15)';
+                        const stickyBg = isToday ? '#0d1e3a' : isSat ? '#0b0f1e' : ri % 2 === 0 ? '#0c1022' : '#090d1a';
+                        return (
+                          <tr key={iso}
+                            onClick={() => { setSelDate(iso); setLens('daily'); }}
+                            style={{ cursor: 'pointer', background: rowBg, borderBottom: `1px solid rgba(255,255,255,${isSat ? '0.12' : '0.06'})` }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(74,158,255,0.07)'}
+                            onMouseLeave={e => e.currentTarget.style.background = rowBg}>
+                            <td style={{ padding: '5px 8px', position: 'sticky', right: 0, background: stickyBg, zIndex: 1, whiteSpace: 'nowrap', verticalAlign: 'middle', borderLeft: `1px solid rgba(255,255,255,0.1)`, borderBottom: `1px solid rgba(255,255,255,${isSat ? '0.12' : '0.06'})` }}>
+                              <span style={{ fontWeight: isToday ? 700 : isSat ? 600 : 400, color: isToday ? '#4a9eff' : isSat ? '#7788aa' : '#c0cce0', fontSize: 13 }}>{num}</span>
+                              <span style={{ fontSize: 10, color: isSat ? '#556' : '#445', marginRight: 4 }}>{DAY_SHORT[dow]}</span>
+                              {dayData.notes && <span style={{ fontSize: 10 }}>📝</span>}
+                            </td>
+                            {people.map((person) => {
+                              const code     = dayData.statuses?.[person] || '';
+                              const st       = statusStyle(code);
+                              const cellKey  = `${iso}|${person}`;
+                              const isHover  = hoverCell === cellKey;
+                              return (
+                                <td key={person}
+                                  onDragOver={mgr ? (e => { e.preventDefault(); e.stopPropagation(); setHoverCell(cellKey); }) : undefined}
+                                  onDragLeave={mgr ? (() => setHoverCell(h => h === cellKey ? null : h)) : undefined}
+                                  onDrop={mgr ? (e => {
+                                    e.preventDefault(); e.stopPropagation();
+                                    setHoverCell(null);
+                                    if (dragCode.current !== null) saveStatusForDate(iso, person, dragCode.current);
+                                  }) : undefined}
+                                  onClick={e => e.stopPropagation()}
+                                  style={{ padding: '4px 4px', textAlign: 'center', verticalAlign: 'middle', borderRight: `1px solid rgba(255,255,255,0.07)`, background: isHover ? 'rgba(74,158,255,0.25)' : (code && st ? `${st.bg}33` : 'transparent'), outline: isHover ? '2px dashed #4a9eff' : 'none', transition: 'background .1s', minWidth: 58 }}>
+                                  {code ? <StatusBadge code={code} /> : (isHover ? <span style={{ fontSize: 14, opacity: 0.6 }}>+</span> : null)}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
 
-            {/* Status legend */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12, justifyContent: 'center' }}>
-              {[['י','יום'],['ל','לילה'],['כ','כוננות'],['ח','חופשה'],['מיל','מילואים'],['מ','מחלה'],['פ','פנוי'],['ק','קורס']].map(([code, lbl]) => (
-                <span key={code} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#8892b0' }}>
-                  <span style={{ width: 18, height: 12, background: statusStyle(code)?.bg || '#333', borderRadius: 2, display: 'inline-block' }} />
-                  {lbl}
-                </span>
-              ))}
+                {/* Mobile legend palette (manager only) */}
+                {mgr && mob && (
+                  <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    <div style={{ width: '100%', fontSize: 10, color: '#4a9eff', fontWeight: 700, marginBottom: 4 }}>גרור לתא:</div>
+                    {legendGroups.flatMap(g => g.codes).map(code => {
+                      const st = statusStyle(code);
+                      return (
+                        <div key={code} draggable
+                          onDragStart={() => { dragCode.current = code; }}
+                          onDragEnd={() => { dragCode.current = null; }}
+                          style={{ background: st?.bg || '#1a2a3a', color: '#fff', borderRadius: 5, padding: '4px 8px', fontSize: 12, fontWeight: 700, cursor: 'grab', userSelect: 'none' }}>
+                          {code}
+                        </div>
+                      );
+                    })}
+                    <div draggable
+                      onDragStart={() => { dragCode.current = ''; }}
+                      onDragEnd={() => { dragCode.current = null; }}
+                      style={{ background: 'rgba(231,76,60,0.2)', border: '1px dashed rgba(231,76,60,0.5)', color: '#e74c3c', borderRadius: 5, padding: '4px 8px', fontSize: 11, fontWeight: 700, cursor: 'grab', userSelect: 'none' }}>
+                      🗑 מחק
+                    </div>
+                  </div>
+                )}
+
+                {/* Read-only status legend */}
+                {!mgr && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12, justifyContent: 'center' }}>
+                    {[['י','יום'],['ל','לילה'],['כ','כוננות'],['ח','חופשה'],['מיל','מילואים'],['מ','מחלה'],['פ','פנוי'],['ק','קורס']].map(([code, lbl]) => (
+                      <span key={code} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#8892b0' }}>
+                        <span style={{ width: 20, height: 13, background: statusStyle(code)?.bg || '#333', borderRadius: 2, display: 'inline-block' }} />
+                        {lbl}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         );
