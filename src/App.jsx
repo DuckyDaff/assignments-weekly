@@ -2459,7 +2459,8 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
   const [editCell,  setEditCell]  = useState(null);
   const [hoverCell,  setHoverCell]  = useState(null); // "iso|person|slot" for drag feedback
   const [pickerCell, setPickerCell] = useState(null); // { iso, person, slot, x, y }
-  const dragCode = useRef(null);
+  const dragCode   = useRef(null);
+  const dragSource = useRef(null); // { iso, person, slot } — source cell when dragging from table
   const [legendGroups] = useState(() => {
     try { return JSON.parse(localStorage.getItem("legendGroups")) || DEFAULT_LEGEND; } catch { return DEFAULT_LEGEND; }
   });
@@ -2890,11 +2891,24 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                               const hover1 = hoverCell === key1;
                               const hover2 = hoverCell === key2;
                               const makeTd = (key, slot, code, st, isHover, minW, padR, borderR, bg2) => ({
+                                draggable:   mgr && !!code,
+                                onDragStart: mgr && code ? (e => { e.stopPropagation(); dragCode.current = code; dragSource.current = { iso, person, slot }; }) : undefined,
+                                onDragEnd:   mgr ? (() => { dragCode.current = null; dragSource.current = null; setHoverCell(null); }) : undefined,
                                 onDragOver:  e => { e.preventDefault(); e.stopPropagation(); setHoverCell(key); },
                                 onDragLeave: () => setHoverCell(h => h === key ? null : h),
-                                onDrop:      e => { e.preventDefault(); e.stopPropagation(); setHoverCell(null); if (dragCode.current !== null) saveStatusForDate(iso, person, dragCode.current, slot); },
-                                onClick:     mgr ? (e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setPickerCell({ iso, person, slot, x: r.left, y: r.bottom }); }) : undefined,
-                                style: { padding: `4px ${padR}`, textAlign: 'center', verticalAlign: 'middle', borderRight: borderR, background: isHover ? 'rgba(74,158,255,0.25)' : (code && st ? `${st.bg}33` : bg2), outline: isHover ? '2px dashed #4a9eff' : 'none', transition: 'background .1s', minWidth: minW, cursor: mgr ? 'pointer' : 'default' },
+                                onDrop: e => {
+                                  e.preventDefault(); e.stopPropagation(); setHoverCell(null);
+                                  if (dragCode.current !== null) {
+                                    saveStatusForDate(iso, person, dragCode.current, slot);
+                                    // Clear source cell if dragging from another cell (move, not copy)
+                                    const src = dragSource.current;
+                                    if (src && !(src.iso === iso && src.person === person && src.slot === slot)) {
+                                      saveStatusForDate(src.iso, src.person, '', src.slot);
+                                    }
+                                  }
+                                },
+                                onClick: mgr ? (e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setPickerCell({ iso, person, slot, x: r.left, y: r.bottom }); }) : undefined,
+                                style: { padding: `4px ${padR}`, textAlign: 'center', verticalAlign: 'middle', borderRight: borderR, background: isHover ? 'rgba(74,158,255,0.25)' : (code && st ? `${st.bg}33` : bg2), outline: isHover ? '2px dashed #4a9eff' : 'none', transition: 'background .1s', minWidth: minW, cursor: mgr ? (code ? 'grab' : 'pointer') : 'default' },
                               });
                               return (
                                 <Fragment key={person}>
