@@ -36,14 +36,16 @@ function setupVapid() {
   return false;
 }
 
-// Diff assignments and return notifications for added/removed assignees
+// Diff assignments → notifications for assignees + system owners
 function diffAssignments(oldData, newData) {
   const oldAssignments = oldData?.assignments || [];
   const newAssignments = newData?.assignments || [];
   const newIds = new Set(newAssignments.map(a => a.id));
   const oldIds = new Set(oldAssignments.map(a => a.id));
+  const systemOwners = newData?.systemOwners || {};
 
   const notifications = [];
+  const changedSystems = new Set(); // track which systems had any change
 
   // ── Added / modified assignments ──
   for (const a of newAssignments) {
@@ -54,24 +56,33 @@ function diffAssignments(oldData, newData) {
       for (const name of (a.assignees || [])) {
         notifications.push({ name, title: "שיבוץ חדש 📋", body: `שובצת ל${label}`, url: "/?tab=me" });
       }
+      if ((a.assignees || []).length > 0) changedSystems.add(a.system);
     } else {
       // Existing assignment — find people added or removed
       const oldA = oldAssignments.find(o => o.id === a.id);
       if (oldA) {
         const oldPeople = new Set(oldA.assignees || []);
         const newPeople = new Set(a.assignees || []);
-        // Added to existing assignment
+        let changed = false;
         for (const name of newPeople) {
           if (!oldPeople.has(name)) {
             notifications.push({ name, title: "שיבוץ חדש 📋", body: `שובצת ל${label}`, url: "/?tab=me" });
+            changed = true;
           }
         }
-        // Removed from existing assignment
         for (const name of oldPeople) {
           if (!newPeople.has(name)) {
             notifications.push({ name, title: "שיבוץ בוטל ❌", body: `השיבוץ שלך ל${label} בוטל`, url: "/?tab=me" });
+            changed = true;
           }
         }
+        // Also flag if task/notes changed (owner cares about that too)
+        if (!changed) {
+          const tasksChanged = JSON.stringify(oldA.tasks) !== JSON.stringify(a.tasks);
+          const notesChanged = oldA.notes !== a.notes;
+          if (tasksChanged || notesChanged) changed = true;
+        }
+        if (changed) changedSystems.add(a.system);
       }
     }
   }
@@ -83,6 +94,17 @@ function diffAssignments(oldData, newData) {
       for (const name of (oldA.assignees || [])) {
         notifications.push({ name, title: "שיבוץ בוטל ❌", body: `השיבוץ שלך ל${label} בוטל`, url: "/?tab=me" });
       }
+      changedSystems.add(oldA.system);
+    }
+  }
+
+  // ── Notify system owners (only if not already notified for another reason) ──
+  const alreadyNotified = new Set(notifications.map(n => n.name?.trim()));
+  for (const sys of changedSystems) {
+    const owner = (systemOwners[sys] || "").trim();
+    if (owner && !alreadyNotified.has(owner)) {
+      notifications.push({ name: owner, title: `🔔 עדכון ב${sys}`, body: "בוצע שינוי בשיבוצי המערכת שלך", url: "/?tab=me" });
+      alreadyNotified.add(owner);
     }
   }
 
@@ -183,20 +205,23 @@ export default async function handler(req, res) {
         oldData = raw ? JSON.parse(raw) : null;
       } catch (_) {}
 
+      // Stamp with server time so clients can detect changes
+      const stamped = { ...body, updatedAt: Date.now() };
+
       // Save new data
-      await redis.set("assignments_main", JSON.stringify(body));
+      await redis.set("assignments_main", JSON.stringify(stamped));
 
       // Send push notifications for new assignees — must await before returning!
       // Vercel kills the function the moment res.json() is called,
       // so fire-and-forget would silently drop every notification.
       if (oldData) {
-        const notifications = diffAssignments(oldData, body);
+        const notifications = diffAssignments(oldData, stamped);
         if (notifications.length) {
           await sendPushNotifications(redis, notifications);
         }
       }
 
-      return res.json({ ok: true });
+      return res.json({ ok: true, updatedAt: stamped.updatedAt });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }

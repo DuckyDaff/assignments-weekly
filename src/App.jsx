@@ -384,24 +384,45 @@ export default function App() {
     return () => clearTimeout(t);
   }, [myName]);
 
+  const isSavingRef = useRef(false);
+
+  const applyFetch = useCallback(d => {
+    if (!d || typeof d !== "object") return;
+    if (!d.sections?.length && d.people?.length) {
+      const migrated = { ...d, sections: getSections(d) };
+      delete migrated.people;
+      setData(migrated);
+    } else {
+      setData(d);
+    }
+  }, []);
+
+  // Initial load
   useEffect(() => {
-    fetch("/api/data")
-      .then(r => r.json())
-      .then(d => {
-        // migrate old data that has people[] but no sections
-        if (!d.sections?.length && d.people?.length) {
-          const migrated = { ...d, sections: getSections(d) };
-          delete migrated.people;
-          setData(migrated);
-        } else {
-          setData(d);
-        }
-      })
+    fetch("/api/data").then(r => r.json()).then(applyFetch)
       .catch(() => { setData(DEF); setSaveErr(true); });
+  }, [applyFetch]);
+
+  // Auto-refresh every 30 s — update only when data actually changed
+  useEffect(() => {
+    const poll = () => {
+      if (isSavingRef.current || document.hidden) return;
+      fetch("/api/data").then(r => r.json()).then(fresh => {
+        setData(prev => {
+          if (!prev || !fresh) return prev;
+          if (fresh.updatedAt && fresh.updatedAt !== prev.updatedAt) return fresh;
+          return prev;
+        });
+      }).catch(() => {});
+    };
+    const id = setInterval(poll, 30000);
+    document.addEventListener("visibilitychange", poll); // refresh on tab focus
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", poll); };
   }, []);
 
   const save = useCallback(async (nd, msg) => {
     setData(nd);
+    isSavingRef.current = true;
     try {
       const r = await fetch("/api/data", {
         method: "PUT",
@@ -409,10 +430,15 @@ export default function App() {
         body: JSON.stringify(nd),
       });
       if (!r.ok) throw new Error();
+      // Sync the server-stamped updatedAt back to local state
+      const saved = await r.json().catch(() => null);
+      if (saved?.updatedAt) setData(prev => prev ? { ...prev, updatedAt: saved.updatedAt } : prev);
       setSaveErr(false);
     } catch {
       setSaveErr(true);
       toast("שגיאה בשמירה", "error");
+    } finally {
+      isSavingRef.current = false;
     }
     if (msg) toast(msg);
   }, [toast]);
@@ -1319,9 +1345,16 @@ function SystemsEditor({ data, save, toast, vSys, setVSys }) {
   const [colorPick, setColorPick] = useState(null);
   const [dragIdx, setDragIdx]     = useState(null);
   const [overIdx, setOverIdx]     = useState(null);
-  const sysColors = data.systemColors || {};
+  const sysColors  = data.systemColors  || {};
+  const sysOwners  = data.systemOwners  || {};
+  const allPeople  = getAllPeople(data);
 
   const setColor = (sys, idx) => { save({ ...data, systemColors: { ...sysColors, [sys]: idx } }); setColorPick(null); };
+  const setOwner = (sys, name) => {
+    const owners = { ...sysOwners };
+    if (name) owners[sys] = name; else delete owners[sys];
+    save({ ...data, systemOwners: owners }, name ? `${name} הוגדר/ה כאחראי ${sys}` : `אחראי ${sys} הוסר`);
+  };
 
   const drop = (toIdx) => {
     if (dragIdx === null || dragIdx === toIdx) { setDragIdx(null); setOverIdx(null); return; }
@@ -1359,6 +1392,7 @@ function SystemsEditor({ data, save, toast, vSys, setVSys }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ color: "#445", fontSize: 16, cursor: "grab", userSelect: "none" }}>⠿</span>
                   <span style={{ fontSize: 13 }}>{sys}</span>
+                  {sysOwners[sys] && <span style={{ fontSize: 10, color: col.accent, background: `${col.accent}18`, border: `1px solid ${col.accent}44`, borderRadius: 10, padding: "1px 7px" }}>🔔 {sysOwners[sys].split(" ")[0]}</span>}
                 </div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                   <button onClick={e => { e.stopPropagation(); setColorPick(open ? null : sys); }} title="בחר צבע"
@@ -1369,12 +1403,41 @@ function SystemsEditor({ data, save, toast, vSys, setVSys }) {
                 </div>
               </div>
               {open && (
-                <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderTop: "none", borderRadius: "0 0 9px 9px", padding: "10px 13px", display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <div style={{ fontSize: 10, color: "#8892b0", width: "100%", marginBottom: 4 }}>בחר צבע למערכת:</div>
+                <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderTop: "none", borderRadius: "0 0 9px 9px", padding: "10px 13px" }}>
+                  {/* Color picker */}
+                  <div style={{ fontSize: 10, color: "#8892b0", marginBottom: 6 }}>צבע מערכת:</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
                   {PALETTE.map((p, pi) => (
                     <button key={pi} onClick={() => setColor(sys, pi)} title={`צבע ${pi + 1}`}
                       style={{ width: 30, height: 30, borderRadius: "50%", background: p.accent, border: `3px solid ${idx === pi ? "#fff" : "transparent"}`, cursor: "pointer", transition: "border .15s", boxShadow: idx === pi ? `0 0 0 2px ${p.accent}` : "none" }} />
                   ))}
+                  </div>
+                  {/* System owner */}
+                  <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 10 }}>
+                    <div style={{ fontSize: 10, color: "#8892b0", marginBottom: 6 }}>
+                      אחראי מערכת <span style={{ color: "#445" }}>(יקבל התראה על כל שינוי)</span>
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      <button onClick={() => setOwner(sys, null)}
+                        style={{ padding: "5px 11px", borderRadius: 16, border: `1px solid ${!sysOwners[sys] ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.1)"}`, background: !sysOwners[sys] ? "rgba(255,255,255,0.1)" : "transparent", color: !sysOwners[sys] ? "#fff" : "#556", fontSize: 11, cursor: "pointer", fontWeight: !sysOwners[sys] ? 700 : 400 }}>
+                        ללא
+                      </button>
+                      {allPeople.map(p => {
+                        const isSel = sysOwners[sys] === p;
+                        return (
+                          <button key={p} onClick={() => setOwner(sys, p)}
+                            style={{ padding: "5px 11px", borderRadius: 16, border: `1px solid ${isSel ? col.accent : "rgba(255,255,255,0.1)"}`, background: isSel ? `${col.accent}22` : "transparent", color: isSel ? col.accent : "#8892b0", fontSize: 11, cursor: "pointer", fontWeight: isSel ? 700 : 400 }}>
+                            {isSel ? "✓ " : ""}{p}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {sysOwners[sys] && (
+                      <div style={{ marginTop: 7, fontSize: 10, color: col.accent, fontWeight: 600 }}>
+                        🔔 אחראי: {sysOwners[sys]}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
