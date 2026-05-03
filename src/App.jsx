@@ -607,8 +607,12 @@ function WeekNav({ wk, setWk, children }) {
   const isToday = wk === wKey(new Date());
   return (
     <div style={{ marginBottom: mob ? 12 : 18 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      {/* 3-column layout: spacer | center nav | action buttons — keeps date truly centered */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {/* Left spacer — mirrors width of action buttons so center stays centered */}
+        <div style={{ flex: 1 }} />
+        {/* Center: arrows + week number + dates */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
           <NavBtn onClick={() => setWk(adjW(wk, -1))}><I n="cR" s={15} /></NavBtn>
           <div style={{ textAlign: "center", minWidth: mob ? 120 : 165 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
@@ -620,7 +624,10 @@ function WeekNav({ wk, setWk, children }) {
           <NavBtn onClick={() => setWk(adjW(wk, 1))}><I n="cL" s={15} /></NavBtn>
           {!isToday && <button onClick={() => setWk(wKey(new Date()))} style={{ padding: "4px 9px", border: "1px solid rgba(74,158,255,.3)", borderRadius: 8, background: "rgba(74,158,255,.1)", color: "#4a9eff", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>היום</button>}
         </div>
-        {!mob && <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>{children}</div>}
+        {/* Right side: action buttons */}
+        <div style={{ flex: 1, display: "flex", justifyContent: "flex-start", gap: 7, flexWrap: "wrap", alignItems: "center" }}>
+          {!mob && children}
+        </div>
       </div>
       {mob && children && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>{children}</div>}
     </div>
@@ -1577,12 +1584,12 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
       <div style={{ background: "#0f1525", borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "0 16px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, gap: 8 }}>
         <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 9, padding: "7px 12px", color: "#8892b0", cursor: "pointer", fontSize: 13 }}>✕ סגור</button>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, justifyContent: "center" }}>
-          <button onClick={() => goWeek(-1)} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, padding: "5px 10px", color: "#8892b0", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>›</button>
+          <NavBtn onClick={() => goWeek(-1)}><I n="cR" s={15} /></NavBtn>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>שבוע {planWk.split("-W")[1]}</div>
-            <div style={{ fontSize: 10, color: "#3d7fc4" }}>{wLabel(planWk)}</div>
+            <div style={{ fontSize: 13, color: "#ccd6f6", fontWeight: 600, marginTop: 1 }}>{wLabel(planWk)}</div>
           </div>
-          <button onClick={() => goWeek(1)} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, padding: "5px 10px", color: "#8892b0", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>‹</button>
+          <NavBtn onClick={() => goWeek(1)}><I n="cL" s={15} /></NavBtn>
         </div>
         <button onClick={handleSave} style={{ background: "linear-gradient(135deg,#4a9eff,#3d7fc4)", border: "none", borderRadius: 9, padding: "8px 14px", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700, boxShadow: "0 3px 12px rgba(74,158,255,0.3)" }}>שמור ✓</button>
       </div>
@@ -1625,7 +1632,7 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
         {/* ── Grid ── */}
         <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", padding: "10px 10px 4px" }}
           onClick={e => { if (e.target === e.currentTarget) { setActiveCell(null); setSelected(null); } }}>
-          <table style={{ borderCollapse: "separate", borderSpacing: 4, minWidth: mob ? 520 : 600 }}>
+          <table style={{ borderCollapse: "separate", borderSpacing: 4, minWidth: mob ? 520 : 600, margin: "0 auto" }}>
             <thead>
               <tr>
                 <th style={{ ...PTH, textAlign: "right", paddingRight: 10, width: mob ? 80 : 110 }}>מערכת</th>
