@@ -1310,6 +1310,116 @@ function AssignRow({ a, col, highlight }) {
   );
 }
 
+/* ── LEGEND EDITOR ── */
+const DEFAULT_LEGEND = [
+  { id: 'shift',    name: 'משמרות',      codes: ['י', 'ל', 'Y', 'L'] },
+  { id: 'oncall',   name: 'כוננות',      codes: ['כ', 'כש', 'כמ', 'כמש'] },
+  { id: 'absent',   name: 'היעדרויות',   codes: ['ח', 'מיל', 'מ', 'פ', 'מנוחה', 'ק'] },
+  { id: 'away',     name: 'חוץ לבסיס',  codes: ['חיפה', 'הרצליה', 'ראש פינה', 'PBB', 'רמון'] },
+  { id: 'training', name: 'הכשרות',      codes: ['ב. חשמל', 'ב. כללית', 'השתלמות', 'ניקיון תחנות'] },
+];
+
+function LegendEditor() {
+  const [groups, setGroups] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("legendGroups")) || DEFAULT_LEGEND; } catch { return DEFAULT_LEGEND; }
+  });
+  const [newGroupName, setNewGroupName] = useState("");
+  const [dropTarget, setDropTarget]     = useState(null);
+  const dragRef = useRef(null);
+
+  function persist(g) { setGroups(g); localStorage.setItem("legendGroups", JSON.stringify(g)); }
+
+  function onDrop(toGroupId) {
+    if (!dragRef.current) return;
+    const { code, fromGroupId } = dragRef.current;
+    if (fromGroupId === toGroupId) { dragRef.current = null; return; }
+    persist(groups.map(g => {
+      if (g.id === fromGroupId) return { ...g, codes: g.codes.filter(c => c !== code) };
+      if (g.id === toGroupId)   return { ...g, codes: [...g.codes, code] };
+      return g;
+    }));
+    dragRef.current = null;
+  }
+
+  function removeCode(groupId, code) {
+    persist(groups.map(g => g.id === groupId ? { ...g, codes: g.codes.filter(c => c !== code) } : g));
+  }
+
+  function renameGroup(id, name) {
+    persist(groups.map(g => g.id === id ? { ...g, name } : g));
+  }
+
+  function removeGroup(id) {
+    const dying = groups.find(g => g.id === id);
+    const firstOther = groups.find(g => g.id !== id);
+    persist(groups
+      .filter(g => g.id !== id)
+      .map(g => g.id === firstOther?.id ? { ...g, codes: [...g.codes, ...(dying?.codes || [])] } : g));
+  }
+
+  function addGroup() {
+    if (!newGroupName.trim()) return;
+    persist([...groups, { id: Date.now().toString(36), name: newGroupName.trim(), codes: [] }]);
+    setNewGroupName("");
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <div style={{ fontSize: 12, color: "#8892b0" }}>גרור קודים בין קבוצות לשינוי הסיווג</div>
+        <button onClick={() => persist(DEFAULT_LEGEND)} style={{ background: "none", border: "1px solid #334", borderRadius: 6, padding: "4px 10px", fontSize: 11, color: "#556", cursor: "pointer" }}>איפוס</button>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {groups.map(group => (
+          <div key={group.id}
+            onDragOver={e => { e.preventDefault(); setDropTarget(group.id); }}
+            onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDropTarget(null); }}
+            onDrop={e => { e.preventDefault(); onDrop(group.id); setDropTarget(null); }}
+            style={{ border: `2px solid ${dropTarget === group.id ? "#4a9eff" : "rgba(255,255,255,0.1)"}`, borderRadius: 12, overflow: "hidden", transition: "border-color .15s", background: dropTarget === group.id ? "rgba(74,158,255,0.06)" : "transparent" }}>
+            {/* Group header */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "rgba(255,255,255,0.04)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+              <input value={group.name} onChange={e => renameGroup(group.id, e.target.value)}
+                style={{ ...inp, padding: "3px 8px", fontSize: 12, fontWeight: 700, flex: 1 }} />
+              <span style={{ fontSize: 10, color: "#445", background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: "2px 8px", whiteSpace: "nowrap" }}>{group.codes.length} קודים</span>
+              {groups.length > 1 && (
+                <button onClick={() => removeGroup(group.id)} style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", fontSize: 15, opacity: .6, padding: 2 }} title="מחק קבוצה">✕</button>
+              )}
+            </div>
+            {/* Code chips */}
+            <div style={{ padding: "10px 12px", display: "flex", flexWrap: "wrap", gap: 8, minHeight: 54 }}>
+              {group.codes.length === 0 && (
+                <span style={{ fontSize: 11, color: "#334", alignSelf: "center", fontStyle: "italic" }}>גרור לכאן קודים…</span>
+              )}
+              {group.codes.map(code => {
+                const st = statusStyle(code);
+                return (
+                  <div key={code} draggable
+                    onDragStart={() => { dragRef.current = { code, fromGroupId: group.id }; }}
+                    style={{ display: "flex", alignItems: "center", gap: 6, background: st ? `${st.bg}22` : "rgba(255,255,255,0.06)", border: `1px solid ${st ? `${st.bg}55` : "rgba(255,255,255,0.12)"}`, borderRadius: 8, padding: "5px 10px", cursor: "grab", userSelect: "none" }}>
+                    <span style={{ background: st?.bg || "#555", color: "#fff", borderRadius: 4, padding: "2px 8px", fontSize: 12, fontWeight: 700 }}>{code}</span>
+                    {st?.label && <span style={{ fontSize: 11, color: "#8892b0" }}>{st.label}</span>}
+                    <button onClick={() => removeCode(group.id, code)}
+                      style={{ background: "none", border: "none", color: "#556", cursor: "pointer", fontSize: 13, lineHeight: 1, padding: "0 0 0 2px" }} title="הסר">✕</button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Add new group */}
+      <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
+        <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && addGroup()}
+          placeholder="שם קבוצה חדשה…" style={{ ...inp, flex: 1 }} />
+        <PillBtn onClick={addGroup} color="#4a9eff">+ קבוצה</PillBtn>
+      </div>
+    </div>
+  );
+}
+
 /* ── SETTINGS ── */
 function SettingsView({ data, save, mgr, mgrName, toast }) {
   const isMaster = mgrName === "מנהל ראשי";
@@ -1324,23 +1434,25 @@ function SettingsView({ data, save, mgr, mgrName, toast }) {
     </div>
   );
   const tabs = [
-    { id: "sys", l: "מערכות" },
-    { id: "ppl", l: "אנשי צוות" },
-    { id: "log", l: "יומן פעילות" },
+    { id: "sys",    l: "מערכות" },
+    { id: "ppl",    l: "אנשי צוות" },
+    { id: "legend", l: "מקרא" },
+    { id: "log",    l: "יומן" },
     ...(isMaster ? [{ id: "mgrs", l: "מנהלים" }, { id: "sec", l: "אבטחה" }] : []),
   ];
   return (
     <div style={{ maxWidth: 540, margin: "0 auto" }}>
       <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: 4, flexWrap: "wrap" }}>
         {tabs.map(t => (
-          <button key={t.id} onClick={() => setSt(t.id)} style={{ flex: 1, minWidth: 70, padding: "7px 4px", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: st === t.id ? 700 : 400, background: st === t.id ? "rgba(74,158,255,0.2)" : "transparent", color: st === t.id ? "#4a9eff" : "#8892b0" }}>{t.l}</button>
+          <button key={t.id} onClick={() => setSt(t.id)} style={{ flex: 1, minWidth: 60, padding: "7px 4px", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: st === t.id ? 700 : 400, background: st === t.id ? "rgba(74,158,255,0.2)" : "transparent", color: st === t.id ? "#4a9eff" : "#8892b0" }}>{t.l}</button>
         ))}
       </div>
-      {st === "sys"  && <SystemsEditor data={data} save={save} toast={toast} vSys={vSys} setVSys={setVSys} />}
-      {st === "ppl"  && <SectionsEditor data={data} save={save} toast={toast} />}
-      {st === "log"  && <ActivityLog data={data} />}
-      {st === "mgrs" && isMaster && <ManagersEditor data={data} save={save} toast={toast} />}
-      {st === "sec"  && isMaster && (
+      {st === "sys"    && <SystemsEditor data={data} save={save} toast={toast} vSys={vSys} setVSys={setVSys} />}
+      {st === "ppl"    && <SectionsEditor data={data} save={save} toast={toast} />}
+      {st === "legend" && <LegendEditor />}
+      {st === "log"    && <ActivityLog data={data} />}
+      {st === "mgrs"   && isMaster && <ManagersEditor data={data} save={save} toast={toast} />}
+      {st === "sec"    && isMaster && (
         <div>
           <label style={lbl}>שנה קוד PIN ראשי</label>
           <div style={{ display: "flex", gap: 8 }}>
@@ -2562,40 +2674,43 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
             </div>
 
             {/* People × Days grid */}
-            <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${sc.accent}33` }}>
-              <table style={{ borderCollapse: 'collapse', width: '100%', direction: 'rtl', minWidth: Math.max(320, people.length * 46 + 64) }}>
+            <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${sc.accent}55`, boxShadow: `0 0 0 1px rgba(0,0,0,0.4)` }}>
+              <table style={{ borderCollapse: 'collapse', width: '100%', direction: 'rtl', minWidth: Math.max(320, people.length * 48 + 68) }}>
                 <thead>
-                  {/* Section title row */}
-                  <tr style={{ background: `${sc.accent}18` }}>
-                    <th style={{ padding: '6px 10px', fontSize: 11, color: sc.accent, textAlign: 'right', borderBottom: `1px solid ${sc.accent}33`, width: 60, position: 'sticky', right: 0, background: `${sc.accent}18`, zIndex: 2 }}>יום</th>
-                    {people.map(person => (
-                      <th key={person} style={{ padding: '5px 3px', fontSize: 9, color: person === myName ? '#4a9eff' : sc.accent, borderBottom: `1px solid ${sc.accent}33`, textAlign: 'center', minWidth: 38, maxWidth: 54, fontWeight: person === myName ? 700 : 500 }} title={person}>
-                        {person.split(' ')[0]}
+                  <tr style={{ background: `${sc.accent}30` }}>
+                    <th style={{ padding: '8px 10px', fontSize: 12, color: sc.accent, textAlign: 'right', borderBottom: `2px solid ${sc.accent}66`, borderLeft: `1px solid rgba(255,255,255,0.1)`, width: 64, position: 'sticky', right: 0, background: `${sc.accent}30`, zIndex: 2 }}>יום</th>
+                    {people.map((person, pi) => (
+                      <th key={person} style={{ padding: '6px 4px 8px', fontSize: 10, color: person === myName ? '#4a9eff' : '#dde8ff', borderBottom: `2px solid ${sc.accent}66`, borderRight: `1px solid rgba(255,255,255,0.1)`, textAlign: 'center', minWidth: 36, fontWeight: person === myName ? 700 : 600 }}>
+                        <div style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', transform: 'rotate(180deg)', whiteSpace: 'nowrap', fontSize: 10, lineHeight: 1 }}>
+                          {person}
+                        </div>
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {monthDays.map(({ num, iso, dow }) => {
-                    const dayData = days[iso] || {};
-                    const isToday = iso === today;
-                    const isSat   = dow === 6;
+                  {monthDays.map(({ num, iso, dow }, ri) => {
+                    const dayData  = days[iso] || {};
+                    const isToday  = iso === today;
+                    const isSat    = dow === 6;
+                    const rowBg    = isToday ? 'rgba(74,158,255,0.1)' : isSat ? 'rgba(255,255,255,0.025)' : ri % 2 === 0 ? 'rgba(255,255,255,0.018)' : 'rgba(0,0,0,0.15)';
+                    const stickyBg = isToday ? '#0d1e3a' : isSat ? '#0b0f1e' : ri % 2 === 0 ? '#0c1022' : '#090d1a';
                     return (
                       <tr key={iso}
                         onClick={() => { setSelDate(iso); setLens('daily'); }}
-                        style={{ cursor: 'pointer', background: isToday ? 'rgba(74,158,255,0.07)' : isSat ? 'rgba(255,255,255,0.015)' : 'transparent' }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(74,158,255,0.05)'}
-                        onMouseLeave={e => e.currentTarget.style.background = isToday ? 'rgba(74,158,255,0.07)' : isSat ? 'rgba(255,255,255,0.015)' : 'transparent'}>
-                        <td style={{ padding: '3px 8px', position: 'sticky', right: 0, background: isToday ? '#0c1830' : '#080c18', zIndex: 1, borderBottom: '1px solid rgba(255,255,255,0.04)', whiteSpace: 'nowrap' }}>
-                          <span style={{ fontWeight: isToday ? 700 : 400, color: isToday ? '#4a9eff' : isSat ? '#556' : '#aab', fontSize: 12 }}>{num}</span>
-                          <span style={{ fontSize: 9, color: '#334', marginRight: 3 }}>{DAY_SHORT[dow]}</span>
+                        style={{ cursor: 'pointer', background: rowBg, borderBottom: `1px solid rgba(255,255,255,${isSat ? '0.12' : '0.06'})` }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(74,158,255,0.07)'}
+                        onMouseLeave={e => e.currentTarget.style.background = rowBg}>
+                        <td style={{ padding: '4px 8px', position: 'sticky', right: 0, background: stickyBg, zIndex: 1, whiteSpace: 'nowrap', borderLeft: `1px solid rgba(255,255,255,0.1)`, borderBottom: `1px solid rgba(255,255,255,${isSat ? '0.12' : '0.06'})` }}>
+                          <span style={{ fontWeight: isToday ? 700 : isSat ? 600 : 400, color: isToday ? '#4a9eff' : isSat ? '#7788aa' : '#c0cce0', fontSize: 13 }}>{num}</span>
+                          <span style={{ fontSize: 9, color: isSat ? '#556' : '#445', marginRight: 4 }}>{DAY_SHORT[dow]}</span>
                           {dayData.notes && <span style={{ fontSize: 9 }}>📝</span>}
                         </td>
-                        {people.map(person => {
+                        {people.map((person, pi) => {
                           const code = dayData.statuses?.[person] || '';
                           const st   = statusStyle(code);
                           return (
-                            <td key={person} style={{ padding: '2px 2px', textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.04)', background: code && st ? `${st.bg}18` : 'transparent' }}>
+                            <td key={person} style={{ padding: '3px 2px', textAlign: 'center', borderRight: `1px solid rgba(255,255,255,0.07)`, background: code && st ? `${st.bg}28` : 'transparent' }}>
                               {code && <StatusBadge code={code} small />}
                             </td>
                           );
