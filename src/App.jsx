@@ -2763,7 +2763,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
 
         const sec    = sections[selSecIdx] || sections[0];
         const sc     = sec ? secPal(null, sec.name, selSecIdx) : { accent: '#4a9eff' };
-        const people = sec?.people || [];
+        const people = (sec?.people || []).filter(p => !p.includes('נוסף'));
 
         return (
           <div>
@@ -2840,7 +2840,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                           const lastName = rest.join(' ');
                           const isMe = person === myName;
                           return (
-                            <th key={person} colSpan={2} style={{ padding: '6px 4px 2px', fontSize: 12, color: isMe ? '#4a9eff' : '#dde8ff', borderBottom: `1px solid ${sc.accent}44`, borderRight: `3px solid rgba(255,255,255,0.55)`, textAlign: 'center', fontWeight: isMe ? 700 : 600, verticalAlign: 'bottom' }}>
+                            <th key={person} colSpan={2} style={{ padding: '6px 4px 2px', fontSize: 12, color: isMe ? '#4a9eff' : '#dde8ff', borderBottom: `1px solid ${sc.accent}44`, borderLeft: `1px solid rgba(255,255,255,0.08)`, textAlign: 'center', fontWeight: isMe ? 700 : 600, verticalAlign: 'bottom' }}>
                               <div style={{ lineHeight: 1.4 }}>
                                 <div>{firstName}</div>
                                 {lastName && <div style={{ opacity: 0.75, fontSize: 10 }}>{lastName}</div>}
@@ -2853,8 +2853,8 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                       <tr style={{ background: `${sc.accent}22` }}>
                         {people.map((person) => (
                           <Fragment key={person}>
-                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#778', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, textAlign: 'center', minWidth: 44, letterSpacing: 0.3 }}>ראשי</th>
-                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#667', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `3px solid rgba(255,255,255,0.55)`, textAlign: 'center', minWidth: 22, letterSpacing: 0.3 }}>מש׳</th>
+                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#778', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `3px solid rgba(255,255,255,0.55)`, textAlign: 'center', minWidth: 44, letterSpacing: 0.3 }}>ראשי</th>
+                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#667', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `1px solid rgba(255,255,255,0.13)`, textAlign: 'center', minWidth: 22, letterSpacing: 0.3 }}>מש׳</th>
                           </Fragment>
                         ))}
                       </tr>
@@ -2895,14 +2895,14 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                               } : { onClick: e => e.stopPropagation() };
                               return (
                                 <Fragment key={person}>
-                                  {/* Slot 1 — main (2/3 width) */}
+                                  {/* Slot 1 — main (2/3 width) — person separator on borderRight */}
                                   <td {...makeDrop(key1, 1)}
-                                    style={{ padding: '4px 3px', textAlign: 'center', verticalAlign: 'middle', borderRight: `1px solid rgba(255,255,255,0.13)`, background: hover1 ? 'rgba(74,158,255,0.25)' : (code1 && st1 ? `${st1.bg}33` : 'transparent'), outline: hover1 ? '2px dashed #4a9eff' : 'none', transition: 'background .1s', minWidth: 44 }}>
+                                    style={{ padding: '4px 3px', textAlign: 'center', verticalAlign: 'middle', borderRight: `3px solid rgba(255,255,255,0.55)`, background: hover1 ? 'rgba(74,158,255,0.25)' : (code1 && st1 ? `${st1.bg}33` : 'transparent'), outline: hover1 ? '2px dashed #4a9eff' : 'none', transition: 'background .1s', minWidth: 44 }}>
                                     {code1 ? <StatusBadge code={code1} /> : (hover1 ? <span style={{ fontSize: 13, opacity: 0.5 }}>+</span> : null)}
                                   </td>
-                                  {/* Slot 2 — secondary (1/3 width) */}
+                                  {/* Slot 2 — secondary (1/3 width) — thin inner divider on borderRight */}
                                   <td {...makeDrop(key2, 2)}
-                                    style={{ padding: '4px 2px', textAlign: 'center', verticalAlign: 'middle', borderRight: `3px solid rgba(255,255,255,0.55)`, background: hover2 ? 'rgba(74,158,255,0.25)' : (code2 && st2 ? `${st2.bg}28` : 'rgba(0,0,0,0.1)'), outline: hover2 ? '2px dashed #4a9eff' : 'none', transition: 'background .1s', minWidth: 22 }}>
+                                    style={{ padding: '4px 2px', textAlign: 'center', verticalAlign: 'middle', borderRight: `1px solid rgba(255,255,255,0.13)`, background: hover2 ? 'rgba(74,158,255,0.25)' : (code2 && st2 ? `${st2.bg}28` : 'rgba(0,0,0,0.1)'), outline: hover2 ? '2px dashed #4a9eff' : 'none', transition: 'background .1s', minWidth: 22 }}>
                                     {code2 ? <StatusBadge code={code2} small /> : (hover2 ? <span style={{ fontSize: 11, opacity: 0.5 }}>+</span> : null)}
                                   </td>
                                 </Fragment>
