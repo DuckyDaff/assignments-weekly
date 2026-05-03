@@ -725,12 +725,59 @@ function CalendarView({ wk, setWk, weekA, prevA, data, sysMap, mgr, onAdd, onEdi
 }
 /* ── CALENDAR MOBILE (no horizontal scroll) ── */
 function CalendarMobile({ weekA, activeSys, activePeople, sysMap, todayKey, mode, onView }) {
-  const [expanded, setExpanded] = useState({});
+  const [expanded,  setExpanded]  = useState({});
+  const [viewMode,  setViewMode]  = useState("grid"); // "grid" | "day"
+  const [activeDay, setActiveDay] = useState(() => todayKey || "sun");
   const rows = mode === "sys" ? activeSys : activePeople;
-  const WORK = DAYS.slice(0, 5);   // ראשון–חמישי
-  const WKND = DAYS.slice(5);      // שישי–שבת
+  const WORK = DAYS.slice(0, 5);
+  const WKND = DAYS.slice(5);
   const firstName = n => n.split(" ")[0];
   const MAX = 4;
+
+  // ── Day view ──────────────────────────────────────────
+  if (viewMode === "day") {
+    const dayAssigns = weekA.filter(a => !a.days || a.days.length === 0 || a.days.includes(activeDay));
+    const grouped = activeSys.map(sys => ({ sys, col: sysMap[sys] || pal(activeSys.indexOf(sys)), a: dayAssigns.filter(a => a.system === sys) })).filter(g => g.a.length > 0);
+    return (
+      <div>
+        {/* Toggle */}
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+          <button onClick={() => setViewMode("grid")} style={{ padding: "4px 10px", fontSize: 11, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 7, color: "#8892b0", cursor: "pointer" }}>📊 תצוגת טבלה</button>
+        </div>
+        {/* Day tabs */}
+        <div style={{ display: "flex", gap: 4, marginBottom: 12, overflowX: "auto" }}>
+          {DAYS.map(d => {
+            const isToday = d.key === todayKey;
+            const isActive = d.key === activeDay;
+            const cnt = weekA.filter(a => !a.days || a.days.length === 0 || a.days.includes(d.key)).length;
+            return (
+              <button key={d.key} onClick={() => setActiveDay(d.key)}
+                style={{ flex: "0 0 auto", padding: "7px 12px", border: `2px solid ${isActive ? "#4a9eff" : isToday ? "rgba(74,158,255,0.4)" : "rgba(255,255,255,0.1)"}`, borderRadius: 10, background: isActive ? "rgba(74,158,255,0.18)" : isToday ? "rgba(74,158,255,0.06)" : "rgba(255,255,255,0.03)", color: isActive ? "#4a9eff" : isToday ? "#7ab3e8" : "#8892b0", fontSize: 13, fontWeight: isActive ? 700 : 400, cursor: "pointer", whiteSpace: "nowrap" }}>
+                {d.long}{cnt > 0 && <span style={{ marginRight: 5, fontSize: 10, opacity: .7 }}>({cnt})</span>}
+              </button>
+            );
+          })}
+        </div>
+        {/* Assignments list */}
+        {grouped.length === 0
+          ? <div style={{ textAlign: "center", padding: "32px 0", opacity: .4, fontSize: 14 }}>אין שיבוצים ביום זה</div>
+          : grouped.map(({ sys, col, a }) => (
+            <div key={sys} onClick={() => onView(a[0])} style={{ marginBottom: 10, background: col.dark, border: `1px solid ${col.accent}44`, borderRight: `4px solid ${col.accent}`, borderRadius: 12, padding: "12px 14px", cursor: "pointer" }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: col.accent, marginBottom: 6 }}>{sys}</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {[...new Set(a.flatMap(x => x.assignees || []))].map(p => (
+                  <span key={p} style={{ fontSize: 13, background: `${col.accent}22`, color: col.accent, border: `1px solid ${col.accent}44`, borderRadius: 20, padding: "3px 10px", fontWeight: 600 }}>{p}</span>
+                ))}
+              </div>
+              {a[0]?.tasks?.length > 0 && <div style={{ marginTop: 8, fontSize: 11, color: "#8892b0" }}>✓ {a[0].tasks[0]}{a[0].tasks.length > 1 ? ` +${a[0].tasks.length - 1}` : ""}</div>}
+            </div>
+          ))
+        }
+      </div>
+    );
+  }
+
+  // ── Grid view (original) ───────────────────────────────
 
   const getDayData = (rowA, key) => {
     const dayA = rowA.filter(a => !a.days || a.days.length === 0 || a.days.includes(key));
@@ -740,6 +787,10 @@ function CalendarMobile({ weekA, activeSys, activePeople, sysMap, todayKey, mode
 
   return (
     <div style={{ width: "100%" }}>
+      {/* Toggle to day view */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <button onClick={() => setViewMode("day")} style={{ padding: "4px 10px", fontSize: 11, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 7, color: "#8892b0", cursor: "pointer" }}>📅 תצוגת יום</button>
+      </div>
       {/* header */}
       <div style={{ display: "grid", gridTemplateColumns: "62px repeat(5,1fr) 26px 26px", gap: 2, marginBottom: 3 }}>
         <div />
@@ -1122,32 +1173,54 @@ function SectionsEditor({ data, save, toast }) {
 }
 
 function SystemsEditor({ data, save, toast, vSys, setVSys }) {
-  const [colorPick, setColorPick] = useState(null); // system name being color-edited
+  const [colorPick, setColorPick] = useState(null);
+  const [dragIdx, setDragIdx]     = useState(null);
+  const [overIdx, setOverIdx]     = useState(null);
   const sysColors = data.systemColors || {};
-  const setColor = (sys, idx) => {
-    save({ ...data, systemColors: { ...sysColors, [sys]: idx } });
-    setColorPick(null);
+
+  const setColor = (sys, idx) => { save({ ...data, systemColors: { ...sysColors, [sys]: idx } }); setColorPick(null); };
+
+  const drop = (toIdx) => {
+    if (dragIdx === null || dragIdx === toIdx) { setDragIdx(null); setOverIdx(null); return; }
+    const arr = [...data.systems];
+    const [item] = arr.splice(dragIdx, 1);
+    arr.splice(toIdx, 0, item);
+    save({ ...data, systems: arr }, "סדר מערכות עודכן");
+    setDragIdx(null); setOverIdx(null);
   };
+
   return (
     <div>
       <div style={{ display: "flex", gap: 7, marginBottom: 13 }}>
         <input value={vSys} onChange={e => setVSys(e.target.value)} onKeyDown={e => e.key === "Enter" && (() => { if (!vSys.trim() || data.systems.includes(vSys.trim())) { toast("שם כבר קיים", "error"); return; } save({ ...data, systems: [...data.systems, vSys.trim()] }, "מערכת נוספה"); setVSys(""); })()} placeholder="שם המערכת החדשה" style={inp} />
         <PillBtn onClick={() => { if (!vSys.trim() || data.systems.includes(vSys.trim())) { toast("שם כבר קיים", "error"); return; } save({ ...data, systems: [...data.systems, vSys.trim()] }, "מערכת נוספה"); setVSys(""); }} color="#4a9eff">הוסף</PillBtn>
       </div>
+      <div style={{ fontSize: 10, color: "#445", marginBottom: 8, textAlign: "center" }}>⠿ גרור שורה לשינוי סדר</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {data.systems.map((sys, i) => {
           const idx = sysColors[sys] ?? i;
           const col = pal(idx);
           const open = colorPick === sys;
+          const isDragging = dragIdx === i;
+          const isOver = overIdx === i;
           return (
-            <div key={sys}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 13px", background: "rgba(255,255,255,0.04)", border: `1px solid rgba(255,255,255,0.07)`, borderRight: `3px solid ${col.accent}`, borderRadius: open ? "9px 9px 0 0" : 9 }}
-                onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.07)"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}>
-                <span style={{ fontSize: 13 }}>{sys}</span>
+            <div key={sys}
+              draggable
+              onDragStart={() => setDragIdx(i)}
+              onDragOver={e => { e.preventDefault(); setOverIdx(i); }}
+              onDragLeave={() => setOverIdx(null)}
+              onDrop={() => drop(i)}
+              onDragEnd={() => { setDragIdx(null); setOverIdx(null); }}
+              style={{ opacity: isDragging ? 0.4 : 1, transition: "opacity .15s" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 13px", background: isOver ? "rgba(74,158,255,0.1)" : "rgba(255,255,255,0.04)", border: `1px solid ${isOver ? "rgba(74,158,255,0.4)" : "rgba(255,255,255,0.07)"}`, borderRight: `3px solid ${col.accent}`, borderRadius: open ? "9px 9px 0 0" : 9, cursor: "grab", transition: "background .1s,border .1s" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ color: "#445", fontSize: 16, cursor: "grab", userSelect: "none" }}>⠿</span>
+                  <span style={{ fontSize: 13 }}>{sys}</span>
+                </div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  <button onClick={() => setColorPick(open ? null : sys)} title="בחר צבע"
+                  <button onClick={e => { e.stopPropagation(); setColorPick(open ? null : sys); }} title="בחר צבע"
                     style={{ width: 22, height: 22, borderRadius: "50%", background: col.accent, border: `2px solid ${open ? "#fff" : "transparent"}`, cursor: "pointer", flexShrink: 0, transition: "border .15s" }} />
-                  <button onClick={() => save({ ...data, systems: data.systems.filter(s => s !== sys) }, "מערכת הוסרה")}
+                  <button onClick={e => { e.stopPropagation(); save({ ...data, systems: data.systems.filter(s => s !== sys) }, "מערכת הוסרה"); }}
                     style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", opacity: .7 }}
                     onMouseEnter={e => e.currentTarget.style.opacity = "1"} onMouseLeave={e => e.currentTarget.style.opacity = ".7"}><I n="trash" s={14} /></button>
                 </div>
