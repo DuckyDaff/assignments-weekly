@@ -2172,9 +2172,37 @@ function AssignModal({ mode, a, wk, data, sysMap, onClose, onSave }) {
 /* ═══════════════════════════════════════════════════════
    ANNUAL PLAN VIEW
 ═══════════════════════════════════════════════════════ */
-const MONTHS_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
-const DAY_SHORT = ['א','ב','ג','ד','ה','ו','ש'];
-const DAY_LONG  = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+const MONTHS_HE  = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+const DAY_SHORT  = ['א','ב','ג','ד','ה','ו','ש'];
+const DAY_LONG   = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+
+// Status category classification
+const CAT_DAY      = new Set(['י','Y','2']);
+const CAT_NIGHT    = new Set(['ל','L','ל2']);
+const CAT_ONCALL   = new Set(['כ','כש','כמ','כמש']);
+const CAT_UNAVAIL  = new Set(['ח','מיל','מ','פ','מנוחה','ק']);
+const CAT_AWAY     = new Set(['חיפה','הרצליה','ראש פינה','PBB','רמון']);
+const CAT_TRAINING = new Set(['ב. חשמל','ב. כללית','השתלמות','ניקיון תחנות','ב. שמיעה','ס. רפואי','ר. גובה','ר. מלגזה','ע. ראשונה']);
+
+function classifyStatus(code) {
+  if (!code) return null;
+  if (CAT_DAY.has(code))      return 'day';
+  if (CAT_NIGHT.has(code))    return 'night';
+  if (CAT_ONCALL.has(code))   return 'oncall';
+  if (CAT_UNAVAIL.has(code))  return 'unavail';
+  if (CAT_AWAY.has(code))     return 'away';
+  if (CAT_TRAINING.has(code)) return 'training';
+  return 'other';
+}
+
+const CAT_STYLE = {
+  day:      { bg: '#27ae60', light: '#1a4a2a', label: '☀️ משמרת יום',         labelShort: 'יום'     },
+  night:    { bg: '#2980b9', light: '#0d2a40', label: '🌙 משמרת לילה',        labelShort: 'לילה'    },
+  oncall:   { bg: '#e67e22', light: '#3a1f00', label: '🔶 כוננות',             labelShort: 'כוננות'  },
+  unavail:  { bg: '#e74c3c', light: '#3a0c0c', label: '🔴 לא זמינים',         labelShort: 'חסרים'   },
+  away:     { bg: '#16a085', light: '#0a2a24', label: '✈️ מחוץ לבסיס',        labelShort: 'בחוץ'    },
+  training: { bg: '#8e44ad', light: '#2a1040', label: '📚 הכשרה / בטיחות',    labelShort: 'הכשרה'   },
+};
 
 function StatusBadge({ code, small }) {
   const st = statusStyle(code);
@@ -2186,12 +2214,37 @@ function StatusBadge({ code, small }) {
   );
 }
 
+/* ── Daily briefing helpers ── */
+function buildDayGroups(dayData, sections) {
+  const statuses = dayData?.statuses || {};
+  const groups   = { day: [], night: [], oncall: [], unavail: [], away: [], training: [] };
+  const allPeople = sections.flatMap(s => s.people);
+  for (const person of allPeople) {
+    const code = statuses[person] || '';
+    const cat  = classifyStatus(code);
+    if (cat && groups[cat]) groups[cat].push({ person, code });
+  }
+  return groups;
+}
+
+function PersonChip({ person, code, isMe }) {
+  const st = statusStyle(code);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderRadius: 20, background: isMe ? 'rgba(74,158,255,0.1)' : 'rgba(255,255,255,0.05)', border: isMe ? '1px solid rgba(74,158,255,0.3)' : '1px solid rgba(255,255,255,0.08)' }}>
+      <span style={{ fontSize: 12, color: isMe ? '#4a9eff' : '#ccd6f6' }}>{person}</span>
+      {code && st && <span style={{ background: st.bg, color: '#fff', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>{code}</span>}
+    </div>
+  );
+}
+
 function AnnualView({ annualData, onSaveDay, mgr, myName }) {
   const mob = useContext(MobileCtx);
-  const [viewMode, setViewMode] = useState('month');
-  const [selMonth, setSelMonth] = useState(() => new Date().getMonth());
-  const [selDate,  setSelDate]  = useState(null);
-  const [editCell, setEditCell] = useState(null); // { person }
+  // lens: 'daily' | 'monthly' | 'personal'
+  const [lens,      setLens]      = useState('daily');
+  const [selDate,   setSelDate]   = useState(() => new Date().toISOString().slice(0, 10));
+  const [selMonth,  setSelMonth]  = useState(() => new Date().getMonth());
+  const [selPerson, setSelPerson] = useState(myName || '');
+  const [editCell,  setEditCell]  = useState(null);
 
   if (!annualData) {
     return (
@@ -2212,153 +2265,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
   const year     = annualData.year || 2026;
   const sections = annualData.sections || [];
   const days     = annualData.days || {};
-
-  const today = new Date().toISOString().slice(0, 10);
-  const daysInMonth = new Date(year, selMonth + 1, 0).getDate();
-  const monthDays = Array.from({ length: daysInMonth }, (_, i) => {
-    const d   = new Date(year, selMonth, i + 1);
-    const iso = `${year}-${String(selMonth + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
-    return { num: i + 1, iso, dow: d.getDay() };
-  });
-
-  // ── My annual status strip (shown when myName is set) ──
-  function MyStrip() {
-    if (!myName) return null;
-    return (
-      <div style={{ background: 'rgba(74,158,255,0.06)', border: '1px solid rgba(74,158,255,0.15)', borderRadius: 12, padding: '10px 14px', marginBottom: 16 }}>
-        <div style={{ fontSize: 11, color: '#4a9eff', fontWeight: 700, marginBottom: 8 }}>הסטטוס שלי — {MONTHS_HE[selMonth]}</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {monthDays.map(({ num, iso, dow }) => {
-            const code = days[iso]?.statuses?.[myName] || '';
-            const st   = statusStyle(code);
-            const isToday = iso === today;
-            return (
-              <div key={iso} onClick={() => { setSelDate(iso); setViewMode('day'); }}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, cursor: 'pointer', minWidth: 28, padding: '3px 2px', borderRadius: 6, background: isToday ? 'rgba(74,158,255,0.15)' : 'transparent', border: isToday ? '1px solid rgba(74,158,255,0.4)' : '1px solid transparent' }}>
-                <span style={{ fontSize: 9, color: dow === 6 ? '#557' : '#445' }}>{DAY_SHORT[dow]}</span>
-                <span style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? '#4a9eff' : '#8892b0' }}>{num}</span>
-                {code
-                  ? <span style={{ width: 24, height: 14, background: st?.bg || '#333', borderRadius: 3, fontSize: 8, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{code.slice(0,3)}</span>
-                  : <span style={{ width: 24, height: 14 }} />}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  // ── MONTH VIEW ──────────────────────────────────────────────────
-  if (viewMode === 'month') {
-    // On mobile: show mini personal strip + one section at a time via tabs
-    const [mobileSecIdx, setMobileSecIdx] = useState(0);
-    const visibleSections = mob ? [sections[mobileSecIdx]].filter(Boolean) : sections;
-
-    return (
-      <div>
-        {/* Month nav */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 14 }}>
-          <NavBtn onClick={() => setSelMonth(m => (m + 11) % 12)}><I n="cR" s={14} /></NavBtn>
-          <div style={{ textAlign: 'center', minWidth: 130 }}>
-            <div style={{ fontWeight: 700, fontSize: 18, color: '#fff' }}>{MONTHS_HE[selMonth]}</div>
-            <div style={{ fontSize: 13, color: '#8892b0' }}>{year}</div>
-          </div>
-          <NavBtn onClick={() => setSelMonth(m => (m + 1) % 12)}><I n="cL" s={14} /></NavBtn>
-        </div>
-
-        <MyStrip />
-
-        {/* Legend */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14, justifyContent: 'center' }}>
-          {[['י','יום'],['ל','לילה'],['כ','כונן'],['ח','חופש'],['מיל','מילואים'],['מ','מחלה'],['פ','פנוי'],['ק','קורס']].map(([code, lbl]) => (
-            <span key={code} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#8892b0' }}>
-              <span style={{ width: 20, height: 13, background: statusStyle(code)?.bg || '#333', borderRadius: 3, display: 'inline-block', flexShrink: 0 }} />
-              {lbl}
-            </span>
-          ))}
-        </div>
-
-        {/* Mobile: section selector tabs */}
-        {mob && sections.length > 1 && (
-          <div style={{ display: 'flex', marginBottom: 10, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
-            {sections.map((sec, si) => {
-              const sc = secPal(null, sec.name, si);
-              const isSel = si === mobileSecIdx;
-              return (
-                <button key={sec.name} onClick={() => setMobileSecIdx(si)}
-                  style={{ flex: 1, padding: '8px 4px', border: 'none', background: isSel ? `${sc.accent}20` : 'transparent', color: isSel ? sc.accent : '#556', fontSize: 10, fontWeight: isSel ? 700 : 400, cursor: 'pointer', borderTop: `2px solid ${isSel ? sc.accent : 'transparent'}` }}>
-                  {sec.name.replace('מדור ', '')}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Grid */}
-        <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid rgba(255,255,255,0.07)' }}>
-          <table style={{ borderCollapse: 'collapse', width: '100%', direction: 'rtl', minWidth: mob ? 340 : 600 }}>
-            <thead>
-              <tr style={{ background: '#0f1525' }}>
-                <th style={{ padding: '6px 8px', fontSize: 11, color: '#4a9eff', borderBottom: '1px solid rgba(255,255,255,0.07)', width: 52, textAlign: 'right', position: 'sticky', right: 0, background: '#0f1525', zIndex: 2 }}>יום</th>
-                {visibleSections.map(sec => {
-                  const sc = secPal(null, sec.name, sections.indexOf(sec));
-                  return (
-                    <th key={sec.name} colSpan={sec.people.length}
-                      style={{ padding: '5px 6px', fontSize: 10, color: sc.accent, borderBottom: '1px solid rgba(255,255,255,0.07)', textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.07)' }}>
-                      {sec.name}
-                    </th>
-                  );
-                })}
-              </tr>
-              <tr style={{ background: '#0a1020' }}>
-                <th style={{ position: 'sticky', right: 0, background: '#0a1020', zIndex: 2, borderBottom: '1px solid rgba(255,255,255,0.07)' }} />
-                {visibleSections.flatMap(sec => sec.people.map((person, pi) => (
-                  <th key={person} style={{ padding: '4px 2px', fontSize: 9, color: person === myName ? '#4a9eff' : '#445', borderBottom: '1px solid rgba(255,255,255,0.07)', borderRight: pi === sec.people.length - 1 ? '1px solid rgba(255,255,255,0.07)' : 'none', textAlign: 'center', minWidth: 32, maxWidth: 44, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: person === myName ? 700 : 400 }} title={person}>
-                    {person.split(' ')[0]}
-                  </th>
-                )))}
-              </tr>
-            </thead>
-            <tbody>
-              {monthDays.map(({ num, iso, dow }) => {
-                const dayData = days[iso] || {};
-                const isSat   = dow === 6;
-                const isToday = iso === today;
-                return (
-                  <tr key={iso} onClick={() => { setSelDate(iso); setViewMode('day'); }}
-                    style={{ cursor: 'pointer', background: isToday ? 'rgba(74,158,255,0.07)' : isSat ? 'rgba(255,255,255,0.015)' : 'transparent' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(74,158,255,0.05)'}
-                    onMouseLeave={e => e.currentTarget.style.background = isToday ? 'rgba(74,158,255,0.07)' : isSat ? 'rgba(255,255,255,0.015)' : 'transparent'}>
-                    <td style={{ padding: '3px 6px', position: 'sticky', right: 0, background: isToday ? '#0c1830' : '#080c18', zIndex: 1, borderBottom: '1px solid rgba(255,255,255,0.04)', whiteSpace: 'nowrap' }}>
-                      <span style={{ fontWeight: isToday ? 700 : 400, color: isToday ? '#4a9eff' : isSat ? '#556' : '#aab', fontSize: 12 }}>{num}</span>
-                      <span style={{ fontSize: 9, color: '#334', marginRight: 3 }}>{DAY_SHORT[dow]}</span>
-                      {dayData.notes && <span style={{ fontSize: 9 }}>📝</span>}
-                    </td>
-                    {visibleSections.flatMap(sec => sec.people.map((person, pi) => {
-                      const code = dayData.statuses?.[person] || '';
-                      const st   = statusStyle(code);
-                      return (
-                        <td key={person} style={{ padding: '2px 1px', textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.04)', borderRight: pi === sec.people.length - 1 ? '1px solid rgba(255,255,255,0.07)' : 'none', background: code && st ? `${st.bg}1a` : 'transparent' }}>
-                          {code && <StatusBadge code={code} small />}
-                        </td>
-                      );
-                    }))}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  }
-
-  // ── DAILY VIEW ──────────────────────────────────────────────────
-  const selDayData = days[selDate] || {};
-  const selDateObj = selDate ? new Date(selDate + 'T00:00:00') : null;
-  const selDow     = selDateObj ? selDateObj.getDay() : 0;
-  const selNum     = selDateObj ? selDateObj.getDate() : 0;
-  const selMon     = selDateObj ? selDateObj.getMonth() : 0;
+  const today    = new Date().toISOString().slice(0, 10);
 
   const STATUS_OPTIONS = [
     '', 'י', 'ל', 'Y', 'L', 'כ', 'כש', 'כמ', 'כמש',
@@ -2366,12 +2273,6 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
     'חיפה', 'הרצליה', 'ראש פינה', 'PBB', 'רמון',
     'ב. חשמל', 'ב. כללית', 'השתלמות', 'ניקיון תחנות',
   ];
-
-  function saveStatus(person, code) {
-    const newStatuses = { ...(selDayData.statuses || {}) };
-    if (code) newStatuses[person] = code; else delete newStatuses[person];
-    onSaveDay({ date: selDate, statuses: newStatuses });
-  }
 
   function navDay(delta) {
     const d = new Date(selDate + 'T00:00:00');
@@ -2382,88 +2283,313 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
     setEditCell(null);
   }
 
+  function saveStatus(person, code) {
+    const dayData = days[selDate] || {};
+    const newStatuses = { ...(dayData.statuses || {}) };
+    if (code) newStatuses[person] = code; else delete newStatuses[person];
+    onSaveDay({ date: selDate, statuses: newStatuses });
+  }
+
+  // ── Lens tabs ─────────────────────────────────────────────────
+  const LENSES = [
+    { id: 'daily',    label: 'יומי',   icon: '☀️' },
+    { id: 'monthly',  label: 'חודשי',  icon: '📊' },
+    { id: 'personal', label: 'אישי',   icon: '👤' },
+  ];
+
   return (
     <div>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-        <NavBtn onClick={() => setViewMode('month')}><I n="cR" s={14} /></NavBtn>
-        <div style={{ flex: 1, textAlign: 'center' }}>
-          <div style={{ fontWeight: 700, fontSize: 17, color: '#fff' }}>
-            {selNum} {MONTHS_HE[selMon]} {year}
-          </div>
-          <div style={{ fontSize: 12, color: '#8892b0' }}>יום {DAY_LONG[selDow]}</div>
-        </div>
-        <NavBtn onClick={() => navDay(-1)}><I n="cR" s={14} /></NavBtn>
-        <NavBtn onClick={() => navDay(1)}><I n="cL" s={14} /></NavBtn>
+      {/* Lens selector */}
+      <div style={{ display: 'flex', marginBottom: 16, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+        {LENSES.map(l => (
+          <button key={l.id} onClick={() => setLens(l.id)}
+            style={{ flex: 1, padding: '10px 4px', border: 'none', cursor: 'pointer',
+              background: lens === l.id ? 'rgba(74,158,255,0.18)' : 'transparent',
+              color: lens === l.id ? '#4a9eff' : '#556',
+              fontWeight: lens === l.id ? 700 : 400,
+              fontSize: 13,
+              borderBottom: `2px solid ${lens === l.id ? '#4a9eff' : 'transparent'}`,
+              transition: 'all .15s' }}>
+            {l.icon} {l.label}
+          </button>
+        ))}
       </div>
 
-      {/* Summary */}
-      {(selDayData.countDay != null || selDayData.countNight != null || selDayData.workDay || selDayData.workNight) && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', justifyContent: 'center' }}>
-          {selDayData.countDay   != null && <span style={{ background: 'rgba(39,174,96,0.12)', border: '1px solid rgba(39,174,96,0.3)', borderRadius: 8, padding: '4px 12px', fontSize: 12, color: '#2ecc71' }}>☀ יום: {selDayData.countDay}</span>}
-          {selDayData.countNight != null && <span style={{ background: 'rgba(41,128,185,0.12)', border: '1px solid rgba(41,128,185,0.3)', borderRadius: 8, padding: '4px 12px', fontSize: 12, color: '#3498db' }}>🌙 לילה: {selDayData.countNight}</span>}
-          {selDayData.workDay  && <span style={{ background: 'rgba(39,174,96,0.08)',  border: '1px solid rgba(39,174,96,0.2)',  borderRadius: 8, padding: '4px 12px', fontSize: 12, color: '#2ecc71' }}>⚙ יום: {selDayData.workDay}</span>}
-          {selDayData.workNight && <span style={{ background: 'rgba(41,128,185,0.08)', border: '1px solid rgba(41,128,185,0.2)', borderRadius: 8, padding: '4px 12px', fontSize: 12, color: '#3498db' }}>⚙ לילה: {selDayData.workNight}</span>}
-        </div>
-      )}
+      {/* ══ DAILY LENS ══════════════════════════════════════════════ */}
+      {lens === 'daily' && (() => {
+        const selDayData = days[selDate] || {};
+        const selDateObj = selDate ? new Date(selDate + 'T00:00:00') : null;
+        const selDow     = selDateObj ? selDateObj.getDay() : 0;
+        const selNum     = selDateObj ? selDateObj.getDate() : 0;
+        const selMon     = selDateObj ? selDateObj.getMonth() : 0;
+        const groups     = buildDayGroups(selDayData, sections);
 
-      {/* Notes */}
-      <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 14px', marginBottom: 14 }}>
-        <div style={{ fontSize: 11, color: '#556', marginBottom: 6 }}>📝 הערות יומיות</div>
-        {mgr ? (
-          <input value={selDayData.notes || ''} onChange={e => onSaveDay({ date: selDate, notes: e.target.value })}
-            placeholder="הוסף הערה ליום..." style={{ ...inp, fontSize: 13 }} />
-        ) : (
-          <div style={{ fontSize: 13, color: selDayData.notes ? '#ccd6f6' : '#334' }}>{selDayData.notes || 'אין הערות'}</div>
-        )}
-      </div>
-
-      {/* Section cards */}
-      {sections.map((sec, si) => {
-        const sc = secPal(null, sec.name, si);
         return (
-          <div key={sec.name} style={{ marginBottom: 14, border: `1px solid ${sc.accent}33`, borderRadius: 12, overflow: 'hidden' }}>
-            <div style={{ background: `${sc.accent}18`, padding: '8px 14px', borderBottom: `1px solid ${sc.accent}22`, fontSize: 13, fontWeight: 700, color: sc.accent }}>
-              {sec.name}
+          <div>
+            {/* Date nav */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <NavBtn onClick={() => navDay(-1)}><I n="cR" s={14} /></NavBtn>
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <div style={{ fontWeight: 700, fontSize: 17, color: '#fff' }}>
+                  {selNum} {MONTHS_HE[selMon]} {year}
+                </div>
+                <div style={{ fontSize: 12, color: '#8892b0' }}>
+                  יום {DAY_LONG[selDow]}{selDate === today ? ' — היום' : ''}
+                </div>
+              </div>
+              <NavBtn onClick={() => navDay(1)}><I n="cL" s={14} /></NavBtn>
             </div>
-            <div style={{ padding: '10px 12px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {sec.people.map(person => {
-                const code  = selDayData.statuses?.[person] || '';
-                const st    = statusStyle(code);
-                const isMe  = person === myName;
-                const isEd  = editCell?.person === person;
+
+            {/* Summary bar */}
+            {(selDayData.countDay != null || selDayData.countNight != null || selDayData.workDay || selDayData.workNight || selDayData.notes) && (
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '10px 14px', marginBottom: 14 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginBottom: selDayData.notes ? 8 : 0 }}>
+                  {selDayData.countDay   != null && <span style={{ background: 'rgba(39,174,96,0.12)',  border: '1px solid rgba(39,174,96,0.3)',  borderRadius: 8, padding: '4px 12px', fontSize: 12, color: '#2ecc71' }}>☀ יום: {selDayData.countDay}</span>}
+                  {selDayData.countNight != null && <span style={{ background: 'rgba(41,128,185,0.12)', border: '1px solid rgba(41,128,185,0.3)', borderRadius: 8, padding: '4px 12px', fontSize: 12, color: '#3498db' }}>🌙 לילה: {selDayData.countNight}</span>}
+                  {selDayData.workDay    && <span style={{ background: 'rgba(39,174,96,0.08)',  border: '1px solid rgba(39,174,96,0.2)',  borderRadius: 8, padding: '4px 12px', fontSize: 12, color: '#2ecc71' }}>⚙ יום: {selDayData.workDay}</span>}
+                  {selDayData.workNight  && <span style={{ background: 'rgba(41,128,185,0.08)', border: '1px solid rgba(41,128,185,0.2)', borderRadius: 8, padding: '4px 12px', fontSize: 12, color: '#3498db' }}>⚙ לילה: {selDayData.workNight}</span>}
+                </div>
+                {selDayData.notes && <div style={{ fontSize: 13, color: '#ccd6f6', textAlign: 'right' }}>📝 {selDayData.notes}</div>}
+              </div>
+            )}
+
+            {/* Notes edit — managers only */}
+            {mgr && (
+              <div style={{ marginBottom: 14 }}>
+                <input value={selDayData.notes || ''}
+                  onChange={e => onSaveDay({ date: selDate, ...selDayData, notes: e.target.value })}
+                  placeholder="הערות ליום..." style={{ ...inp, fontSize: 13 }} />
+              </div>
+            )}
+
+            {/* Group cards — one per shift category */}
+            {Object.entries(CAT_STYLE).map(([cat, style]) => {
+              const people = groups[cat] || [];
+              if (!people.length) return null;
+              const emoji = style.label.match(/^\S+/)?.[0] || '';
+              const title = style.label.replace(/^\S+\s*/, '');
+              return (
+                <div key={cat} style={{ marginBottom: 12, border: `1px solid ${style.bg}33`, borderRadius: 12, overflow: 'hidden' }}>
+                  <div style={{ background: `${style.bg}22`, padding: '8px 14px', borderBottom: `1px solid ${style.bg}22`, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14 }}>{emoji}</span>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: style.bg }}>{title}</span>
+                    <span style={{ marginRight: 'auto', background: `${style.bg}33`, color: style.bg, borderRadius: 10, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>{people.length}</span>
+                  </div>
+                  <div style={{ padding: '10px 12px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {people.map(({ person, code }) => {
+                      const isMe = person === myName;
+                      const isEd = editCell?.person === person;
+                      return (
+                        <div key={person} style={{ display: 'flex', alignItems: 'center', gap: 6, background: isMe ? 'rgba(74,158,255,0.07)' : 'rgba(255,255,255,0.03)', border: isMe ? '1px solid rgba(74,158,255,0.22)' : '1px solid rgba(255,255,255,0.07)', borderRadius: 8, padding: '5px 9px', flexWrap: isEd ? 'wrap' : 'nowrap', maxWidth: isEd ? 340 : 'none' }}>
+                          <span style={{ fontSize: 12, color: isMe ? '#4a9eff' : '#8892b0', whiteSpace: 'nowrap' }}>{person}</span>
+                          {mgr ? (
+                            isEd ? (
+                              <>
+                                {STATUS_OPTIONS.map(opt => (
+                                  <button key={opt || '__none'} onClick={() => { saveStatus(person, opt); setEditCell(null); }}
+                                    style={{ padding: '2px 7px', fontSize: 10, borderRadius: 4, border: 'none', cursor: 'pointer', background: opt === code ? (statusStyle(opt)?.bg || '#4a9eff') : 'rgba(255,255,255,0.08)', color: opt === code ? '#fff' : '#8892b0', fontWeight: opt === code ? 700 : 400, margin: '1px' }}>
+                                    {opt || '—'}
+                                  </button>
+                                ))}
+                                <button onClick={() => setEditCell(null)} style={{ padding: '2px 6px', fontSize: 10, borderRadius: 4, border: '1px solid #333', background: 'transparent', color: '#556', cursor: 'pointer' }}>✕</button>
+                              </>
+                            ) : (
+                              <button onClick={() => setEditCell({ person })}
+                                style={{ background: code && statusStyle(code) ? statusStyle(code).bg : 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 5, padding: '3px 9px', fontSize: 11, color: code ? '#fff' : '#445', cursor: 'pointer', fontWeight: 700, minWidth: 30, whiteSpace: 'nowrap' }}>
+                                {code || '—'}
+                              </button>
+                            )
+                          ) : (
+                            code
+                              ? <span style={{ background: style.bg, borderRadius: 5, padding: '2px 8px', fontSize: 11, color: '#fff', fontWeight: 700 }}>{code}</span>
+                              : <span style={{ fontSize: 11, color: '#334' }}>—</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Quick date jump */}
+            <div style={{ textAlign: 'center', marginTop: 10 }}>
+              <input type="date" value={selDate}
+                onChange={e => { if (e.target.value) { setSelDate(e.target.value); setSelMonth(new Date(e.target.value + 'T00:00:00').getMonth()); }}}
+                style={{ ...inp, fontSize: 12, width: 'auto', padding: '4px 10px' }} />
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ══ MONTHLY LENS ════════════════════════════════════════════ */}
+      {lens === 'monthly' && (() => {
+        const daysInMonth = new Date(year, selMonth + 1, 0).getDate();
+        const monthDays = Array.from({ length: daysInMonth }, (_, i) => {
+          const iso = `${year}-${String(selMonth + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
+          return { num: i + 1, iso, dow: new Date(year, selMonth, i + 1).getDay() };
+        });
+        const MIN_DAY = 3, MIN_NIGHT = 2;
+
+        return (
+          <div>
+            {/* Month nav */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 16 }}>
+              <NavBtn onClick={() => setSelMonth(m => (m + 11) % 12)}><I n="cR" s={14} /></NavBtn>
+              <div style={{ textAlign: 'center', minWidth: 130 }}>
+                <div style={{ fontWeight: 700, fontSize: 18, color: '#fff' }}>{MONTHS_HE[selMonth]}</div>
+                <div style={{ fontSize: 13, color: '#8892b0' }}>{year}</div>
+              </div>
+              <NavBtn onClick={() => setSelMonth(m => (m + 1) % 12)}><I n="cL" s={14} /></NavBtn>
+            </div>
+
+            {/* Coverage legend */}
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
+              {[['#27ae60','כיסוי מלא'],['#f39c12','כיסוי חלקי'],['#e74c3c','כיסוי נמוך']].map(([bg, lbl]) => (
+                <span key={lbl} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#8892b0' }}>
+                  <span style={{ width: 12, height: 12, background: bg, borderRadius: 3, display: 'inline-block' }} /> {lbl}
+                </span>
+              ))}
+            </div>
+
+            {/* Coverage table */}
+            <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '52px 1fr 1fr 1fr 1fr 1fr', background: '#0f1525', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.07)', direction: 'rtl' }}>
+                <span style={{ fontSize: 10, color: '#4a9eff' }}>יום</span>
+                <span style={{ fontSize: 10, color: '#27ae60', textAlign: 'center' }}>☀ יום</span>
+                <span style={{ fontSize: 10, color: '#2980b9', textAlign: 'center' }}>🌙 לילה</span>
+                <span style={{ fontSize: 10, color: '#e67e22', textAlign: 'center' }}>🔶 כוננות</span>
+                <span style={{ fontSize: 10, color: '#e74c3c', textAlign: 'center' }}>🔴 חסרים</span>
+                <span style={{ fontSize: 10, color: '#8892b0', textAlign: 'center' }}>הערות</span>
+              </div>
+              {monthDays.map(({ num, iso, dow }) => {
+                const dayData      = days[iso] || {};
+                const g            = buildDayGroups(dayData, sections);
+                const dayCount     = g.day.length;
+                const nightCount   = g.night.length;
+                const oncallCount  = g.oncall.length;
+                const unavailCount = g.unavail.length;
+                const isToday = iso === today;
+                const isSat   = dow === 6;
+                const dayBg   = dayCount   >= MIN_DAY   ? '#27ae60' : dayCount   > 0 ? '#f39c12' : '#e74c3c';
+                const nightBg = nightCount >= MIN_NIGHT ? '#27ae60' : nightCount > 0 ? '#f39c12' : '#e74c3c';
                 return (
-                  <div key={person} style={{ display: 'flex', alignItems: 'center', gap: 6, background: isMe ? 'rgba(74,158,255,0.07)' : 'rgba(255,255,255,0.03)', border: isMe ? '1px solid rgba(74,158,255,0.22)' : '1px solid rgba(255,255,255,0.07)', borderRadius: 8, padding: '5px 9px', flexWrap: isEd ? 'wrap' : 'nowrap', maxWidth: isEd ? 340 : 'none' }}>
-                    <span style={{ fontSize: 12, color: isMe ? '#4a9eff' : '#8892b0', whiteSpace: 'nowrap' }}>{person}</span>
-                    {mgr ? (
-                      isEd ? (
-                        <>
-                          {STATUS_OPTIONS.map(opt => (
-                            <button key={opt || '__none'} onClick={() => { saveStatus(person, opt); setEditCell(null); }}
-                              style={{ padding: '2px 7px', fontSize: 10, borderRadius: 4, border: 'none', cursor: 'pointer', background: opt === code ? (statusStyle(opt)?.bg || '#4a9eff') : 'rgba(255,255,255,0.08)', color: opt === code ? '#fff' : '#8892b0', fontWeight: opt === code ? 700 : 400, margin: '1px' }}>
-                              {opt || '—'}
-                            </button>
-                          ))}
-                          <button onClick={() => setEditCell(null)} style={{ padding: '2px 6px', fontSize: 10, borderRadius: 4, border: '1px solid #333', background: 'transparent', color: '#556', cursor: 'pointer' }}>✕</button>
-                        </>
-                      ) : (
-                        <button onClick={() => setEditCell({ person })}
-                          style={{ background: code && st ? st.bg : 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 5, padding: '3px 9px', fontSize: 11, color: code ? '#fff' : '#445', cursor: 'pointer', fontWeight: 700, minWidth: 30, whiteSpace: 'nowrap' }}>
-                          {code || '—'}
-                        </button>
-                      )
-                    ) : (
-                      code && st
-                        ? <span style={{ background: st.bg, borderRadius: 5, padding: '2px 8px', fontSize: 11, color: '#fff', fontWeight: 700 }}>{code}</span>
-                        : <span style={{ fontSize: 11, color: '#334' }}>—</span>
-                    )}
+                  <div key={iso}
+                    onClick={() => { setSelDate(iso); setLens('daily'); }}
+                    style={{ display: 'grid', gridTemplateColumns: '52px 1fr 1fr 1fr 1fr 1fr', padding: '7px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', direction: 'rtl', background: isToday ? 'rgba(74,158,255,0.08)' : isSat ? 'rgba(255,255,255,0.015)' : 'transparent', alignItems: 'center' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(74,158,255,0.05)'}
+                    onMouseLeave={e => e.currentTarget.style.background = isToday ? 'rgba(74,158,255,0.08)' : isSat ? 'rgba(255,255,255,0.015)' : 'transparent'}>
+                    <div style={{ display: 'flex', gap: 4, alignItems: 'baseline' }}>
+                      <span style={{ fontSize: 13, fontWeight: isToday ? 700 : 400, color: isToday ? '#4a9eff' : isSat ? '#557' : '#aab' }}>{num}</span>
+                      <span style={{ fontSize: 9, color: '#334' }}>{DAY_SHORT[dow]}</span>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <span style={{ background: `${dayBg}22`, color: dayBg, borderRadius: 6, padding: '2px 8px', fontSize: 12, fontWeight: 700 }}>{dayCount}</span>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <span style={{ background: `${nightBg}22`, color: nightBg, borderRadius: 6, padding: '2px 8px', fontSize: 12, fontWeight: 700 }}>{nightCount}</span>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      {oncallCount > 0
+                        ? <span style={{ background: 'rgba(230,126,34,0.15)', color: '#e67e22', borderRadius: 6, padding: '2px 8px', fontSize: 12, fontWeight: 700 }}>{oncallCount}</span>
+                        : <span style={{ color: '#334', fontSize: 12 }}>—</span>}
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      {unavailCount > 0
+                        ? <span style={{ background: 'rgba(231,76,60,0.15)', color: '#e74c3c', borderRadius: 6, padding: '2px 8px', fontSize: 12, fontWeight: 700 }}>⚠{unavailCount}</span>
+                        : <span style={{ color: '#334', fontSize: 12 }}>—</span>}
+                    </div>
+                    <div style={{ textAlign: 'center', fontSize: 13 }}>{dayData.notes ? '📝' : ''}</div>
                   </div>
                 );
               })}
             </div>
           </div>
         );
-      })}
+      })()}
+
+      {/* ══ PERSONAL LENS ═══════════════════════════════════════════ */}
+      {lens === 'personal' && (() => {
+        const allPeople = sections.flatMap(s => s.people);
+        const person = selPerson || allPeople[0] || '';
+
+        // Build 12-month grid for this person
+        const yearMonths = Array.from({ length: 12 }, (_, m) => {
+          const dInM = new Date(year, m + 1, 0).getDate();
+          const ds = Array.from({ length: dInM }, (_, d) => {
+            const iso  = `${year}-${String(m + 1).padStart(2, '0')}-${String(d + 1).padStart(2, '0')}`;
+            const code = days[iso]?.statuses?.[person] || '';
+            const cat  = classifyStatus(code);
+            return { iso, d: d + 1, code, cat, dow: new Date(year, m, d + 1).getDay() };
+          });
+          return { month: m, days: ds };
+        });
+
+        // Tally stats
+        const stats = { day: 0, night: 0, oncall: 0, unavail: 0, away: 0, training: 0 };
+        yearMonths.forEach(({ days: ds }) => ds.forEach(({ cat }) => { if (cat && stats[cat] !== undefined) stats[cat]++; }));
+
+        return (
+          <div>
+            {/* Person picker */}
+            <div style={{ marginBottom: 16 }}>
+              <select value={person} onChange={e => setSelPerson(e.target.value)}
+                style={{ ...inp, cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>
+                {sections.map(sec => (
+                  <optgroup key={sec.name} label={sec.name}>
+                    {sec.people.map(p => <option key={p} value={p}>{p}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+
+            {/* Stat chips */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 18, justifyContent: 'center' }}>
+              {Object.entries(stats).filter(([, v]) => v > 0).map(([cat, count]) => {
+                const st = CAT_STYLE[cat];
+                return (
+                  <span key={cat} style={{ background: `${st.bg}22`, color: st.bg, border: `1px solid ${st.bg}44`, borderRadius: 10, padding: '4px 12px', fontSize: 11, fontWeight: 700 }}>
+                    {st.labelShort}: {count}
+                  </span>
+                );
+              })}
+            </div>
+
+            {/* Year grid — GitHub contribution style */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {yearMonths.map(({ month, days: ds }) => (
+                <div key={month}>
+                  <div style={{ fontSize: 11, color: '#4a9eff', fontWeight: 700, marginBottom: 5 }}>{MONTHS_HE[month]}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                    {ds.map(({ iso, d, code, cat, dow }) => {
+                      const st = cat ? CAT_STYLE[cat] : null;
+                      const bg = st ? st.bg : 'rgba(255,255,255,0.04)';
+                      const isToday = iso === today;
+                      return (
+                        <div key={iso} title={`${d} ${MONTHS_HE[month]}${code ? ` — ${code}` : ''}`}
+                          onClick={() => { setSelDate(iso); setSelMonth(month); setLens('daily'); }}
+                          style={{ width: 22, height: 22, borderRadius: 4, background: bg, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: st ? '#fff' : '#334', fontWeight: 700, border: isToday ? '2px solid #4a9eff' : dow === 6 ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent', opacity: dow === 6 ? 0.7 : 1 }}>
+                          {code ? code.slice(0, 2) : ''}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Color legend */}
+            <div style={{ marginTop: 20, display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+              {Object.entries(CAT_STYLE).map(([cat, st]) => (
+                <span key={cat} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: '#8892b0' }}>
+                  <span style={{ width: 12, height: 12, background: st.bg, borderRadius: 3, display: 'inline-block' }} />
+                  {st.labelShort}
+                </span>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
