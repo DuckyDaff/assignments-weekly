@@ -176,7 +176,7 @@ const STATUS_MAP = {
   'כש':  { bg: '#d35400', label: 'כונן שבת' },
   'כמ':  { bg: '#f39c12', label: 'כונן מסלולים' },
   'כמש': { bg: '#ca6f1e', label: 'כונן מסלולים שבת' },
-  'ח':   { bg: '#e74c3c', label: 'חופש' },
+  'ח':   { bg: '#e74c3c', label: 'חופשה' },
   'מיל': { bg: '#922b21', label: 'מילואים' },
   'מ':   { bg: '#c0392b', label: 'מחלה' },
   'פ':   { bg: '#7f8c8d', label: 'פנוי' },
@@ -2696,7 +2696,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
 
 /* ── ABSENCE REGISTRATION MODAL ── */
 const ABSENCE_TYPES = [
-  { code: "ח",   label: "חופש",              color: "#e74c3c" },
+  { code: "ח",   label: "חופשה",             color: "#e74c3c" },
   { code: "מיל", label: "מילואים",           color: "#922b21" },
   { code: "מ",   label: "מחלה",              color: "#c0392b" },
   { code: "פ",   label: "יום פנוי",          color: "#7f8c8d" },
