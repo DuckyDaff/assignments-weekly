@@ -1964,29 +1964,32 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
       {mob ? (
         <>
           {/* System cards — scrollable */}
-          <div style={{ flex: 1, overflowY: "auto", padding: "10px 12px 4px", display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ flex: 1, overflowY: "auto", padding: "12px 12px 4px", display: "flex", flexDirection: "column", gap: 10 }}>
             {data.systems.map(sys => {
               const col = sysMap[sys] || pal(0);
               return (
-                <div key={sys} style={{ background: col.dark, border: `2px solid ${col.accent}44`, borderRadius: 12, padding: "10px 12px" }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: col.accent, marginBottom: 8 }}>{sys}</div>
-                  <div style={{ display: "flex", gap: 4 }}>
+                <div key={sys} style={{ background: `linear-gradient(135deg,${col.dark},rgba(10,14,28,0.95))`, border: `2px solid ${col.accent}55`, borderRadius: 14, padding: "12px 14px", boxShadow: `0 2px 12px ${col.accent}18` }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: col.accent, marginBottom: 10, letterSpacing: .3 }}>{sys}</div>
+                  <div style={{ display: "flex", gap: 5 }}>
                     {PLAN_COLS.map(c => {
                       const k = ck(sys, c.key);
                       const people = grid[k] || [];
                       const task = cellTasks[k] || "";
                       const isActive = activeCell === k;
+                      const hasContent = people.length > 0 || task;
                       return (
                         <div key={c.key} onClick={() => handleCellClick(sys, c.key)}
-                          style={{ flex: 1, minWidth: 0, padding: "5px 3px", borderRadius: 8, textAlign: "center", cursor: "pointer", transition: "all .12s",
-                            border: `2px solid ${isActive ? col.accent : people.length ? col.accent + "55" : "rgba(255,255,255,0.08)"}`,
-                            background: isActive ? `${col.accent}22` : people.length ? `${col.accent}0e` : "rgba(255,255,255,0.02)" }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: isActive ? col.accent : c.narrow ? "#3d7fc4" : "#8892b0", marginBottom: 2 }}>{c.short}</div>
-                          {task && <div style={{ fontSize: 9, color: col.accent, marginBottom: 1 }}>✓</div>}
+                          style={{ flex: 1, minWidth: 0, padding: "7px 4px", borderRadius: 9, textAlign: "center", cursor: "pointer", transition: "all .12s",
+                            border: `2px solid ${isActive ? col.accent : hasContent ? col.accent + "66" : "rgba(255,255,255,0.1)"}`,
+                            background: isActive ? `${col.accent}28` : hasContent ? `${col.accent}12` : "rgba(255,255,255,0.03)",
+                            boxShadow: isActive ? `0 0 0 2px ${col.accent}33` : "none" }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: isActive ? col.accent : hasContent ? col.accent : "#8892b0", marginBottom: 3 }}>{c.short}</div>
+                          {task && <div style={{ fontSize: 10, color: col.accent, marginBottom: 2 }}>✓</div>}
                           {people.slice(0, 3).map(p => (
-                            <div key={p} style={{ fontSize: 9, color: col.accent, fontWeight: 600, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "0 2px" }}>{p.split(" ")[0]}</div>
+                            <div key={p} style={{ fontSize: 10, color: col.accent, fontWeight: 600, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "1px 2px" }}>{p.split(" ")[0]}</div>
                           ))}
-                          {people.length > 3 && <div style={{ fontSize: 8, color: col.accent }}>+{people.length - 3}</div>}
+                          {people.length > 3 && <div style={{ fontSize: 9, color: col.accent, fontWeight: 700 }}>+{people.length - 3}</div>}
+                          {!hasContent && <div style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>—</div>}
                         </div>
                       );
                     })}
@@ -1997,7 +2000,7 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
           </div>
 
           {/* Bottom panel */}
-          <div style={{ flexShrink: 0, borderTop: "2px solid rgba(255,255,255,0.1)", background: "#090e1c" }}>
+          <div style={{ flexShrink: 0, borderTop: "2px solid rgba(255,255,255,0.12)", background: "#0a0f1e" }}>
 
             {/* Active cell: assigned people + task input */}
             {activeCell && (() => {
@@ -2008,19 +2011,19 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
               const task = cellTasks[activeCell] || "";
               const dayLabel = PLAN_COLS.find(c => c.key === aDay)?.label || aDay;
               return (
-                <div style={{ padding: "8px 12px", borderBottom: "1px solid rgba(255,255,255,0.07)", background: `${col.accent}0a` }}>
-                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: col.accent }}>{aSys} — {dayLabel}</span>
+                <div style={{ padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.08)", background: `${col.accent}0e` }}>
+                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: col.accent }}>{aSys} — {dayLabel}</span>
                     {people.map(p => (
-                      <div key={p} style={{ display: "flex", alignItems: "center", gap: 3, background: `${col.accent}22`, border: `1px solid ${col.accent}55`, borderRadius: 12, padding: "2px 8px" }}>
-                        <span style={{ fontSize: 11, color: col.accent, fontWeight: 600 }}>{p}</span>
-                        <button onClick={e => { e.stopPropagation(); rem(aSys, aDay, p); }} style={{ background: "none", border: "none", color: col.accent, cursor: "pointer", fontSize: 14, padding: 0, lineHeight: 1 }}>×</button>
+                      <div key={p} style={{ display: "flex", alignItems: "center", gap: 4, background: `${col.accent}28`, border: `1px solid ${col.accent}66`, borderRadius: 14, padding: "4px 10px" }}>
+                        <span style={{ fontSize: 13, color: col.accent, fontWeight: 600 }}>{p}</span>
+                        <button onClick={e => { e.stopPropagation(); rem(aSys, aDay, p); }} style={{ background: "none", border: "none", color: col.accent, cursor: "pointer", fontSize: 16, padding: 0, lineHeight: 1 }}>×</button>
                       </div>
                     ))}
                   </div>
                   <input ref={taskInputRef} value={task} onChange={e => setCellTasks(t => ({ ...t, [activeCell]: e.target.value }))}
                     placeholder="כתוב משימה..."
-                    style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${col.accent}44`, borderRadius: 8, color: "#fff", fontSize: 13, padding: "7px 10px", outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                    style={{ width: "100%", background: "rgba(255,255,255,0.07)", border: `1px solid ${col.accent}55`, borderRadius: 9, color: "#fff", fontSize: 14, padding: "9px 12px", outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
                 </div>
               );
             })()}
@@ -2030,13 +2033,13 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
               const nonEmpty = getSections(data).filter(s => s.people.length > 0);
               return (
                 <>
-                  <div style={{ display: "flex" }}>
+                  <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
                     {nonEmpty.map((sec, ti) => {
                       const sc = secPal(data, sec.name, getSections(data).indexOf(sec));
                       const isSel = activeSec === ti;
                       return (
                         <button key={sec.name} onClick={() => setActiveSec(ti)}
-                          style={{ flex: 1, padding: "9px 4px", background: isSel ? `${sc.accent}18` : "transparent", border: "none", borderTop: `3px solid ${isSel ? sc.accent : "transparent"}`, color: isSel ? sc.accent : "#556", fontSize: 11, fontWeight: isSel ? 700 : 400, cursor: "pointer", lineHeight: 1.3 }}>
+                          style={{ flex: 1, padding: "10px 4px", background: isSel ? `${sc.accent}18` : "transparent", border: "none", borderTop: `3px solid ${isSel ? sc.accent : "transparent"}`, color: isSel ? sc.accent : "#667", fontSize: 12, fontWeight: isSel ? 700 : 400, cursor: "pointer", lineHeight: 1.3 }}>
                           {sec.name.replace("מדור ", "")}
                         </button>
                       );
@@ -2050,21 +2053,20 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
                     const sc = secPal(data, sec.name, getSections(data).indexOf(sec));
                     const [aSys, aDay] = activeCell ? activeCell.split("__") : [null, null];
                     return (
-                      <div style={{ padding: "10px 12px 14px", display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      <div style={{ padding: "12px 12px 16px", display: "flex", flexWrap: "wrap", gap: 8 }}>
                         {sec.people.map(p => {
                           const inCell = activeCell ? (grid[activeCell] || []).includes(p) : false;
-                          // Annual plan status for active day
-                          const activeDayIso = aDay ? wkDayToDate(wk, aDay) : null;
+                          const activeDayIso = aDay ? wkDayToDate(planWk, aDay) : null;
                           const annualStatus = activeDayIso ? (annualData?.days?.[activeDayIso]?.statuses?.[p] || '') : '';
                           const annSt = statusStyle(annualStatus);
                           const isUnavail = UNAVAILABLE_CODES.has(annualStatus);
                           return (
                             <div key={p}
                               onClick={() => { if (!activeCell) return; inCell ? rem(aSys, aDay, p) : add(aSys, aDay, p); }}
-                              style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", border: `2px solid ${inCell ? sc.accent : isUnavail ? "#e74c3c66" : sc.accent + "44"}`, borderRadius: 22, background: inCell ? `${sc.accent}33` : isUnavail ? "rgba(231,76,60,0.06)" : "rgba(255,255,255,0.04)", color: inCell ? sc.accent : activeCell ? "#ccd6f6" : "#667", fontSize: 14, fontWeight: inCell ? 700 : 500, cursor: activeCell ? "pointer" : "default", userSelect: "none", transition: "all .12s", opacity: isUnavail && !inCell ? 0.65 : 1 }}>
-                              {inCell ? "✓ " : ""}
+                              style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", border: `2px solid ${inCell ? sc.accent : isUnavail ? "#e74c3c77" : sc.accent + "44"}`, borderRadius: 24, background: inCell ? `${sc.accent}33` : isUnavail ? "rgba(231,76,60,0.08)" : "rgba(255,255,255,0.05)", color: inCell ? sc.accent : activeCell ? "#ccd6f6" : "#778", fontSize: 15, fontWeight: inCell ? 700 : 500, cursor: activeCell ? "pointer" : "default", userSelect: "none", transition: "all .12s", opacity: isUnavail && !inCell ? 0.65 : 1 }}>
+                              {inCell && <span style={{ fontSize: 13 }}>✓</span>}
                               {p}
-                              {annualStatus && <span style={{ background: annSt?.bg || '#333', color: '#fff', borderRadius: 4, padding: '1px 5px', fontSize: 10, fontWeight: 700 }}>{annualStatus}</span>}
+                              {annualStatus && <span style={{ background: annSt?.bg || '#333', color: '#fff', borderRadius: 4, padding: '2px 6px', fontSize: 11, fontWeight: 700 }}>{annualStatus}</span>}
                             </div>
                           );
                         })}
@@ -2081,20 +2083,19 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
         <div style={{ flex: 1, display: "flex", overflow: "hidden" }}
           onClick={e => { if (e.target === e.currentTarget) { setActiveCell(null); setSelected(null); } }}>
 
-          {/* Desktop left sidebar */}
-          <div style={{ width: 210, flexShrink: 0, overflowY: "auto", borderLeft: "2px solid rgba(255,255,255,0.07)", background: "#090e1c", padding: "14px 12px" }}>
-            <div style={{ fontSize: 10, color: "#556", fontWeight: 700, letterSpacing: .5, marginBottom: 10, textTransform: "uppercase" }}>
-              {selected ? `✓ ${selected}` : "גרור לתא ← שם"}
+          {/* Desktop sidebar */}
+          <div style={{ width: 230, flexShrink: 0, overflowY: "auto", borderLeft: "2px solid rgba(255,255,255,0.08)", background: "#090e1c", padding: "16px 14px" }}>
+            <div style={{ fontSize: 11, color: "#556", fontWeight: 700, letterSpacing: .5, marginBottom: 14, textTransform: "uppercase" }}>
+              {selected ? `✓ ${selected}` : "⠿ גרור שם לתא"}
             </div>
             {getSections(data).map((sec, si) => { const sc = secPal(data, sec.name, si); return sec.people.length === 0 ? null : (
-              <div key={sec.name} style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 10, color: sc.accent, fontWeight: 700, marginBottom: 6, borderBottom: `1px solid ${sc.accent}33`, paddingBottom: 4 }}>{sec.name}</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <div key={sec.name} style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, color: sc.accent, fontWeight: 700, marginBottom: 8, borderBottom: `2px solid ${sc.accent}44`, paddingBottom: 5 }}>{sec.name}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                   {sec.people.map(p => {
                     const isSel = selected === p;
-                    // Week status dots from annual plan
                     const weekDots = PLAN_COLS.filter(c => !c.narrow).map(c => {
-                      const iso = wkDayToDate(wk, c.key);
+                      const iso = wkDayToDate(planWk, c.key);
                       const code = iso ? (annualData?.days?.[iso]?.statuses?.[p] || '') : '';
                       const st = statusStyle(code);
                       return { key: c.key, short: c.short, code, st };
@@ -2105,13 +2106,13 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
                         onDragStart={() => { setDragging(p); setSelected(null); }}
                         onDragEnd={() => setDragging(null)}
                         onClick={() => setSelected(isSel ? null : p)}
-                        style={{ padding: "6px 10px", border: `2px solid ${isSel ? sc.accent : sc.accent + "33"}`, borderRadius: 8, background: isSel ? `${sc.accent}28` : "rgba(255,255,255,0.03)", color: isSel ? sc.accent : "#9aa0b0", fontSize: 12, cursor: "grab", fontWeight: isSel ? 700 : 400, userSelect: "none", boxShadow: isSel ? `0 0 0 2px ${sc.accent}33` : "none", transition: "all .12s", opacity: dragging === p ? .35 : 1 }}>
+                        style={{ padding: "8px 12px", border: `2px solid ${isSel ? sc.accent : sc.accent + "33"}`, borderRadius: 9, background: isSel ? `${sc.accent}28` : "rgba(255,255,255,0.04)", color: isSel ? sc.accent : "#aab0c0", fontSize: 13, cursor: "grab", fontWeight: isSel ? 700 : 400, userSelect: "none", boxShadow: isSel ? `0 0 0 2px ${sc.accent}33` : "none", transition: "all .12s", opacity: dragging === p ? .35 : 1 }}>
                         <div>{isSel ? "✓ " : "⠿ "}{p}</div>
                         {hasAnnual && (
-                          <div style={{ display: "flex", gap: 2, marginTop: 4 }}>
+                          <div style={{ display: "flex", gap: 3, marginTop: 5 }}>
                             {weekDots.map(d => (
                               <span key={d.key} title={`${d.short}: ${d.code || 'זמין'}`}
-                                style={{ width: 18, height: 12, borderRadius: 2, background: d.st?.bg || 'rgba(255,255,255,0.08)', fontSize: 8, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, overflow: 'hidden' }}>
+                                style={{ width: 22, height: 14, borderRadius: 3, background: d.st?.bg || 'rgba(255,255,255,0.08)', fontSize: 9, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
                                 {d.code ? d.code.slice(0,2) : ''}
                               </span>
                             ))}
@@ -2125,18 +2126,23 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
             ); })}
           </div>
 
-          {/* Desktop grid table */}
-          <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", padding: "10px 10px 4px" }}
+          {/* Desktop grid */}
+          <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", padding: "14px 14px 8px" }}
             onClick={e => { if (e.target === e.currentTarget) { setActiveCell(null); setSelected(null); } }}>
-            <table style={{ borderCollapse: "separate", borderSpacing: 4, minWidth: 600, margin: "0 auto" }}>
+            <table style={{ borderCollapse: "separate", borderSpacing: 5, minWidth: 680, margin: "0 auto" }}>
               <thead>
                 <tr>
-                  <th style={{ ...PTH, textAlign: "right", paddingRight: 10, width: 110 }}>מערכת</th>
-                  {PLAN_COLS.map(c => (
-                    <th key={c.key} style={{ ...PTH, background: c.narrow ? "rgba(61,127,196,0.14)" : "rgba(74,158,255,0.08)", color: c.narrow ? "#3d7fc4" : "#4a9eff", minWidth: c.narrow ? 58 : 120, width: c.narrow ? 58 : undefined }}>
-                      {c.narrow ? c.short : c.label}
-                    </th>
-                  ))}
+                  <th style={{ ...PTH, textAlign: "right", paddingRight: 14, width: 130 }}>מערכת</th>
+                  {PLAN_COLS.map(c => {
+                    const iso = wkDayToDate(planWk, c.key);
+                    const dayNum = iso ? new Date(iso + "T00:00:00").getDate() : null;
+                    return (
+                      <th key={c.key} style={{ ...PTH, background: c.narrow ? "rgba(61,127,196,0.18)" : "rgba(74,158,255,0.1)", color: c.narrow ? "#5b9fd4" : "#6ab0ff", minWidth: c.narrow ? 66 : 130, width: c.narrow ? 66 : undefined }}>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>{c.narrow ? c.short : c.label}</div>
+                        {dayNum && <div style={{ fontSize: 11, opacity: .7, marginTop: 2 }}>{dayNum}</div>}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
@@ -2144,38 +2150,45 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
                   const col = sysMap[sys] || pal(0);
                   return (
                     <tr key={sys}>
-                      <td style={{ ...PTD, background: col.dark, borderRight: `3px solid ${col.accent}`, fontWeight: 700, fontSize: 12, color: col.accent, maxWidth: 110, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sys}</td>
+                      <td style={{ ...PTD, background: `linear-gradient(135deg,${col.dark},rgba(8,12,24,0.9))`, borderRight: `4px solid ${col.accent}`, fontWeight: 700, fontSize: 13, color: col.accent, maxWidth: 130, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sys}</td>
                       {PLAN_COLS.map(c => {
                         const k = ck(sys, c.key);
                         const people = grid[k] || [];
                         const task = cellTasks[k] || "";
                         const isActive = activeCell === k;
                         const isOver = dragOver === k;
+                        const hasContent = people.length > 0 || task;
                         return (
                           <td key={c.key}
                             onDragOver={e => { e.preventDefault(); setDragOver(k); }}
                             onDragLeave={() => { if (dragOver === k) setDragOver(null); }}
                             onDrop={e => { e.preventDefault(); if (dragging) { add(sys, c.key, dragging); setDragging(null); setDragOver(null); if (!activeCell) activateCell(k); } }}
                             onClick={() => handleCellClick(sys, c.key)}
-                            style={{ ...PTD, background: isActive ? `${col.accent}18` : isOver ? `${col.accent}28` : (c.narrow ? "rgba(61,127,196,0.05)" : (people.length || task ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.015)")), border: `2px solid ${isActive ? col.accent : isOver ? col.accent + "88" : (people.length || task ? col.accent + "33" : "rgba(255,255,255,0.07)")}`, verticalAlign: "top", cursor: selected ? "copy" : "pointer", minHeight: 44, width: c.narrow ? 58 : undefined, transition: "background .1s,border .1s", boxShadow: isActive ? `0 0 0 1px ${col.accent}44 inset` : "none" }}>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                            style={{ ...PTD,
+                              background: isActive ? `${col.accent}22` : isOver ? `${col.accent}33` : (hasContent ? `${col.accent}0d` : (c.narrow ? "rgba(61,127,196,0.06)" : "rgba(255,255,255,0.02)")),
+                              border: `2px solid ${isActive ? col.accent : isOver ? col.accent + "99" : (hasContent ? col.accent + "44" : "rgba(255,255,255,0.09)")}`,
+                              verticalAlign: "top", cursor: selected ? "copy" : "pointer", minHeight: 56,
+                              width: c.narrow ? 66 : undefined, transition: "background .1s,border .1s",
+                              boxShadow: isActive ? `0 0 0 2px ${col.accent}44 inset` : isOver ? `0 0 0 1px ${col.accent}55 inset` : "none" }}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                               {isActive
                                 ? <input ref={taskInputRef} value={task} onChange={e => setCellTasks(t => ({ ...t, [k]: e.target.value }))}
                                     onClick={e => { if (!selected) e.stopPropagation(); }}
                                     placeholder="כתוב משימה..."
-                                    style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: `1px solid ${col.accent}55`, borderRadius: 5, color: "#fff", fontSize: 11, padding: "4px 6px", outline: "none", fontFamily: "inherit" }} />
+                                    style={{ width: "100%", background: "rgba(255,255,255,0.09)", border: `1px solid ${col.accent}66`, borderRadius: 6, color: "#fff", fontSize: 13, padding: "6px 8px", outline: "none", fontFamily: "inherit" }} />
                                 : task
-                                  ? <div style={{ fontSize: 13, color: col.accent, fontWeight: 600, lineHeight: 1.3, marginBottom: 2, opacity: .9 }}>✓ {task.length > 40 ? task.slice(0,38)+"…" : task}</div>
-                                  : <div style={{ fontSize: 9, color: "rgba(255,255,255,0.12)", textAlign: "center", padding: "2px 0" }}>לחץ</div>
+                                  ? <div style={{ fontSize: 13, color: col.accent, fontWeight: 600, lineHeight: 1.4, marginBottom: 2 }}>✓ {task.length > 38 ? task.slice(0,36)+"…" : task}</div>
+                                  : null
                               }
                               {people.map(p => (
-                                <div key={p} onClick={e => { if (!selected) e.stopPropagation(); }} style={{ display: "flex", alignItems: "center", gap: 3, background: `${col.accent}1e`, border: `1px solid ${col.accent}44`, borderRadius: 5, padding: "3px 6px" }}>
-                                  <span style={{ fontSize: 11, color: col.accent, fontWeight: 600, flex: 1, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p}</span>
-                                  <button onClick={e => { e.stopPropagation(); rem(sys, c.key, p); }} style={{ background: "none", border: "none", color: col.accent, cursor: "pointer", fontSize: 13, padding: "0 1px", lineHeight: 1, opacity: .55, flexShrink: 0 }}>×</button>
+                                <div key={p} onClick={e => { if (!selected) e.stopPropagation(); }}
+                                  style={{ display: "flex", alignItems: "center", gap: 4, background: `${col.accent}22`, border: `1px solid ${col.accent}55`, borderRadius: 6, padding: "5px 8px" }}>
+                                  <span style={{ fontSize: 12, color: col.accent, fontWeight: 600, flex: 1, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p}</span>
+                                  <button onClick={e => { e.stopPropagation(); rem(sys, c.key, p); }} style={{ background: "none", border: "none", color: col.accent, cursor: "pointer", fontSize: 15, padding: "0 2px", lineHeight: 1, opacity: .6, flexShrink: 0 }}>×</button>
                                 </div>
                               ))}
-                              {!people.length && !task && !isActive && (
-                                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.07)", textAlign: "center" }}>—</div>
+                              {!hasContent && !isActive && (
+                                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.15)", textAlign: "center", padding: "6px 0" }}>—</div>
                               )}
                             </div>
                           </td>
@@ -2192,8 +2205,8 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
     </div>
   );
 }
-const PTH = { padding: "7px 6px", textAlign: "center", borderRadius: 6, fontWeight: 600, background: "rgba(255,255,255,0.04)", color: "#8892b0" };
-const PTD = { padding: "4px 4px", borderRadius: 6, fontSize: 11 };
+const PTH = { padding: "11px 8px", textAlign: "center", borderRadius: 7, fontWeight: 700, background: "rgba(255,255,255,0.06)", color: "#8892b0", border: "1px solid rgba(255,255,255,0.08)" };
+const PTD = { padding: "8px 7px", borderRadius: 8, fontSize: 13 };
 
 /* ── ASSIGN DETAIL MODAL ── */
 function AssignDetailModal({ a, sysMap, mgr, onClose, onEdit, onDelete }) {
