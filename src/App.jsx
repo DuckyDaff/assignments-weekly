@@ -2457,7 +2457,8 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
   const [selPerson, setSelPerson] = useState(myName || '');
   const [selSecIdx, setSelSecIdx] = useState(0);
   const [editCell,  setEditCell]  = useState(null);
-  const [hoverCell, setHoverCell] = useState(null); // "iso|person" for drag feedback
+  const [hoverCell,  setHoverCell]  = useState(null); // "iso|person|slot" for drag feedback
+  const [pickerCell, setPickerCell] = useState(null); // { iso, person, slot, x, y }
   const dragCode = useRef(null);
   const [legendGroups] = useState(() => {
     try { return JSON.parse(localStorage.getItem("legendGroups")) || DEFAULT_LEGEND; } catch { return DEFAULT_LEGEND; }
@@ -2869,40 +2870,38 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                         const stickyBg  = isToday ? '#0d1e3a' : isSat ? '#0b0f1e' : ri % 2 === 0 ? '#0c1022' : '#090d1a';
                         return (
                           <tr key={iso}
-                            onClick={() => { setSelDate(iso); setLens('daily'); }}
-                            style={{ cursor: 'pointer', background: rowBg, borderBottom: `1px solid rgba(255,255,255,${isSat ? '0.12' : '0.06'})` }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(74,158,255,0.07)'}
-                            onMouseLeave={e => e.currentTarget.style.background = rowBg}>
-                            <td style={{ padding: '5px 8px', position: 'sticky', right: 0, background: stickyBg, zIndex: 1, whiteSpace: 'nowrap', verticalAlign: 'middle', borderLeft: `1px solid rgba(255,255,255,0.1)`, borderBottom: `1px solid rgba(255,255,255,${isSat ? '0.12' : '0.06'})` }}>
+                            style={{ background: rowBg, borderBottom: `1px solid rgba(255,255,255,${isSat ? '0.12' : '0.06'})` }}>
+                            {/* Date cell — only this navigates to daily lens */}
+                            <td onClick={() => { setSelDate(iso); setLens('daily'); }}
+                              style={{ padding: '5px 8px', position: 'sticky', right: 0, background: stickyBg, zIndex: 1, whiteSpace: 'nowrap', verticalAlign: 'middle', borderLeft: `1px solid rgba(255,255,255,0.1)`, borderBottom: `1px solid rgba(255,255,255,${isSat ? '0.12' : '0.06'})`, cursor: 'pointer' }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#1a2a4a'}
+                              onMouseLeave={e => e.currentTarget.style.background = stickyBg}>
                               <span style={{ fontWeight: isToday ? 700 : isSat ? 600 : 400, color: isToday ? '#4a9eff' : isSat ? '#7788aa' : '#c0cce0', fontSize: 13 }}>{num}</span>
                               <span style={{ fontSize: 10, color: isSat ? '#556' : '#445', marginRight: 4 }}>{DAY_SHORT[dow]}</span>
                               {dayData.notes && <span style={{ fontSize: 10 }}>📝</span>}
                             </td>
                             {people.map((person) => {
-                              const code1   = dayData.statuses?.[person] || '';
-                              const code2   = statuses2[person] || '';
-                              const st1     = statusStyle(code1);
-                              const st2     = statusStyle(code2);
-                              const key1    = `${iso}|${person}|1`;
-                              const key2    = `${iso}|${person}|2`;
-                              const hover1  = hoverCell === key1;
-                              const hover2  = hoverCell === key2;
-                              const makeDrop = (key, slot) => mgr ? {
+                              const code1  = dayData.statuses?.[person] || '';
+                              const code2  = statuses2[person] || '';
+                              const st1    = statusStyle(code1);
+                              const st2    = statusStyle(code2);
+                              const key1   = `${iso}|${person}|1`;
+                              const key2   = `${iso}|${person}|2`;
+                              const hover1 = hoverCell === key1;
+                              const hover2 = hoverCell === key2;
+                              const makeTd = (key, slot, code, st, isHover, minW, padR, borderR, bg2) => ({
                                 onDragOver:  e => { e.preventDefault(); e.stopPropagation(); setHoverCell(key); },
                                 onDragLeave: () => setHoverCell(h => h === key ? null : h),
                                 onDrop:      e => { e.preventDefault(); e.stopPropagation(); setHoverCell(null); if (dragCode.current !== null) saveStatusForDate(iso, person, dragCode.current, slot); },
-                                onClick:     e => e.stopPropagation(),
-                              } : { onClick: e => e.stopPropagation() };
+                                onClick:     mgr ? (e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setPickerCell({ iso, person, slot, x: r.left, y: r.bottom }); }) : undefined,
+                                style: { padding: `4px ${padR}`, textAlign: 'center', verticalAlign: 'middle', borderRight: borderR, background: isHover ? 'rgba(74,158,255,0.25)' : (code && st ? `${st.bg}33` : bg2), outline: isHover ? '2px dashed #4a9eff' : 'none', transition: 'background .1s', minWidth: minW, cursor: mgr ? 'pointer' : 'default' },
+                              });
                               return (
                                 <Fragment key={person}>
-                                  {/* Slot 1 — main (2/3 width) — person separator on borderRight */}
-                                  <td {...makeDrop(key1, 1)}
-                                    style={{ padding: '4px 3px', textAlign: 'center', verticalAlign: 'middle', borderRight: `3px solid rgba(255,255,255,0.55)`, background: hover1 ? 'rgba(74,158,255,0.25)' : (code1 && st1 ? `${st1.bg}33` : 'transparent'), outline: hover1 ? '2px dashed #4a9eff' : 'none', transition: 'background .1s', minWidth: 44 }}>
+                                  <td {...makeTd(key1, 1, code1, st1, hover1, 44, '3px', '3px solid rgba(255,255,255,0.55)', 'transparent')}>
                                     {code1 ? <StatusBadge code={code1} /> : (hover1 ? <span style={{ fontSize: 13, opacity: 0.5 }}>+</span> : null)}
                                   </td>
-                                  {/* Slot 2 — secondary (1/3 width) — thin inner divider on borderRight */}
-                                  <td {...makeDrop(key2, 2)}
-                                    style={{ padding: '4px 2px', textAlign: 'center', verticalAlign: 'middle', borderRight: `1px solid rgba(255,255,255,0.13)`, background: hover2 ? 'rgba(74,158,255,0.25)' : (code2 && st2 ? `${st2.bg}28` : 'rgba(0,0,0,0.1)'), outline: hover2 ? '2px dashed #4a9eff' : 'none', transition: 'background .1s', minWidth: 22 }}>
+                                  <td {...makeTd(key2, 2, code2, st2, hover2, 22, '2px', '1px solid rgba(255,255,255,0.13)', 'rgba(0,0,0,0.1)')}>
                                     {code2 ? <StatusBadge code={code2} small /> : (hover2 ? <span style={{ fontSize: 11, opacity: 0.5 }}>+</span> : null)}
                                   </td>
                                 </Fragment>
@@ -2914,6 +2913,38 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                     </tbody>
                   </table>
                 </div>
+
+                {/* ── Status picker popup (manager click on cell) ── */}
+                {pickerCell && (
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 300 }} onClick={() => setPickerCell(null)}>
+                    <div onClick={e => e.stopPropagation()}
+                      style={{ position: 'fixed', top: Math.min(pickerCell.y + 4, window.innerHeight - 280), left: Math.max(4, Math.min(pickerCell.x, window.innerWidth - 220)), width: 210, background: '#0d1525', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.7)', padding: '10px 8px', zIndex: 301 }}>
+                      <div style={{ fontSize: 10, color: '#4a9eff', fontWeight: 700, marginBottom: 8, textAlign: 'center' }}>
+                        {pickerCell.person.split(' ')[0]} — {pickerCell.slot === 1 ? 'ראשי' : 'משני'}
+                      </div>
+                      {legendGroups.map(group => (
+                        <div key={group.id} style={{ marginBottom: 7 }}>
+                          <div style={{ fontSize: 9, color: '#556', fontWeight: 600, marginBottom: 4, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 2 }}>{group.name}</div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                            {group.codes.map(code => {
+                              const st = statusStyle(code);
+                              return (
+                                <div key={code} onClick={() => { saveStatusForDate(pickerCell.iso, pickerCell.person, code, pickerCell.slot); setPickerCell(null); }}
+                                  style={{ background: st?.bg || '#1a2a3a', color: '#fff', borderRadius: 5, padding: '4px 7px', fontSize: 11, fontWeight: 700, cursor: 'pointer', userSelect: 'none' }}>
+                                  {code}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                      <div onClick={() => { saveStatusForDate(pickerCell.iso, pickerCell.person, '', pickerCell.slot); setPickerCell(null); }}
+                        style={{ background: 'rgba(231,76,60,0.2)', border: '1px dashed rgba(231,76,60,0.5)', color: '#e74c3c', borderRadius: 5, padding: '5px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer', textAlign: 'center', marginTop: 4 }}>
+                        🗑 מחק סטטוס
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Mobile legend palette (manager only) */}
                 {mgr && mob && (
