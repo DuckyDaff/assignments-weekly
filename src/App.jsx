@@ -326,7 +326,11 @@ function Overlay({ onClose, children, wide = false }) {
 export default function App() {
   const mob = useMobile();
   const [data, setData]     = useState(null);
-  const [tab, setTab]       = useState("calendar");
+  const [tab, setTab]       = useState(() => {
+    // If opened via notification click, start on the right tab
+    const p = new URLSearchParams(window.location.search).get("tab");
+    return p || "calendar";
+  });
   const [wk, setWk]         = useState(wKey(new Date()));
   const [mgr, setMgr]       = useState(false);
   const [modal, setModal]   = useState(null);
@@ -349,11 +353,19 @@ export default function App() {
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3200);
   }, []);
 
-  // Register SW on load (needed even before permission granted, for offline support)
+  // Register SW on load + listen for navigation messages from notification clicks
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
-    }
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    // When app is already open and user clicks a notification,
+    // the SW sends a postMessage instead of reopening the window
+    const onMsg = e => {
+      if (e.data?.type === "NAVIGATE_TAB" && e.data.tab) {
+        setTab(e.data.tab);
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", onMsg);
+    return () => navigator.serviceWorker.removeEventListener("message", onMsg);
   }, []);
 
   // When myName is set and permission is "default", auto-ask

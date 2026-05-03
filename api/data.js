@@ -115,7 +115,7 @@ async function sendPushNotifications(redis, notifications) {
       try {
         await webpush.sendNotification(
           target.subscription,
-          JSON.stringify({ title: notif.title, body: notif.body, tag: "shibutz" })
+          JSON.stringify({ title: notif.title, body: notif.body, tag: "shibutz", url: "/?tab=me" })
         );
         sent++;
         console.log(`[push] ✓ sent to "${normName}"`);

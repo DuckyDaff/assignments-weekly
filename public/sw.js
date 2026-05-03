@@ -15,7 +15,7 @@ self.addEventListener('push', e => {
     tag: data.tag || 'shibutz',
     renotify: true,
     vibrate: [200, 100, 200],
-    data: { url: data.url || '/' }
+    data: { url: data.url || '/?tab=me' }
   };
 
   e.waitUntil(
@@ -25,13 +25,19 @@ self.addEventListener('push', e => {
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
+  const targetUrl = e.notification.data?.url || '/?tab=me';
+
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
-      const url = e.notification.data?.url || '/';
+      // If app is already open — focus it and send a message to navigate
       for (const c of clients) {
-        if (c.url.includes(self.location.origin) && 'focus' in c) return c.focus();
+        if (c.url.startsWith(self.location.origin)) {
+          c.postMessage({ type: 'NAVIGATE_TAB', tab: 'me' });
+          return c.focus();
+        }
       }
-      return self.clients.openWindow(url);
+      // App is closed — open to the right URL
+      return self.clients.openWindow(targetUrl);
     })
   );
 });
