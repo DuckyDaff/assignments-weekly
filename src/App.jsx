@@ -2934,15 +2934,20 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                                     setPickerCell({ iso, person, slot, x: r.left, y: r.bottom });
                                   }
                                 }) : undefined,
-                                style: { padding: `4px ${padR}`, textAlign: 'center', verticalAlign: 'middle', borderRight: borderR, background: isHover ? 'rgba(74,158,255,0.25)' : (code && st ? `${st.bg}33` : bg2), outline: isHover ? '2px dashed #4a9eff' : 'none', transition: 'background .1s', minWidth: minW, cursor: mgr ? (paintCode !== null ? 'crosshair' : code ? 'grab' : 'pointer') : 'default' },
+                                style: { padding: 0, textAlign: 'center', verticalAlign: 'middle', borderRight: borderR, background: isHover ? 'rgba(74,158,255,0.4)' : (code && st ? st.bg : bg2), outline: isHover ? '2px dashed #4a9eff' : 'none', outlineOffset: '-2px', transition: 'background .1s', minWidth: minW, cursor: mgr ? (paintCode !== null ? 'crosshair' : code ? 'grab' : 'pointer') : 'default' },
                               });
+                              const cellH = { display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 28, fontWeight: 700, color: '#fff', userSelect: 'none', lineHeight: 1 };
                               return (
                                 <Fragment key={person}>
                                   <td {...makeTd(key1, 1, code1, st1, hover1, 44, '3px', '3px solid rgba(255,255,255,0.55)', emptyCellBg)}>
-                                    {code1 ? <StatusBadge code={code1} /> : (hover1 ? <span style={{ fontSize: 13, opacity: 0.5 }}>+</span> : null)}
+                                    {code1
+                                      ? <div style={{ ...cellH, fontSize: 12 }}>{code1}</div>
+                                      : <div style={{ ...cellH, fontSize: 14, opacity: 0.2, color: '#aaa' }}>{hover1 ? '+' : ''}</div>}
                                   </td>
                                   <td {...makeTd(key2, 2, code2, st2, hover2, 22, '2px', '1px solid rgba(255,255,255,0.13)', isWeekend ? 'rgba(100,100,130,0.15)' : 'rgba(0,0,0,0.1)')}>
-                                    {code2 ? <StatusBadge code={code2} small /> : (hover2 ? <span style={{ fontSize: 11, opacity: 0.5 }}>+</span> : null)}
+                                    {code2
+                                      ? <div style={{ ...cellH, fontSize: 9 }}>{code2}</div>
+                                      : <div style={{ ...cellH, fontSize: 12, opacity: 0.2, color: '#aaa' }}>{hover2 ? '+' : ''}</div>}
                                   </td>
                                 </Fragment>
                               );
