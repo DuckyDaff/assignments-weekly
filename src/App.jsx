@@ -258,7 +258,8 @@ export default function App() {
   const [wk, setWk]         = useState(wKey(new Date()));
   const [mgr, setMgr]       = useState(false);
   const [modal, setModal]   = useState(null);
-  const [myName, setMyName] = useState(() => sessionStorage.getItem("myName") || "");
+  const [myName, setMyName] = useState(() => localStorage.getItem("myName") || "");
+  const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem("myName"));
   const [toasts, setToasts] = useState([]);
   const [filterPerson, setFilterPerson] = useState("");
   const [saveErr, setSaveErr] = useState(false);
@@ -334,7 +335,7 @@ export default function App() {
   const TABS = [
     { id: "calendar", label: "לוח שבועי",    icon: "cal"  },
     { id: "board",    label: "לוח שיבוצים", icon: "grid" },
-    { id: "me",       label: "השיבוצים שלי", icon: "user" },
+    { id: "me",       label: myName ? myName.split(" ")[0] : "שלי", icon: "user" },
     { id: "settings", label: "הגדרות",       icon: "cog"  },
   ];
 
@@ -373,7 +374,7 @@ export default function App() {
         <main className="main-pad" style={{ flex: 1, padding: "20px 18px", maxWidth: 1320, margin: "0 auto", width: "100%" }}>
           {tab === "board"    && <BoardView    wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} filterPerson={filterPerson} setFilterPerson={setFilterPerson} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onDelete={deleteAssign} onCopy={copyFromPrev} onCSV={() => doExportCSV(wk, weekA)} onPrint={() => doPrint(wk, weekA, data.systems)} onView={a => setViewAssign(a)} />}
           {tab === "calendar" && <CalendarView wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onCopy={copyFromPrev} onView={a => setViewAssign(a)} onPlan={() => setPlanner(true)} />}
-          {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} setMyName={n => { setMyName(n); sessionStorage.setItem("myName", n); }} onView={a => setViewAssign(a)} />}
+          {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} setMyName={n => { setMyName(n); if (n) localStorage.setItem("myName", n); else localStorage.removeItem("myName"); }} onView={a => setViewAssign(a)} onChangeName={() => setShowWelcome(true)} />}
           {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} toast={toast} />}
         </main>
 
@@ -387,7 +388,45 @@ export default function App() {
       {modal?.t === "auth"   && <AuthModal pin={data.pin} onOk={() => { setMgr(true); setModal(null); toast("ברוך הבא, מנהל", "info"); }} onClose={() => setModal(null)} />}
       {viewAssign && <AssignDetailModal a={viewAssign} sysMap={sysColorMap} mgr={mgr} onClose={() => setViewAssign(null)} onEdit={() => { setModal({ t: "assign", mode: "edit", a: viewAssign }); setViewAssign(null); }} onDelete={() => { deleteAssign(viewAssign.id); setViewAssign(null); }} />}
       {planner && <PlannerView wk={wk} data={data} sysMap={sysColorMap} weekA={weekA} onClose={() => setPlanner(false)} onSave={assignments => { save({ ...data, assignments }, "שבוע תוכנן ✓"); }} />}
+      {showWelcome && data && <WelcomeModal data={data} myName={myName} onSelect={n => { setMyName(n); localStorage.setItem("myName", n); setShowWelcome(false); }} onSkip={() => setShowWelcome(false)} />}
     </MobileCtx.Provider>
+  );
+}
+
+/* ── WELCOME / NAME PICKER MODAL ── */
+function WelcomeModal({ data, myName, onSelect, onSkip }) {
+  const [hovered, setHovered] = useState(null);
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, backdropFilter: "blur(6px)" }}>
+      <div dir="rtl" style={{ background: "linear-gradient(160deg,#0f1a35,#0a1220)", border: "1px solid rgba(74,158,255,0.2)", borderRadius: 20, padding: "28px 24px", width: "100%", maxWidth: 420, maxHeight: "85vh", overflowY: "auto", boxShadow: "0 24px 64px rgba(0,0,0,0.7)" }}>
+        <img src="/logo.png" alt="" style={{ width: 72, height: 72, display: "block", margin: "0 auto 16px", opacity: .9 }} />
+        <div style={{ textAlign: "center", marginBottom: 22 }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", marginBottom: 6 }}>ברוך הבא!</div>
+          <div style={{ fontSize: 14, color: "#8892b0" }}>בחר את שמך כדי לראות את השיבוצים שלך</div>
+        </div>
+        {getSections(data).map((sec, si) => sec.people.length === 0 ? null : (
+          <div key={sec.name} style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: pal(si).accent, fontWeight: 700, letterSpacing: .5, marginBottom: 8, textTransform: "uppercase" }}>{sec.name}</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {sec.people.map(p => {
+                const isSel = myName === p;
+                const isHov = hovered === p;
+                return (
+                  <button key={p}
+                    onClick={() => onSelect(p)}
+                    onMouseEnter={() => setHovered(p)}
+                    onMouseLeave={() => setHovered(null)}
+                    style={{ padding: "10px 18px", border: `2px solid ${isSel || isHov ? pal(si).accent : pal(si).accent + "44"}`, borderRadius: 24, background: isSel ? `${pal(si).accent}30` : isHov ? `${pal(si).accent}18` : "rgba(255,255,255,0.04)", color: isSel ? pal(si).accent : isHov ? pal(si).accent : "#ccd6f6", fontSize: 15, fontWeight: isSel ? 700 : 500, cursor: "pointer", transition: "all .12s", userSelect: "none" }}>
+                    {isSel ? "✓ " : ""}{p}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        <button onClick={onSkip} style={{ width: "100%", marginTop: 8, padding: "10px", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 11, color: "#556", cursor: "pointer", fontSize: 13 }}>דלג — אראה לך את זה אחר כך</button>
+      </div>
+    </div>
   );
 }
 
@@ -752,7 +791,7 @@ const TH = { padding: "8px 10px", textAlign: "center", borderRadius: 7, fontSize
 const TD = { padding: "7px 9px", borderRadius: 7, fontSize: 12, minHeight: 36 };
 
 /* ── MY VIEW ── */
-function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName, onView }) {
+function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName, onView, onChangeName }) {
   const todayKey      = todayDayKey();
   const isTodayWork   = isWorkDay(todayKey);
   const isCurrentWeek = wk === wKey(new Date());
@@ -762,24 +801,37 @@ function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName, onView }) {
   return (
     <div style={{ maxWidth: 640, margin: "0 auto" }}>
       <WeekNav wk={wk} setWk={setWk} />
-      <div style={{ marginBottom: 20, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 13, padding: "14px 16px" }}>
-        <label style={{ ...lbl, marginBottom: 10 }}>מי אתה?</label>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {getSections(data).map((sec, si) => sec.people.length === 0 ? null : (
-            <div key={sec.name}>
-              <div style={{ fontSize: 10, color: pal(si).accent, fontWeight: 700, letterSpacing: .5, marginBottom: 6, textTransform: "uppercase" }}>{sec.name}</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {sec.people.map(p => (
-                  <button key={p} onClick={() => setMyName(myName === p ? "" : p)} style={{ padding: "7px 14px", border: `1px solid ${myName === p ? pal(si).accent : "rgba(255,255,255,0.1)"}`, borderRadius: 20, background: myName === p ? `${pal(si).accent}22` : "rgba(255,255,255,0.04)", color: myName === p ? pal(si).accent : "#8892b0", fontSize: 12, cursor: "pointer", fontWeight: myName === p ? 700 : 400 }}>
-                    {myName === p && "● "}{p}
-                  </button>
-                ))}
-              </div>
+      {myName ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, background: "rgba(74,158,255,0.07)", border: "1px solid rgba(74,158,255,0.2)", borderRadius: 13, padding: "12px 16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 38, height: 38, borderRadius: "50%", background: "linear-gradient(135deg,#4a9eff,#3d7fc4)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 16, color: "#fff", flexShrink: 0 }}>{myName[0]}</div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: "#fff" }}>{myName}</div>
+              <div style={{ fontSize: 11, color: "#8892b0" }}>השיבוצים שלי</div>
             </div>
-          ))}
+          </div>
+          <button onClick={onChangeName} style={{ padding: "6px 12px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, color: "#8892b0", fontSize: 12, cursor: "pointer" }}>שנה שם</button>
         </div>
-      </div>
-      {!myName && <div style={{ textAlign: "center", padding: "48px 24px", opacity: .5 }}><div style={{ fontSize: 40, marginBottom: 10 }}>👆</div><div style={{ fontSize: 15, fontWeight: 600, color: "#ccd6f6" }}>בחר את שמך</div></div>}
+      ) : (
+        <div style={{ marginBottom: 20, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 13, padding: "14px 16px" }}>
+          <label style={{ ...lbl, marginBottom: 10 }}>מי אתה?</label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {getSections(data).map((sec, si) => sec.people.length === 0 ? null : (
+              <div key={sec.name}>
+                <div style={{ fontSize: 10, color: pal(si).accent, fontWeight: 700, letterSpacing: .5, marginBottom: 6, textTransform: "uppercase" }}>{sec.name}</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {sec.people.map(p => (
+                    <button key={p} onClick={() => { setMyName(p); localStorage.setItem("myName", p); }} style={{ padding: "7px 14px", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 20, background: "rgba(255,255,255,0.04)", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {!myName && <div style={{ textAlign: "center", padding: "48px 24px", opacity: .5 }}><div style={{ fontSize: 40, marginBottom: 10 }}>👆</div><div style={{ fontSize: 15, fontWeight: 600, color: "#ccd6f6" }}>בחר את שמך למעלה</div></div>}
       {myName && mine.length === 0 && <div style={{ textAlign: "center", padding: "48px 24px", opacity: .5 }}><div style={{ fontSize: 40, marginBottom: 10 }}>📭</div><div style={{ fontSize: 15, fontWeight: 600, color: "#ccd6f6" }}>אין שיבוצים ל{myName} בשבוע זה</div></div>}
       {todayMine.length > 0 && (
         <div style={{ marginBottom: 18 }}>
