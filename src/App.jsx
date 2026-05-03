@@ -164,6 +164,47 @@ function secPal(data, sectionName, fallbackIdx) {
   return pal(fallbackIdx);
 }
 
+/* ── ANNUAL PLAN STATUS HELPERS ── */
+const STATUS_MAP = {
+  'י':   { bg: '#27ae60', label: 'יום' },
+  'ל':   { bg: '#2980b9', label: 'לילה' },
+  'Y':   { bg: '#16a085', label: 'מחליף יום' },
+  'L':   { bg: '#1a5276', label: 'מחליף לילה' },
+  'ל2':  { bg: '#154360', label: 'לילה נוסף' },
+  '2':   { bg: '#1e8bc3', label: 'יום נוסף' },
+  'כ':   { bg: '#e67e22', label: 'כונן' },
+  'כש':  { bg: '#d35400', label: 'כונן שבת' },
+  'כמ':  { bg: '#f39c12', label: 'כונן מסלולים' },
+  'כמש': { bg: '#ca6f1e', label: 'כונן מסלולים שבת' },
+  'ח':   { bg: '#e74c3c', label: 'חופש' },
+  'מיל': { bg: '#922b21', label: 'מילואים' },
+  'מ':   { bg: '#c0392b', label: 'מחלה' },
+  'פ':   { bg: '#7f8c8d', label: 'פנוי' },
+  'מנוחה': { bg: '#7f8c8d', label: 'מנוחה' },
+  'ק':   { bg: '#8e44ad', label: 'קורס' },
+  'חיפה': { bg: '#0e6655', label: 'חיפה' },
+  'הרצליה': { bg: '#0e6655', label: 'הרצליה' },
+  'ראש פינה': { bg: '#0e6655', label: 'ראש פינה' },
+  'PBB': { bg: '#1a5276', label: 'PBB' },
+  'רמון': { bg: '#1a5276', label: 'רמון' },
+  'ב. חשמל': { bg: '#6c3483', label: 'בטיחות חשמל' },
+  'ב. כללית': { bg: '#6c3483', label: 'בטיחות כללית' },
+  'השתלמות': { bg: '#6c3483', label: 'השתלמות' },
+  'ניקיון תחנות': { bg: '#2c3e50', label: 'ניקיון תחנות' },
+};
+const UNAVAILABLE_CODES = new Set(['ח','מיל','מ','פ','מנוחה','ק']);
+function statusStyle(code) {
+  if (!code) return null;
+  return STATUS_MAP[code] || { bg: '#1a4a3a', label: code };
+}
+function wkDayToDate(wk, dayKey) {
+  const { sun } = wDates(wk);
+  const off = ['sun','mon','tue','wed','thu','fri','sat'].indexOf(dayKey);
+  if (off < 0) return null;
+  const d = new Date(sun); d.setDate(sun.getDate() + off);
+  return d.toISOString().slice(0, 10);
+}
+
 function doExportCSV(wk, list) {
   const h = ["מערכת", "אנשים", ...DAYS.map(d => d.long), "משימות", "הערות"];
   const sys = [...new Set(list.map(a => a.system))];
@@ -246,6 +287,7 @@ const I = ({ n, s = 17 }) => {
     user:   <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>,
     grid:   <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
     cal:    <><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></>,
+    calY:   <><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /><text x="12" y="20" textAnchor="middle" fontSize="7" strokeWidth="0" fill="currentColor" fontWeight="bold">שנ׳</text></>,
     lock:   <><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>,
     unlock: <><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 9.9-1" /></>,
     cog:    <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></>,
@@ -420,6 +462,25 @@ export default function App() {
     return () => { clearInterval(id); document.removeEventListener("visibilitychange", poll); };
   }, []);
 
+  // ── Annual plan state ──
+  const [annualData, setAnnualData] = useState(null);
+  useEffect(() => {
+    fetch("/api/annual").then(r => r.ok ? r.json() : null).then(d => { if (d) setAnnualData(d); }).catch(() => {});
+  }, []);
+  const saveAnnualDay = useCallback(async patch => {
+    // Optimistic update
+    setAnnualData(prev => {
+      if (!prev) return prev;
+      const existing = prev.days[patch.date] || {};
+      return { ...prev, days: { ...prev.days, [patch.date]: { ...existing, ...patch } } };
+    });
+    await fetch("/api/annual", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }).catch(() => {});
+  }, []);
+
   const save = useCallback(async (nd, msg) => {
     setData(nd);
     isSavingRef.current = true;
@@ -489,6 +550,7 @@ export default function App() {
   const TABS = [
     { id: "calendar", label: "לוח שבועי",    icon: "cal"  },
     { id: "board",    label: "לוח שיבוצים", icon: "grid" },
+    { id: "annual",   label: "תוכנית שנתית", icon: "calY" },
     { id: "me",       label: myName ? myName.split(" ")[0] : "שלי", icon: "user" },
     { id: "settings", label: "הגדרות",       icon: "cog"  },
   ];
@@ -528,7 +590,8 @@ export default function App() {
         <main className="main-pad" style={{ flex: 1, padding: "20px 18px", maxWidth: 1320, margin: "0 auto", width: "100%" }}>
           {tab === "board"    && <BoardView    wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} filterPerson={filterPerson} setFilterPerson={setFilterPerson} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onDelete={deleteAssign} onCopy={copyFromPrev} onCSV={() => doExportCSV(wk, weekA)} onPrint={() => doPrint(wk, weekA, data.systems)} onView={a => setViewAssign(a)} />}
           {tab === "calendar" && <CalendarView wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onCopy={copyFromPrev} onView={a => setViewAssign(a)} onPlan={() => setPlanner(true)} />}
-          {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} setMyName={n => { setMyName(n); if (n) localStorage.setItem("myName", n); else localStorage.removeItem("myName"); }} onView={a => setViewAssign(a)} onChangeName={() => setShowWelcome(true)} pushStatus={pushStatus} onEnablePush={() => registerPush(myName, remindersOn).then(() => setPushStatus(Notification?.permission || "default"))} remindersOn={remindersOn} onToggleReminders={v => { setRemindersOn(v); localStorage.setItem("remindersOn", v); updateReminderPref(v); }} />}
+          {tab === "annual"   && <AnnualView  annualData={annualData} onSaveDay={saveAnnualDay} mgr={mgr} myName={myName} />}
+          {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} annualData={annualData} setMyName={n => { setMyName(n); if (n) localStorage.setItem("myName", n); else localStorage.removeItem("myName"); }} onView={a => setViewAssign(a)} onChangeName={() => setShowWelcome(true)} pushStatus={pushStatus} onEnablePush={() => registerPush(myName, remindersOn).then(() => setPushStatus(Notification?.permission || "default"))} remindersOn={remindersOn} onToggleReminders={v => { setRemindersOn(v); localStorage.setItem("remindersOn", v); updateReminderPref(v); }} />}
           {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} mgrName={mgrName} toast={toast} />}
         </main>
 
@@ -541,7 +604,7 @@ export default function App() {
       {modal?.t === "assign" && <AssignModal mode={modal.mode} a={modal.a} wk={wk} data={data} sysMap={sysColorMap} onClose={() => setModal(null)} onSave={upsertAssign} />}
       {modal?.t === "auth"   && <AuthModal pin={data.pin} managers={data.managers||[]} onOk={(name) => { setMgr(true); setMgrName(name); setModal(null); toast(`ברוך הבא, ${name}`, "info"); }} onClose={() => setModal(null)} />}
       {viewAssign && <AssignDetailModal a={viewAssign} sysMap={sysColorMap} mgr={mgr} onClose={() => setViewAssign(null)} onEdit={() => { setModal({ t: "assign", mode: "edit", a: viewAssign }); setViewAssign(null); }} onDelete={() => { deleteAssign(viewAssign.id); setViewAssign(null); }} />}
-      {planner && <PlannerView wk={wk} data={data} sysMap={sysColorMap} weekA={weekA} onClose={() => setPlanner(false)} onSave={(assignments, planWk) => { const nd = addLog({ ...data, assignments }, "תכנן שבוע", `שבוע ${planWk||wk}`); save(nd, "שבוע תוכנן ✓"); }} />}
+      {planner && <PlannerView wk={wk} data={data} sysMap={sysColorMap} weekA={weekA} annualData={annualData} onClose={() => setPlanner(false)} onSave={(assignments, planWk) => { const nd = addLog({ ...data, assignments }, "תכנן שבוע", `שבוע ${planWk||wk}`); save(nd, "שבוע תוכנן ✓"); }} />}
       {showWelcome && data && <WelcomeModal data={data} myName={myName} onSelect={n => { setMyName(n); localStorage.setItem("myName", n); setShowWelcome(false); }} onSkip={() => setShowWelcome(false)} />}
     </MobileCtx.Provider>
   );
@@ -1003,7 +1066,7 @@ const TH = { padding: "8px 10px", textAlign: "center", borderRadius: 7, fontSize
 const TD = { padding: "7px 9px", borderRadius: 7, fontSize: 12, minHeight: 36 };
 
 /* ── MY VIEW ── */
-function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName, onView, onChangeName, pushStatus, onEnablePush, remindersOn, onToggleReminders }) {
+function MyView({ wk, setWk, weekA, data, sysMap, myName, annualData, setMyName, onView, onChangeName, pushStatus, onEnablePush, remindersOn, onToggleReminders }) {
   const todayKey      = todayDayKey();
   const isTodayWork   = isWorkDay(todayKey);
   const isCurrentWeek = wk === wKey(new Date());
@@ -1108,6 +1171,36 @@ function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName, onView, onC
           </div>
         </div>
       )}
+      {/* Annual plan status this week */}
+      {mode === "me" && myName && annualData && (() => {
+        const wdKeys = ['sun','mon','tue','wed','thu','fri'];
+        const strips = wdKeys.map(dk => {
+          const iso  = wkDayToDate(wk, dk);
+          const code = iso ? (annualData.days?.[iso]?.statuses?.[myName] || '') : '';
+          const st   = statusStyle(code);
+          const d    = DAYS.find(x => x.key === dk);
+          const isToday = dk === todayDayKey() && wk === wKey(new Date());
+          return { dk, iso, code, st, short: d?.short || dk, isToday };
+        });
+        const hasAny = strips.some(s => s.code);
+        if (!hasAny) return null;
+        return (
+          <div style={{ marginBottom: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '12px 14px' }}>
+            <div style={{ fontSize: 11, color: '#8892b0', fontWeight: 700, marginBottom: 8 }}>📅 סטטוס שלי השבוע</div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {strips.map(({ dk, code, st, short, isToday }) => (
+                <div key={dk} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '4px 2px', borderRadius: 7, background: isToday ? 'rgba(74,158,255,0.1)' : 'transparent', border: isToday ? '1px solid rgba(74,158,255,0.25)' : '1px solid transparent' }}>
+                  <span style={{ fontSize: 10, color: isToday ? '#4a9eff' : '#445', fontWeight: isToday ? 700 : 400 }}>{short}</span>
+                  {code
+                    ? <span style={{ background: st?.bg || '#333', color: '#fff', borderRadius: 4, padding: '2px 4px', fontSize: 9, fontWeight: 700, width: '100%', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{code.slice(0,4)}</span>
+                    : <span style={{ width: '100%', height: 18 }} />}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {mode === "me" && !myName && (
         <div style={{ marginBottom: 20, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 13, padding: "14px 16px" }}>
           <label style={{ ...lbl, marginBottom: 10 }}>מי אתה?</label>
@@ -1485,7 +1578,7 @@ const PLAN_COLS = [
   { key: "sat", label: "שבת",   short: "ש׳", days: ["sat"], narrow: true },
 ];
 
-function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
+function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
   const mob = useContext(MobileCtx);
 
   const [planWk, setPlanWk] = useState(wk);
@@ -1691,11 +1784,18 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
                       <div style={{ padding: "10px 12px 14px", display: "flex", flexWrap: "wrap", gap: 8 }}>
                         {sec.people.map(p => {
                           const inCell = activeCell ? (grid[activeCell] || []).includes(p) : false;
+                          // Annual plan status for active day
+                          const activeDayIso = aDay ? wkDayToDate(wk, aDay) : null;
+                          const annualStatus = activeDayIso ? (annualData?.days?.[activeDayIso]?.statuses?.[p] || '') : '';
+                          const annSt = statusStyle(annualStatus);
+                          const isUnavail = UNAVAILABLE_CODES.has(annualStatus);
                           return (
                             <div key={p}
                               onClick={() => { if (!activeCell) return; inCell ? rem(aSys, aDay, p) : add(aSys, aDay, p); }}
-                              style={{ padding: "9px 16px", border: `2px solid ${inCell ? sc.accent : sc.accent + "44"}`, borderRadius: 22, background: inCell ? `${sc.accent}33` : "rgba(255,255,255,0.04)", color: inCell ? sc.accent : activeCell ? "#ccd6f6" : "#667", fontSize: 14, fontWeight: inCell ? 700 : 500, cursor: activeCell ? "pointer" : "default", userSelect: "none", transition: "all .12s" }}>
-                              {inCell ? "✓ " : ""}{p}
+                              style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", border: `2px solid ${inCell ? sc.accent : isUnavail ? "#e74c3c66" : sc.accent + "44"}`, borderRadius: 22, background: inCell ? `${sc.accent}33` : isUnavail ? "rgba(231,76,60,0.06)" : "rgba(255,255,255,0.04)", color: inCell ? sc.accent : activeCell ? "#ccd6f6" : "#667", fontSize: 14, fontWeight: inCell ? 700 : 500, cursor: activeCell ? "pointer" : "default", userSelect: "none", transition: "all .12s", opacity: isUnavail && !inCell ? 0.65 : 1 }}>
+                              {inCell ? "✓ " : ""}
+                              {p}
+                              {annualStatus && <span style={{ background: annSt?.bg || '#333', color: '#fff', borderRadius: 4, padding: '1px 5px', fontSize: 10, fontWeight: 700 }}>{annualStatus}</span>}
                             </div>
                           );
                         })}
@@ -1723,13 +1823,31 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   {sec.people.map(p => {
                     const isSel = selected === p;
+                    // Week status dots from annual plan
+                    const weekDots = PLAN_COLS.filter(c => !c.narrow).map(c => {
+                      const iso = wkDayToDate(wk, c.key);
+                      const code = iso ? (annualData?.days?.[iso]?.statuses?.[p] || '') : '';
+                      const st = statusStyle(code);
+                      return { key: c.key, short: c.short, code, st };
+                    });
+                    const hasAnnual = weekDots.some(d => d.code);
                     return (
                       <div key={p} draggable
                         onDragStart={() => { setDragging(p); setSelected(null); }}
                         onDragEnd={() => setDragging(null)}
                         onClick={() => setSelected(isSel ? null : p)}
                         style={{ padding: "6px 10px", border: `2px solid ${isSel ? sc.accent : sc.accent + "33"}`, borderRadius: 8, background: isSel ? `${sc.accent}28` : "rgba(255,255,255,0.03)", color: isSel ? sc.accent : "#9aa0b0", fontSize: 12, cursor: "grab", fontWeight: isSel ? 700 : 400, userSelect: "none", boxShadow: isSel ? `0 0 0 2px ${sc.accent}33` : "none", transition: "all .12s", opacity: dragging === p ? .35 : 1 }}>
-                        {isSel ? "✓ " : "⠿ "}{p}
+                        <div>{isSel ? "✓ " : "⠿ "}{p}</div>
+                        {hasAnnual && (
+                          <div style={{ display: "flex", gap: 2, marginTop: 4 }}>
+                            {weekDots.map(d => (
+                              <span key={d.key} title={`${d.short}: ${d.code || 'זמין'}`}
+                                style={{ width: 18, height: 12, borderRadius: 2, background: d.st?.bg || 'rgba(255,255,255,0.08)', fontSize: 8, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, overflow: 'hidden' }}>
+                                {d.code ? d.code.slice(0,2) : ''}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -1977,6 +2095,305 @@ function AssignModal({ mode, a, wk, data, sysMap, onClose, onSave }) {
         </div>
       </div>
     </Overlay>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════
+   ANNUAL PLAN VIEW
+═══════════════════════════════════════════════════════ */
+const MONTHS_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+const DAY_SHORT = ['א','ב','ג','ד','ה','ו','ש'];
+const DAY_LONG  = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+
+function StatusBadge({ code, small }) {
+  const st = statusStyle(code);
+  if (!st) return <span style={{ color: '#334', fontSize: small ? 9 : 11 }}>—</span>;
+  return (
+    <span style={{ display: 'inline-block', background: st.bg, color: '#fff', borderRadius: small ? 3 : 4, padding: small ? '1px 4px' : '2px 7px', fontSize: small ? 9 : 11, fontWeight: 700, whiteSpace: 'nowrap' }}>
+      {code}
+    </span>
+  );
+}
+
+function AnnualView({ annualData, onSaveDay, mgr, myName }) {
+  const mob = useContext(MobileCtx);
+  const [viewMode, setViewMode] = useState('month');
+  const [selMonth, setSelMonth] = useState(() => new Date().getMonth());
+  const [selDate,  setSelDate]  = useState(null);
+  const [editCell, setEditCell] = useState(null); // { person }
+
+  if (!annualData) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px 20px', color: '#8892b0' }}>
+        <div style={{ fontSize: 40, marginBottom: 16 }}>📅</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 8 }}>תוכנית שנתית לא נטענה עדיין</div>
+        <div style={{ fontSize: 13, marginBottom: 20 }}>יש לייבא את תוכנית העבודה מ-Excel</div>
+        <div style={{ background: 'rgba(74,158,255,0.08)', border: '1px solid rgba(74,158,255,0.2)', borderRadius: 12, padding: '14px 18px', maxWidth: 420, margin: '0 auto', fontSize: 12, color: '#8892b0', textAlign: 'right' }}>
+          <div style={{ fontWeight: 700, color: '#4a9eff', marginBottom: 8 }}>שלבי ייבוא:</div>
+          <div>1. ודא ש-Python ו-openpyxl מותקנים</div>
+          <div>2. הרץ: <code style={{ background: '#0a1020', padding: '2px 6px', borderRadius: 4, color: '#4a9eff' }}>python scripts/import_annual.py --upload</code></div>
+          <div>3. רענן את הדף</div>
+        </div>
+      </div>
+    );
+  }
+
+  const year     = annualData.year || 2026;
+  const sections = annualData.sections || [];
+  const days     = annualData.days || {};
+
+  const today = new Date().toISOString().slice(0, 10);
+  const daysInMonth = new Date(year, selMonth + 1, 0).getDate();
+  const monthDays = Array.from({ length: daysInMonth }, (_, i) => {
+    const d   = new Date(year, selMonth, i + 1);
+    const iso = `${year}-${String(selMonth + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
+    return { num: i + 1, iso, dow: d.getDay() };
+  });
+
+  // ── My annual status strip (shown when myName is set) ──
+  function MyStrip() {
+    if (!myName) return null;
+    return (
+      <div style={{ background: 'rgba(74,158,255,0.06)', border: '1px solid rgba(74,158,255,0.15)', borderRadius: 12, padding: '10px 14px', marginBottom: 16 }}>
+        <div style={{ fontSize: 11, color: '#4a9eff', fontWeight: 700, marginBottom: 8 }}>הסטטוס שלי — {MONTHS_HE[selMonth]}</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {monthDays.map(({ num, iso, dow }) => {
+            const code = days[iso]?.statuses?.[myName] || '';
+            const st   = statusStyle(code);
+            const isToday = iso === today;
+            return (
+              <div key={iso} onClick={() => { setSelDate(iso); setViewMode('day'); }}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, cursor: 'pointer', minWidth: 28, padding: '3px 2px', borderRadius: 6, background: isToday ? 'rgba(74,158,255,0.15)' : 'transparent', border: isToday ? '1px solid rgba(74,158,255,0.4)' : '1px solid transparent' }}>
+                <span style={{ fontSize: 9, color: dow === 6 ? '#557' : '#445' }}>{DAY_SHORT[dow]}</span>
+                <span style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? '#4a9eff' : '#8892b0' }}>{num}</span>
+                {code
+                  ? <span style={{ width: 24, height: 14, background: st?.bg || '#333', borderRadius: 3, fontSize: 8, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{code.slice(0,3)}</span>
+                  : <span style={{ width: 24, height: 14 }} />}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // ── MONTH VIEW ──────────────────────────────────────────────────
+  if (viewMode === 'month') {
+    // On mobile: show mini personal strip + one section at a time via tabs
+    const [mobileSecIdx, setMobileSecIdx] = useState(0);
+    const visibleSections = mob ? [sections[mobileSecIdx]].filter(Boolean) : sections;
+
+    return (
+      <div>
+        {/* Month nav */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 14 }}>
+          <NavBtn onClick={() => setSelMonth(m => (m + 11) % 12)}><I n="cR" s={14} /></NavBtn>
+          <div style={{ textAlign: 'center', minWidth: 130 }}>
+            <div style={{ fontWeight: 700, fontSize: 18, color: '#fff' }}>{MONTHS_HE[selMonth]}</div>
+            <div style={{ fontSize: 13, color: '#8892b0' }}>{year}</div>
+          </div>
+          <NavBtn onClick={() => setSelMonth(m => (m + 1) % 12)}><I n="cL" s={14} /></NavBtn>
+        </div>
+
+        <MyStrip />
+
+        {/* Legend */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14, justifyContent: 'center' }}>
+          {[['י','יום'],['ל','לילה'],['כ','כונן'],['ח','חופש'],['מיל','מילואים'],['מ','מחלה'],['פ','פנוי'],['ק','קורס']].map(([code, lbl]) => (
+            <span key={code} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#8892b0' }}>
+              <span style={{ width: 20, height: 13, background: statusStyle(code)?.bg || '#333', borderRadius: 3, display: 'inline-block', flexShrink: 0 }} />
+              {lbl}
+            </span>
+          ))}
+        </div>
+
+        {/* Mobile: section selector tabs */}
+        {mob && sections.length > 1 && (
+          <div style={{ display: 'flex', marginBottom: 10, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+            {sections.map((sec, si) => {
+              const sc = secPal(null, sec.name, si);
+              const isSel = si === mobileSecIdx;
+              return (
+                <button key={sec.name} onClick={() => setMobileSecIdx(si)}
+                  style={{ flex: 1, padding: '8px 4px', border: 'none', background: isSel ? `${sc.accent}20` : 'transparent', color: isSel ? sc.accent : '#556', fontSize: 10, fontWeight: isSel ? 700 : 400, cursor: 'pointer', borderTop: `2px solid ${isSel ? sc.accent : 'transparent'}` }}>
+                  {sec.name.replace('מדור ', '')}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Grid */}
+        <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid rgba(255,255,255,0.07)' }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%', direction: 'rtl', minWidth: mob ? 340 : 600 }}>
+            <thead>
+              <tr style={{ background: '#0f1525' }}>
+                <th style={{ padding: '6px 8px', fontSize: 11, color: '#4a9eff', borderBottom: '1px solid rgba(255,255,255,0.07)', width: 52, textAlign: 'right', position: 'sticky', right: 0, background: '#0f1525', zIndex: 2 }}>יום</th>
+                {visibleSections.map(sec => {
+                  const sc = secPal(null, sec.name, sections.indexOf(sec));
+                  return (
+                    <th key={sec.name} colSpan={sec.people.length}
+                      style={{ padding: '5px 6px', fontSize: 10, color: sc.accent, borderBottom: '1px solid rgba(255,255,255,0.07)', textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.07)' }}>
+                      {sec.name}
+                    </th>
+                  );
+                })}
+              </tr>
+              <tr style={{ background: '#0a1020' }}>
+                <th style={{ position: 'sticky', right: 0, background: '#0a1020', zIndex: 2, borderBottom: '1px solid rgba(255,255,255,0.07)' }} />
+                {visibleSections.flatMap(sec => sec.people.map((person, pi) => (
+                  <th key={person} style={{ padding: '4px 2px', fontSize: 9, color: person === myName ? '#4a9eff' : '#445', borderBottom: '1px solid rgba(255,255,255,0.07)', borderRight: pi === sec.people.length - 1 ? '1px solid rgba(255,255,255,0.07)' : 'none', textAlign: 'center', minWidth: 32, maxWidth: 44, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: person === myName ? 700 : 400 }} title={person}>
+                    {person.split(' ')[0]}
+                  </th>
+                )))}
+              </tr>
+            </thead>
+            <tbody>
+              {monthDays.map(({ num, iso, dow }) => {
+                const dayData = days[iso] || {};
+                const isSat   = dow === 6;
+                const isToday = iso === today;
+                return (
+                  <tr key={iso} onClick={() => { setSelDate(iso); setViewMode('day'); }}
+                    style={{ cursor: 'pointer', background: isToday ? 'rgba(74,158,255,0.07)' : isSat ? 'rgba(255,255,255,0.015)' : 'transparent' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(74,158,255,0.05)'}
+                    onMouseLeave={e => e.currentTarget.style.background = isToday ? 'rgba(74,158,255,0.07)' : isSat ? 'rgba(255,255,255,0.015)' : 'transparent'}>
+                    <td style={{ padding: '3px 6px', position: 'sticky', right: 0, background: isToday ? '#0c1830' : '#080c18', zIndex: 1, borderBottom: '1px solid rgba(255,255,255,0.04)', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontWeight: isToday ? 700 : 400, color: isToday ? '#4a9eff' : isSat ? '#556' : '#aab', fontSize: 12 }}>{num}</span>
+                      <span style={{ fontSize: 9, color: '#334', marginRight: 3 }}>{DAY_SHORT[dow]}</span>
+                      {dayData.notes && <span style={{ fontSize: 9 }}>📝</span>}
+                    </td>
+                    {visibleSections.flatMap(sec => sec.people.map((person, pi) => {
+                      const code = dayData.statuses?.[person] || '';
+                      const st   = statusStyle(code);
+                      return (
+                        <td key={person} style={{ padding: '2px 1px', textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.04)', borderRight: pi === sec.people.length - 1 ? '1px solid rgba(255,255,255,0.07)' : 'none', background: code && st ? `${st.bg}1a` : 'transparent' }}>
+                          {code && <StatusBadge code={code} small />}
+                        </td>
+                      );
+                    }))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  // ── DAILY VIEW ──────────────────────────────────────────────────
+  const selDayData = days[selDate] || {};
+  const selDateObj = selDate ? new Date(selDate + 'T00:00:00') : null;
+  const selDow     = selDateObj ? selDateObj.getDay() : 0;
+  const selNum     = selDateObj ? selDateObj.getDate() : 0;
+  const selMon     = selDateObj ? selDateObj.getMonth() : 0;
+
+  const STATUS_OPTIONS = [
+    '', 'י', 'ל', 'Y', 'L', 'כ', 'כש', 'כמ', 'כמש',
+    'ח', 'מיל', 'מ', 'פ', 'מנוחה', 'ק',
+    'חיפה', 'הרצליה', 'ראש פינה', 'PBB', 'רמון',
+    'ב. חשמל', 'ב. כללית', 'השתלמות', 'ניקיון תחנות',
+  ];
+
+  function saveStatus(person, code) {
+    const newStatuses = { ...(selDayData.statuses || {}) };
+    if (code) newStatuses[person] = code; else delete newStatuses[person];
+    onSaveDay({ date: selDate, statuses: newStatuses });
+  }
+
+  function navDay(delta) {
+    const d = new Date(selDate + 'T00:00:00');
+    d.setDate(d.getDate() + delta);
+    const iso = d.toISOString().slice(0, 10);
+    setSelDate(iso);
+    setSelMonth(d.getMonth());
+    setEditCell(null);
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+        <NavBtn onClick={() => setViewMode('month')}><I n="cR" s={14} /></NavBtn>
+        <div style={{ flex: 1, textAlign: 'center' }}>
+          <div style={{ fontWeight: 700, fontSize: 17, color: '#fff' }}>
+            {selNum} {MONTHS_HE[selMon]} {year}
+          </div>
+          <div style={{ fontSize: 12, color: '#8892b0' }}>יום {DAY_LONG[selDow]}</div>
+        </div>
+        <NavBtn onClick={() => navDay(-1)}><I n="cR" s={14} /></NavBtn>
+        <NavBtn onClick={() => navDay(1)}><I n="cL" s={14} /></NavBtn>
+      </div>
+
+      {/* Summary */}
+      {(selDayData.countDay != null || selDayData.countNight != null || selDayData.workDay || selDayData.workNight) && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', justifyContent: 'center' }}>
+          {selDayData.countDay   != null && <span style={{ background: 'rgba(39,174,96,0.12)', border: '1px solid rgba(39,174,96,0.3)', borderRadius: 8, padding: '4px 12px', fontSize: 12, color: '#2ecc71' }}>☀ יום: {selDayData.countDay}</span>}
+          {selDayData.countNight != null && <span style={{ background: 'rgba(41,128,185,0.12)', border: '1px solid rgba(41,128,185,0.3)', borderRadius: 8, padding: '4px 12px', fontSize: 12, color: '#3498db' }}>🌙 לילה: {selDayData.countNight}</span>}
+          {selDayData.workDay  && <span style={{ background: 'rgba(39,174,96,0.08)',  border: '1px solid rgba(39,174,96,0.2)',  borderRadius: 8, padding: '4px 12px', fontSize: 12, color: '#2ecc71' }}>⚙ יום: {selDayData.workDay}</span>}
+          {selDayData.workNight && <span style={{ background: 'rgba(41,128,185,0.08)', border: '1px solid rgba(41,128,185,0.2)', borderRadius: 8, padding: '4px 12px', fontSize: 12, color: '#3498db' }}>⚙ לילה: {selDayData.workNight}</span>}
+        </div>
+      )}
+
+      {/* Notes */}
+      <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 14px', marginBottom: 14 }}>
+        <div style={{ fontSize: 11, color: '#556', marginBottom: 6 }}>📝 הערות יומיות</div>
+        {mgr ? (
+          <input value={selDayData.notes || ''} onChange={e => onSaveDay({ date: selDate, notes: e.target.value })}
+            placeholder="הוסף הערה ליום..." style={{ ...inp, fontSize: 13 }} />
+        ) : (
+          <div style={{ fontSize: 13, color: selDayData.notes ? '#ccd6f6' : '#334' }}>{selDayData.notes || 'אין הערות'}</div>
+        )}
+      </div>
+
+      {/* Section cards */}
+      {sections.map((sec, si) => {
+        const sc = secPal(null, sec.name, si);
+        return (
+          <div key={sec.name} style={{ marginBottom: 14, border: `1px solid ${sc.accent}33`, borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ background: `${sc.accent}18`, padding: '8px 14px', borderBottom: `1px solid ${sc.accent}22`, fontSize: 13, fontWeight: 700, color: sc.accent }}>
+              {sec.name}
+            </div>
+            <div style={{ padding: '10px 12px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {sec.people.map(person => {
+                const code  = selDayData.statuses?.[person] || '';
+                const st    = statusStyle(code);
+                const isMe  = person === myName;
+                const isEd  = editCell?.person === person;
+                return (
+                  <div key={person} style={{ display: 'flex', alignItems: 'center', gap: 6, background: isMe ? 'rgba(74,158,255,0.07)' : 'rgba(255,255,255,0.03)', border: isMe ? '1px solid rgba(74,158,255,0.22)' : '1px solid rgba(255,255,255,0.07)', borderRadius: 8, padding: '5px 9px', flexWrap: isEd ? 'wrap' : 'nowrap', maxWidth: isEd ? 340 : 'none' }}>
+                    <span style={{ fontSize: 12, color: isMe ? '#4a9eff' : '#8892b0', whiteSpace: 'nowrap' }}>{person}</span>
+                    {mgr ? (
+                      isEd ? (
+                        <>
+                          {STATUS_OPTIONS.map(opt => (
+                            <button key={opt || '__none'} onClick={() => { saveStatus(person, opt); setEditCell(null); }}
+                              style={{ padding: '2px 7px', fontSize: 10, borderRadius: 4, border: 'none', cursor: 'pointer', background: opt === code ? (statusStyle(opt)?.bg || '#4a9eff') : 'rgba(255,255,255,0.08)', color: opt === code ? '#fff' : '#8892b0', fontWeight: opt === code ? 700 : 400, margin: '1px' }}>
+                              {opt || '—'}
+                            </button>
+                          ))}
+                          <button onClick={() => setEditCell(null)} style={{ padding: '2px 6px', fontSize: 10, borderRadius: 4, border: '1px solid #333', background: 'transparent', color: '#556', cursor: 'pointer' }}>✕</button>
+                        </>
+                      ) : (
+                        <button onClick={() => setEditCell({ person })}
+                          style={{ background: code && st ? st.bg : 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 5, padding: '3px 9px', fontSize: 11, color: code ? '#fff' : '#445', cursor: 'pointer', fontWeight: 700, minWidth: 30, whiteSpace: 'nowrap' }}>
+                          {code || '—'}
+                        </button>
+                      )
+                    ) : (
+                      code && st
+                        ? <span style={{ background: st.bg, borderRadius: 5, padding: '2px 8px', fontSize: 11, color: '#fff', fontWeight: 700 }}>{code}</span>
+                        : <span style={{ fontSize: 11, color: '#334' }}>—</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
