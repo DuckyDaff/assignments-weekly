@@ -2459,6 +2459,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
   const [editCell,  setEditCell]  = useState(null);
   const [hoverCell,  setHoverCell]  = useState(null); // "iso|person|slot" for drag feedback
   const [pickerCell, setPickerCell] = useState(null); // { iso, person, slot, x, y }
+  const [paintCode,  setPaintCode]  = useState(null); // null=off, ''=erase, 'י'=paint
   const dragCode   = useRef(null);
   const dragSource = useRef(null); // { iso, person, slot } — source cell when dragging from table
   const [legendGroups] = useState(() => {
@@ -2796,35 +2797,49 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
             {/* Main area: legend sidebar (manager) + grid */}
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
 
-              {/* ── Legend drag-palette (manager only, right side in RTL) ── */}
+              {/* ── Legend palette (manager only) — drag OR click to paint ── */}
               {mgr && !mob && (
-                <div style={{ width: 108, flexShrink: 0, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, padding: '10px 8px' }}>
-                  <div style={{ fontSize: 10, color: '#4a9eff', fontWeight: 700, marginBottom: 10, textAlign: 'center', letterSpacing: 0.5 }}>גרור לתא ←</div>
+                <div style={{ width: 114, flexShrink: 0, background: 'rgba(255,255,255,0.04)', border: `1px solid ${paintCode !== null ? 'rgba(74,158,255,0.5)' : 'rgba(255,255,255,0.09)'}`, borderRadius: 10, padding: '10px 8px', transition: 'border .2s' }}>
+                  {/* Header: mode indicator */}
+                  <div style={{ marginBottom: 8, textAlign: 'center' }}>
+                    {paintCode !== null ? (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                        <span style={{ fontSize: 10, color: '#4a9eff', fontWeight: 700 }}>🖊 מצב צביעה</span>
+                        <button onClick={() => setPaintCode(null)}
+                          style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 4, color: '#8892b0', fontSize: 10, cursor: 'pointer', padding: '1px 5px' }}>✕</button>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 9, color: '#667', fontWeight: 600 }}>לחץ לצביעה / גרור</div>
+                    )}
+                  </div>
                   {legendGroups.map(group => (
                     <div key={group.id} style={{ marginBottom: 10 }}>
                       <div style={{ fontSize: 9, color: '#556', fontWeight: 600, marginBottom: 4, textAlign: 'right', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 3 }}>{group.name}</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                         {group.codes.map(code => {
-                          const st = statusStyle(code);
+                          const st      = statusStyle(code);
+                          const isActive = paintCode === code;
                           return (
                             <div key={code} draggable
-                              onDragStart={() => { dragCode.current = code; }}
+                              onDragStart={() => { dragCode.current = code; setPaintCode(null); }}
                               onDragEnd={() => { dragCode.current = null; }}
-                              style={{ background: st?.bg || '#1a2a3a', color: '#fff', borderRadius: 5, padding: '4px 6px', fontSize: 11, fontWeight: 700, cursor: 'grab', textAlign: 'center', userSelect: 'none', boxShadow: '0 1px 4px rgba(0,0,0,0.3)', transition: 'opacity .15s' }}
-                              title={st?.label || code}>
-                              {code}
+                              onClick={() => setPaintCode(isActive ? null : code)}
+                              style={{ background: st?.bg || '#1a2a3a', color: '#fff', borderRadius: 5, padding: '4px 6px', fontSize: 11, fontWeight: 700, cursor: 'pointer', textAlign: 'center', userSelect: 'none', boxShadow: isActive ? `0 0 0 2px #fff, 0 0 0 4px ${st?.bg || '#4a9eff'}` : '0 1px 4px rgba(0,0,0,0.3)', transform: isActive ? 'scale(1.08)' : 'scale(1)', transition: 'all .15s', outline: isActive ? '2px solid #fff' : 'none' }}
+                              title={isActive ? `לחץ על תאים לצבוע ב-${code}` : (st?.label || code)}>
+                              {isActive ? `✓ ${code}` : code}
                             </div>
                           );
                         })}
                       </div>
                     </div>
                   ))}
-                  {/* Clear cell */}
+                  {/* Erase */}
                   <div draggable
-                    onDragStart={() => { dragCode.current = ''; }}
+                    onDragStart={() => { dragCode.current = ''; setPaintCode(null); }}
                     onDragEnd={() => { dragCode.current = null; }}
-                    style={{ background: 'rgba(231,76,60,0.2)', border: '1px dashed rgba(231,76,60,0.5)', color: '#e74c3c', borderRadius: 5, padding: '4px 6px', fontSize: 10, fontWeight: 700, cursor: 'grab', textAlign: 'center', userSelect: 'none', marginTop: 6 }}>
-                    🗑 מחק
+                    onClick={() => setPaintCode(paintCode === '' ? null : '')}
+                    style={{ background: paintCode === '' ? 'rgba(231,76,60,0.4)' : 'rgba(231,76,60,0.2)', border: `1px ${paintCode === '' ? 'solid' : 'dashed'} rgba(231,76,60,0.7)`, color: '#e74c3c', borderRadius: 5, padding: '4px 6px', fontSize: 10, fontWeight: 700, cursor: 'pointer', textAlign: 'center', userSelect: 'none', marginTop: 6, boxShadow: paintCode === '' ? '0 0 0 2px #e74c3c55' : 'none', transition: 'all .15s' }}>
+                    {paintCode === '' ? '✕ מוחק' : '🗑 מחק'}
                   </div>
                 </div>
               )}
@@ -2910,8 +2925,16 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                                     }
                                   }
                                 },
-                                onClick: mgr ? (e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setPickerCell({ iso, person, slot, x: r.left, y: r.bottom }); }) : undefined,
-                                style: { padding: `4px ${padR}`, textAlign: 'center', verticalAlign: 'middle', borderRight: borderR, background: isHover ? 'rgba(74,158,255,0.25)' : (code && st ? `${st.bg}33` : bg2), outline: isHover ? '2px dashed #4a9eff' : 'none', transition: 'background .1s', minWidth: minW, cursor: mgr ? (code ? 'grab' : 'pointer') : 'default' },
+                                onClick: mgr ? (e => {
+                                  e.stopPropagation();
+                                  if (paintCode !== null) {
+                                    saveStatusForDate(iso, person, paintCode, slot);
+                                  } else {
+                                    const r = e.currentTarget.getBoundingClientRect();
+                                    setPickerCell({ iso, person, slot, x: r.left, y: r.bottom });
+                                  }
+                                }) : undefined,
+                                style: { padding: `4px ${padR}`, textAlign: 'center', verticalAlign: 'middle', borderRight: borderR, background: isHover ? 'rgba(74,158,255,0.25)' : (code && st ? `${st.bg}33` : bg2), outline: isHover ? '2px dashed #4a9eff' : 'none', transition: 'background .1s', minWidth: minW, cursor: mgr ? (paintCode !== null ? 'crosshair' : code ? 'grab' : 'pointer') : 'default' },
                               });
                               return (
                                 <Fragment key={person}>
