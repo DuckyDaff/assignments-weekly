@@ -154,6 +154,15 @@ function todayDayKey() {
 }
 function isWorkDay(key) { return DAYS.some(d => d.key === key); }
 function pal(idx) { return PALETTE[((idx % PALETTE.length) + PALETTE.length) % PALETTE.length]; }
+// Section colors: use data.sectionColors[name] if set, otherwise defaults
+// Default mapping gives "משמרת מסלולים" orange so it's clearly different from the blue/green sections
+const SEC_COLOR_DEFAULTS = { "משמרת מסלולים": 3 }; // index 3 = orange
+function secPal(data, sectionName, fallbackIdx) {
+  const sc = data?.sectionColors || {};
+  if (sectionName in sc) return pal(sc[sectionName]);
+  if (sectionName in SEC_COLOR_DEFAULTS) return pal(SEC_COLOR_DEFAULTS[sectionName]);
+  return pal(fallbackIdx);
+}
 
 function doExportCSV(wk, list) {
   const h = ["מערכת", "אנשים", ...DAYS.map(d => d.long), "משימות", "הערות"];
@@ -511,9 +520,9 @@ function WelcomeModal({ data, myName, onSelect, onSkip }) {
           <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", marginBottom: 6 }}>ברוך הבא!</div>
           <div style={{ fontSize: 14, color: "#8892b0" }}>בחר את שמך כדי לראות את השיבוצים שלך</div>
         </div>
-        {getSections(data).map((sec, si) => sec.people.length === 0 ? null : (
+        {getSections(data).map((sec, si) => { const sc = secPal(data, sec.name, si); return sec.people.length === 0 ? null : (
           <div key={sec.name} style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: pal(si).accent, fontWeight: 700, letterSpacing: .5, marginBottom: 8, textTransform: "uppercase" }}>{sec.name}</div>
+            <div style={{ fontSize: 11, color: sc.accent, fontWeight: 700, letterSpacing: .5, marginBottom: 8, textTransform: "uppercase" }}>{sec.name}</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {sec.people.map(p => {
                 const isSel = myName === p;
@@ -523,14 +532,14 @@ function WelcomeModal({ data, myName, onSelect, onSkip }) {
                     onClick={() => onSelect(p)}
                     onMouseEnter={() => setHovered(p)}
                     onMouseLeave={() => setHovered(null)}
-                    style={{ padding: "10px 18px", border: `2px solid ${isSel || isHov ? pal(si).accent : pal(si).accent + "44"}`, borderRadius: 24, background: isSel ? `${pal(si).accent}30` : isHov ? `${pal(si).accent}18` : "rgba(255,255,255,0.04)", color: isSel ? pal(si).accent : isHov ? pal(si).accent : "#ccd6f6", fontSize: 15, fontWeight: isSel ? 700 : 500, cursor: "pointer", transition: "all .12s", userSelect: "none" }}>
+                    style={{ padding: "10px 18px", border: `2px solid ${isSel || isHov ? sc.accent : sc.accent + "44"}`, borderRadius: 24, background: isSel ? `${sc.accent}30` : isHov ? `${sc.accent}18` : "rgba(255,255,255,0.04)", color: isSel ? sc.accent : isHov ? sc.accent : "#ccd6f6", fontSize: 15, fontWeight: isSel ? 700 : 500, cursor: "pointer", transition: "all .12s", userSelect: "none" }}>
                     {isSel ? "✓ " : ""}{p}
                   </button>
                 );
               })}
             </div>
           </div>
-        ))}
+        ); })}
         <button onClick={onSkip} style={{ width: "100%", marginTop: 8, padding: "10px", background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 11, color: "#556", cursor: "pointer", fontSize: 13 }}>דלג — אראה לך את זה אחר כך</button>
       </div>
     </div>
@@ -1058,16 +1067,16 @@ function MyView({ wk, setWk, weekA, data, sysMap, myName, setMyName, onView, onC
         <div style={{ marginBottom: 20, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 13, padding: "14px 16px" }}>
           <label style={{ ...lbl, marginBottom: 10 }}>מי אתה?</label>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {getSections(data).map((sec, si) => sec.people.length === 0 ? null : (
+            {getSections(data).map((sec, si) => { const sc = secPal(data, sec.name, si); return sec.people.length === 0 ? null : (
               <div key={sec.name}>
-                <div style={{ fontSize: 10, color: pal(si).accent, fontWeight: 700, letterSpacing: .5, marginBottom: 6, textTransform: "uppercase" }}>{sec.name}</div>
+                <div style={{ fontSize: 10, color: sc.accent, fontWeight: 700, letterSpacing: .5, marginBottom: 6, textTransform: "uppercase" }}>{sec.name}</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {sec.people.map(p => (
                     <button key={p} onClick={() => { setMyName(p); localStorage.setItem("myName", p); }} style={{ padding: "7px 14px", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 20, background: "rgba(255,255,255,0.04)", color: "#8892b0", fontSize: 12, cursor: "pointer" }}>{p}</button>
                   ))}
                 </div>
               </div>
-            ))}
+            ); })}
           </div>
         </div>
       )}
@@ -1266,7 +1275,7 @@ function SectionsEditor({ data, save, toast }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
       {sections.map((sec, si) => {
-        const c = pal(si);
+        const c = secPal(data, sec.name, si);
         return (
           <div key={sec.name} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${c.accent}22`, borderRadius: 12, padding: "14px 16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
@@ -1516,9 +1525,9 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
             <div style={{ fontSize: 10, color: "#556", fontWeight: 700, letterSpacing: .5, marginBottom: 10, textTransform: "uppercase" }}>
               {selected ? `✓ ${selected}` : "גרור לתא ← שם"}
             </div>
-            {getSections(data).map((sec, si) => sec.people.length === 0 ? null : (
+            {getSections(data).map((sec, si) => { const sc = secPal(data, sec.name, si); return sec.people.length === 0 ? null : (
               <div key={sec.name} style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 10, color: pal(si).accent, fontWeight: 700, marginBottom: 6, borderBottom: `1px solid ${pal(si).accent}33`, paddingBottom: 4 }}>{sec.name}</div>
+                <div style={{ fontSize: 10, color: sc.accent, fontWeight: 700, marginBottom: 6, borderBottom: `1px solid ${sc.accent}33`, paddingBottom: 4 }}>{sec.name}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   {sec.people.map(p => {
                     const isSel = selected === p;
@@ -1527,14 +1536,14 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
                         onDragStart={() => { setDragging(p); setSelected(null); }}
                         onDragEnd={() => setDragging(null)}
                         onClick={() => setSelected(isSel ? null : p)}
-                        style={{ padding: "6px 10px", border: `2px solid ${isSel ? pal(si).accent : pal(si).accent + "33"}`, borderRadius: 8, background: isSel ? `${pal(si).accent}28` : "rgba(255,255,255,0.03)", color: isSel ? pal(si).accent : "#9aa0b0", fontSize: 12, cursor: "grab", fontWeight: isSel ? 700 : 400, userSelect: "none", boxShadow: isSel ? `0 0 0 2px ${pal(si).accent}33` : "none", transition: "all .12s", opacity: dragging === p ? .35 : 1 }}>
+                        style={{ padding: "6px 10px", border: `2px solid ${isSel ? sc.accent : sc.accent + "33"}`, borderRadius: 8, background: isSel ? `${sc.accent}28` : "rgba(255,255,255,0.03)", color: isSel ? sc.accent : "#9aa0b0", fontSize: 12, cursor: "grab", fontWeight: isSel ? 700 : 400, userSelect: "none", boxShadow: isSel ? `0 0 0 2px ${sc.accent}33` : "none", transition: "all .12s", opacity: dragging === p ? .35 : 1 }}>
                         {isSel ? "✓ " : "⠿ "}{p}
                       </div>
                     );
                   })}
                 </div>
               </div>
-            ))}
+            ); })}
           </div>
         )}
 
@@ -1608,9 +1617,9 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
           <div style={{ fontSize: 12, color: selected ? "#4a9eff" : "#667", fontWeight: 700, marginBottom: 10 }}>
             {selected ? `✓ ${selected} — לחץ תא לשיבוץ` : "בחר שם ← לחץ על תא"}
           </div>
-          {getSections(data).map((sec, si) => sec.people.length === 0 ? null : (
+          {getSections(data).map((sec, si) => { const sc = secPal(data, sec.name, si); return sec.people.length === 0 ? null : (
             <div key={sec.name} style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 11, color: pal(si).accent, fontWeight: 700, marginBottom: 6, opacity: .9 }}>
+              <div style={{ fontSize: 11, color: sc.accent, fontWeight: 700, marginBottom: 6, opacity: .9 }}>
                 {sec.name}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -1619,14 +1628,14 @@ function PlannerView({ wk, data, sysMap, weekA, onClose, onSave }) {
                   return (
                     <div key={p}
                       onClick={() => setSelected(isSel ? null : p)}
-                      style={{ padding: "9px 16px", border: `2px solid ${isSel ? pal(si).accent : pal(si).accent + "44"}`, borderRadius: 22, background: isSel ? `${pal(si).accent}33` : "rgba(255,255,255,0.05)", color: isSel ? pal(si).accent : "#aab", fontSize: 15, cursor: "pointer", fontWeight: isSel ? 700 : 500, userSelect: "none", boxShadow: isSel ? `0 0 0 3px ${pal(si).accent}33` : "none", transition: "all .12s", minHeight: 40, display: "flex", alignItems: "center" }}>
+                      style={{ padding: "9px 16px", border: `2px solid ${isSel ? sc.accent : sc.accent + "44"}`, borderRadius: 22, background: isSel ? `${sc.accent}33` : "rgba(255,255,255,0.05)", color: isSel ? sc.accent : "#aab", fontSize: 15, cursor: "pointer", fontWeight: isSel ? 700 : 500, userSelect: "none", boxShadow: isSel ? `0 0 0 3px ${sc.accent}33` : "none", transition: "all .12s", minHeight: 40, display: "flex", alignItems: "center" }}>
                       {isSel ? "✓ " : ""}{p}
                     </div>
                   );
                 })}
               </div>
             </div>
-          ))}
+          ); })}
         </div>
       )}
     </div>
