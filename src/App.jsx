@@ -721,7 +721,7 @@ function WeekNav({ wk, setWk, children }) {
         <div style={{ flex: 1 }} />
         {/* Center: arrows + week number + dates */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
-          <NavBtn onClick={() => setWk(adjW(wk, -1))}><I n="cR" s={15} /></NavBtn>
+          <NavBtn onClick={() => setWk(adjW(wk, -1))}><I n="cL" s={15} /></NavBtn>
           <div style={{ textAlign: "center", minWidth: mob ? 120 : 165 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
               <span style={{ fontWeight: 700, fontSize: mob ? 15 : 17, color: "#fff" }}>שבוע {wk.split("-W")[1]}</span>
@@ -729,7 +729,7 @@ function WeekNav({ wk, setWk, children }) {
             </div>
             <div style={{ fontSize: 14, color: "#ccd6f6", marginTop: 2, fontWeight: 600, letterSpacing: 0.2 }}>{wLabel(wk)}</div>
           </div>
-          <NavBtn onClick={() => setWk(adjW(wk, 1))}><I n="cL" s={15} /></NavBtn>
+          <NavBtn onClick={() => setWk(adjW(wk, 1))}><I n="cR" s={15} /></NavBtn>
           {!isToday && <button onClick={() => setWk(wKey(new Date()))} style={{ padding: "4px 9px", border: "1px solid rgba(74,158,255,.3)", borderRadius: 8, background: "rgba(74,158,255,.1)", color: "#4a9eff", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>היום</button>}
         </div>
         {/* Right side: action buttons */}
@@ -1947,12 +1947,12 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
       <div style={{ background: "#0f1525", borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "0 16px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, gap: 8 }}>
         <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 9, padding: "7px 12px", color: "#8892b0", cursor: "pointer", fontSize: 13 }}>✕ סגור</button>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, justifyContent: "center" }}>
-          <NavBtn onClick={() => goWeek(-1)}><I n="cR" s={15} /></NavBtn>
+          <NavBtn onClick={() => goWeek(-1)}><I n="cL" s={15} /></NavBtn>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>שבוע {planWk.split("-W")[1]}</div>
             <div style={{ fontSize: 13, color: "#ccd6f6", fontWeight: 600, marginTop: 1 }}>{wLabel(planWk)}</div>
           </div>
-          <NavBtn onClick={() => goWeek(1)}><I n="cL" s={15} /></NavBtn>
+          <NavBtn onClick={() => goWeek(1)}><I n="cR" s={15} /></NavBtn>
         </div>
         <button onClick={handleSave} style={{ background: "linear-gradient(135deg,#4a9eff,#3d7fc4)", border: "none", borderRadius: 9, padding: "8px 14px", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700, boxShadow: "0 3px 12px rgba(74,158,255,0.3)" }}>שמור ✓</button>
       </div>
@@ -2541,7 +2541,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
           <div>
             {/* Date nav */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-              <NavBtn onClick={() => navDay(-1)}><I n="cR" s={14} /></NavBtn>
+              <NavBtn onClick={() => navDay(-1)}><I n="cL" s={14} /></NavBtn>
               <div style={{ flex: 1, textAlign: 'center' }}>
                 <div style={{ fontWeight: 700, fontSize: 17, color: '#fff' }}>
                   {selNum} {MONTHS_HE[selMon]} {year}
@@ -2550,7 +2550,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                   יום {DAY_LONG[selDow]}{selDate === today ? ' — היום' : ''}
                 </div>
               </div>
-              <NavBtn onClick={() => navDay(1)}><I n="cL" s={14} /></NavBtn>
+              <NavBtn onClick={() => navDay(1)}><I n="cR" s={14} /></NavBtn>
             </div>
 
             {/* Summary bar */}
@@ -2664,12 +2664,12 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
           <div>
             {/* Week nav */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 16 }}>
-              <NavBtn onClick={() => navWeek(-1)}><I n="cR" s={14} /></NavBtn>
+              <NavBtn onClick={() => navWeek(-1)}><I n="cL" s={14} /></NavBtn>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontWeight: 700, fontSize: 15, color: '#fff' }}>{startLabel} — {endLabel}</div>
                 <div style={{ fontSize: 12, color: '#8892b0' }}>{year}</div>
               </div>
-              <NavBtn onClick={() => navWeek(1)}><I n="cL" s={14} /></NavBtn>
+              <NavBtn onClick={() => navWeek(1)}><I n="cR" s={14} /></NavBtn>
             </div>
 
             {/* 7-column day grid */}
@@ -2750,12 +2750,12 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
           <div>
             {/* Month nav */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 14 }}>
-              <NavBtn onClick={() => setSelMonth(m => (m + 11) % 12)}><I n="cR" s={14} /></NavBtn>
+              <NavBtn onClick={() => setSelMonth(m => (m + 11) % 12)}><I n="cL" s={14} /></NavBtn>
               <div style={{ textAlign: 'center', minWidth: 130 }}>
                 <div style={{ fontWeight: 700, fontSize: 18, color: '#fff' }}>{MONTHS_HE[selMonth]}</div>
                 <div style={{ fontSize: 13, color: '#8892b0' }}>{year}</div>
               </div>
-              <NavBtn onClick={() => setSelMonth(m => (m + 1) % 12)}><I n="cL" s={14} /></NavBtn>
+              <NavBtn onClick={() => setSelMonth(m => (m + 1) % 12)}><I n="cR" s={14} /></NavBtn>
             </div>
 
             {/* Section tabs */}
