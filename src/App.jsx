@@ -65,18 +65,28 @@ function getSections(data) {
 function getAllPeople(data) { return getSections(data).flatMap(s => s.people); }
 
 function wKey(date) {
+  // Week starts Sunday (day 0). Anchor on Thursday of the same Sun–Sat week.
   const d = new Date(date); d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-  const y = d.getFullYear(), w = Math.ceil(((d - new Date(y, 0, 1)) / 864e5 + 1) / 7);
+  d.setDate(d.getDate() + 4 - d.getDay()); // Thu of Sun-based week
+  const y = d.getFullYear();
+  const w = Math.ceil(((d - new Date(y, 0, 1)) / 864e5 + 1) / 7);
   return `${y}-W${String(w).padStart(2, "0")}`;
 }
 function wDates(wk) {
+  // Reconstruct Sunday and Thursday of the given Sun-based week key.
   const [y, w] = wk.split("-W");
-  const j = new Date(Number(y), 0, 1), dw = j.getDay() || 7;
-  const m = new Date(j); m.setDate(j.getDate() + (8 - dw) % 7 + (Number(w) - 1) * 7);
-  const s = new Date(m); s.setDate(m.getDate() - 1);
-  const t = new Date(s); t.setDate(s.getDate() + 4);
-  return { sun: s, thu: t };
+  const jan1 = new Date(Number(y), 0, 1);
+  const D = jan1.getDay(); // 0=Sun … 6=Sat
+  // Thursday of week 1: Jan 1 shifted to the Thursday of its Sun–Sat week
+  const thu1 = new Date(jan1);
+  thu1.setDate(1 + (4 - D + 7) % 7);
+  // Thursday of week N
+  const thu = new Date(thu1);
+  thu.setDate(thu1.getDate() + (Number(w) - 1) * 7);
+  // Sunday of week N = Thursday − 4 days
+  const sun = new Date(thu);
+  sun.setDate(thu.getDate() - 4);
+  return { sun, thu };
 }
 function wLabel(wk) {
   const { sun, thu } = wDates(wk);
