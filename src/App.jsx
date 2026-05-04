@@ -2895,8 +2895,8 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                               style={{ padding: '5px 8px', position: 'sticky', right: 0, background: stickyBg, zIndex: 1, whiteSpace: 'nowrap', verticalAlign: 'middle', borderLeft: `1px solid rgba(255,255,255,0.1)`, borderBottom: `1px solid rgba(255,255,255,${isWeekend ? '0.1' : '0.06'})`, cursor: 'pointer' }}
                               onMouseEnter={e => e.currentTarget.style.background = '#1a2a4a'}
                               onMouseLeave={e => e.currentTarget.style.background = stickyBg}>
-                              <span style={{ fontWeight: isToday ? 700 : isWeekend ? 600 : 400, color: isToday ? '#4a9eff' : isWeekend ? '#8899bb' : '#c0cce0', fontSize: 13 }}>{num}</span>
-                              <span style={{ fontSize: 10, color: isWeekend ? '#667' : '#445', marginRight: 4 }}>{DAY_SHORT[dow]}</span>
+                              <span style={{ fontWeight: 700, color: isToday ? '#4a9eff' : isWeekend ? '#99aacc' : '#ffffff', fontSize: 14 }}>{num}</span>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: isToday ? '#4a9eff' : isWeekend ? '#8899bb' : '#ccd6f6', marginRight: 5 }}>{DAY_SHORT[dow]}</span>
                               {dayData.notes && <span style={{ fontSize: 10 }}>📝</span>}
                             </td>
                             {people.map((person) => {
