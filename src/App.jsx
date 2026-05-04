@@ -2391,7 +2391,12 @@ const DAY_LONG   = ['ראשון','שני','שלישי','רביעי','חמישי'
 const CAT_DAY      = new Set(['י','Y','2']);
 const CAT_NIGHT    = new Set(['ל','L','ל2']);
 const CAT_ONCALL   = new Set(['כ','כש','כמ','כמש']);
-const CAT_UNAVAIL  = new Set(['ח','מיל','מ','פ','מנוחה','ק']);
+const CAT_VACATION = new Set(['ח']);
+const CAT_SICK     = new Set(['מ']);
+const CAT_COURSE   = new Set(['ק']);
+const CAT_RESERVE  = new Set(['מיל']);
+const CAT_FREE     = new Set(['פ','מנוחה']);
+const CAT_UNAVAIL  = new Set(['ח','מיל','מ','פ','מנוחה','ק']); // kept for backward compat
 const CAT_AWAY     = new Set(['חיפה','הרצליה','ראש פינה','PBB','רמון']);
 const CAT_TRAINING = new Set(['ב. חשמל','ב. כללית','השתלמות','ניקיון תחנות','ב. שמיעה','ס. רפואי','ר. גובה','ר. מלגזה','ע. ראשונה']);
 
@@ -2400,7 +2405,12 @@ function classifyStatus(code) {
   if (CAT_DAY.has(code))      return 'day';
   if (CAT_NIGHT.has(code))    return 'night';
   if (CAT_ONCALL.has(code))   return 'oncall';
-  if (CAT_UNAVAIL.has(code))  return 'unavail';
+  if (CAT_VACATION.has(code)) return 'vacation';
+  if (CAT_SICK.has(code))     return 'sick';
+  if (CAT_COURSE.has(code))   return 'course';
+  if (CAT_RESERVE.has(code))  return 'reserve';
+  if (CAT_FREE.has(code))     return 'free';
+  if (CAT_UNAVAIL.has(code))  return 'unavail'; // fallback
   if (CAT_AWAY.has(code))     return 'away';
   if (CAT_TRAINING.has(code)) return 'training';
   return 'other';
@@ -2410,6 +2420,11 @@ const CAT_STYLE = {
   day:      { bg: '#27ae60', light: '#1a4a2a', label: '☀️ משמרת יום',         labelShort: 'יום'     },
   night:    { bg: '#2980b9', light: '#0d2a40', label: '🌙 משמרת לילה',        labelShort: 'לילה'    },
   oncall:   { bg: '#e67e22', light: '#3a1f00', label: '🔶 כוננות',             labelShort: 'כוננות'  },
+  vacation: { bg: '#e74c3c', light: '#3a0c0c', label: '🏖 חופשה',              labelShort: 'חופשה'   },
+  sick:     { bg: '#c0392b', light: '#2d0b09', label: '🤒 מחלה',               labelShort: 'מחלה'    },
+  course:   { bg: '#8e44ad', light: '#2a1040', label: '📚 קורס',               labelShort: 'קורס'    },
+  reserve:  { bg: '#922b21', light: '#2a0c08', label: '🪖 מילואים',            labelShort: 'מיל׳'    },
+  free:     { bg: '#7f8c8d', light: '#1a2020', label: '💤 פנוי / מנוחה',       labelShort: 'פנוי'    },
   unavail:  { bg: '#e74c3c', light: '#3a0c0c', label: '🔴 לא זמינים',         labelShort: 'חסרים'   },
   away:     { bg: '#16a085', light: '#0a2a24', label: '✈️ מחוץ לבסיס',        labelShort: 'בחוץ'    },
   training: { bg: '#8e44ad', light: '#2a1040', label: '📚 הכשרה / בטיחות',    labelShort: 'הכשרה'   },
@@ -2428,7 +2443,7 @@ function StatusBadge({ code, small }) {
 /* ── Daily briefing helpers ── */
 function buildDayGroups(dayData, sections) {
   const statuses = dayData?.statuses || {};
-  const groups   = { day: [], night: [], oncall: [], unavail: [], away: [], training: [] };
+  const groups   = { day: [], night: [], oncall: [], vacation: [], sick: [], course: [], reserve: [], free: [], unavail: [], away: [], training: [] };
   const allPeople = sections.flatMap(s => s.people);
   for (const person of allPeople) {
     const code = statuses[person] || '';
@@ -3050,7 +3065,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
         });
 
         // Tally stats
-        const stats = { day: 0, night: 0, oncall: 0, unavail: 0, away: 0, training: 0 };
+        const stats = { day: 0, night: 0, oncall: 0, vacation: 0, sick: 0, course: 0, reserve: 0, free: 0, unavail: 0, away: 0, training: 0 };
         yearMonths.forEach(({ days: ds }) => ds.forEach(({ cat }) => { if (cat && stats[cat] !== undefined) stats[cat]++; }));
 
         return (
