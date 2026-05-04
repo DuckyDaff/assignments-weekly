@@ -2626,10 +2626,10 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
 
         return (
           <div>
-            {/* Date nav — direction:ltr so ‹=prev is always left, ›=next is always right */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, direction: 'ltr' }}>
-              <NavBtn onClick={() => navDay(-1)}><I n="cL" s={14} /></NavBtn>
-              <div style={{ flex: 1, textAlign: 'center', direction: 'rtl' }}>
+            {/* Date nav — RTL: first in DOM = right visually = prev, last in DOM = left visually = next */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <NavBtn onClick={() => navDay(-1)}><I n="cR" s={14} /></NavBtn>
+              <div style={{ flex: 1, textAlign: 'center' }}>
                 <div style={{ fontWeight: 700, fontSize: 17, color: '#fff' }}>
                   {selNum} {MONTHS_HE[selMon]} {year}
                 </div>
@@ -2637,7 +2637,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                   יום {DAY_LONG[selDow]}{selDate === today ? ' — היום' : ''}
                 </div>
               </div>
-              <NavBtn onClick={() => navDay(1)}><I n="cR" s={14} /></NavBtn>
+              <NavBtn onClick={() => navDay(1)}><I n="cL" s={14} /></NavBtn>
             </div>
 
             {/* Summary bar */}
@@ -2749,14 +2749,14 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
 
         return (
           <div>
-            {/* Week nav — direction:ltr so ‹=prev left, ›=next right */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 16, direction: 'ltr' }}>
-              <NavBtn onClick={() => navWeek(-1)}><I n="cL" s={14} /></NavBtn>
-              <div style={{ textAlign: 'center', direction: 'rtl' }}>
+            {/* Week nav — RTL: first in DOM = right visually = prev, last in DOM = left visually = next */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 16 }}>
+              <NavBtn onClick={() => navWeek(-1)}><I n="cR" s={14} /></NavBtn>
+              <div style={{ textAlign: 'center' }}>
                 <div style={{ fontWeight: 700, fontSize: 15, color: '#fff' }}>{startLabel} — {endLabel}</div>
                 <div style={{ fontSize: 12, color: '#8892b0' }}>{year}</div>
               </div>
-              <NavBtn onClick={() => navWeek(1)}><I n="cR" s={14} /></NavBtn>
+              <NavBtn onClick={() => navWeek(1)}><I n="cL" s={14} /></NavBtn>
             </div>
 
             {/* 7-column day grid */}
@@ -2835,14 +2835,14 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
 
         return (
           <div>
-            {/* Month nav — direction:ltr so ‹=prev left, ›=next right */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 14, direction: 'ltr' }}>
-              <NavBtn onClick={() => setSelMonth(m => (m + 11) % 12)}><I n="cL" s={14} /></NavBtn>
-              <div style={{ textAlign: 'center', minWidth: 130, direction: 'rtl' }}>
+            {/* Month nav — RTL: first in DOM = right visually = prev, last in DOM = left visually = next */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 14 }}>
+              <NavBtn onClick={() => setSelMonth(m => (m + 11) % 12)}><I n="cR" s={14} /></NavBtn>
+              <div style={{ textAlign: 'center', minWidth: 130 }}>
                 <div style={{ fontWeight: 700, fontSize: 18, color: '#fff' }}>{MONTHS_HE[selMonth]}</div>
                 <div style={{ fontSize: 13, color: '#8892b0' }}>{year}</div>
               </div>
-              <NavBtn onClick={() => setSelMonth(m => (m + 1) % 12)}><I n="cR" s={14} /></NavBtn>
+              <NavBtn onClick={() => setSelMonth(m => (m + 1) % 12)}><I n="cL" s={14} /></NavBtn>
             </div>
 
             {/* Section tabs */}
