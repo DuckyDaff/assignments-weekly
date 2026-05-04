@@ -2132,14 +2132,14 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
             <table style={{ borderCollapse: "separate", borderSpacing: 5, minWidth: 680, margin: "0 auto" }}>
               <thead>
                 <tr>
-                  <th style={{ ...PTH, textAlign: "right", paddingRight: 14, width: 130 }}>מערכת</th>
+                  <th style={{ ...PTH, textAlign: "right", paddingRight: 14, width: 155 }}>מערכת</th>
                   {PLAN_COLS.map(c => {
                     const iso = wkDayToDate(planWk, c.key);
                     const dayNum = iso ? new Date(iso + "T00:00:00").getDate() : null;
                     return (
-                      <th key={c.key} style={{ ...PTH, background: c.narrow ? "rgba(61,127,196,0.18)" : "rgba(74,158,255,0.1)", color: c.narrow ? "#5b9fd4" : "#6ab0ff", minWidth: c.narrow ? 66 : 130, width: c.narrow ? 66 : undefined }}>
-                        <div style={{ fontSize: 13, fontWeight: 700 }}>{c.narrow ? c.short : c.label}</div>
-                        {dayNum && <div style={{ fontSize: 11, opacity: .7, marginTop: 2 }}>{dayNum}</div>}
+                      <th key={c.key} style={{ ...PTH, background: c.narrow ? "rgba(61,127,196,0.18)" : "rgba(74,158,255,0.1)", color: c.narrow ? "#5b9fd4" : "#6ab0ff", minWidth: c.narrow ? 80 : 155, width: c.narrow ? 80 : undefined }}>
+                        <div style={{ fontSize: 15, fontWeight: 700 }}>{c.narrow ? c.short : c.label}</div>
+                        {dayNum && <div style={{ fontSize: 12, opacity: .75, marginTop: 3 }}>{dayNum}</div>}
                       </th>
                     );
                   })}
@@ -2150,7 +2150,7 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
                   const col = sysMap[sys] || pal(0);
                   return (
                     <tr key={sys}>
-                      <td style={{ ...PTD, background: `linear-gradient(135deg,${col.dark},rgba(8,12,24,0.9))`, borderRight: `4px solid ${col.accent}`, fontWeight: 700, fontSize: 13, color: col.accent, maxWidth: 130, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sys}</td>
+                      <td style={{ ...PTD, background: `linear-gradient(135deg,${col.dark},rgba(8,12,24,0.9))`, borderRight: `4px solid ${col.accent}`, fontWeight: 700, fontSize: 14, color: col.accent, maxWidth: 155, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sys}</td>
                       {PLAN_COLS.map(c => {
                         const k = ck(sys, c.key);
                         const people = grid[k] || [];
@@ -2167,8 +2167,8 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
                             style={{ ...PTD,
                               background: isActive ? `${col.accent}22` : isOver ? `${col.accent}33` : (hasContent ? `${col.accent}0d` : (c.narrow ? "rgba(61,127,196,0.06)" : "rgba(255,255,255,0.02)")),
                               border: `2px solid ${isActive ? col.accent : isOver ? col.accent + "99" : (hasContent ? col.accent + "44" : "rgba(255,255,255,0.09)")}`,
-                              verticalAlign: "top", cursor: selected ? "copy" : "pointer", minHeight: 56,
-                              width: c.narrow ? 66 : undefined, transition: "background .1s,border .1s",
+                              verticalAlign: "top", cursor: selected ? "copy" : "pointer", minHeight: 72,
+                              width: c.narrow ? 80 : undefined, transition: "background .1s,border .1s",
                               boxShadow: isActive ? `0 0 0 2px ${col.accent}44 inset` : isOver ? `0 0 0 1px ${col.accent}55 inset` : "none" }}>
                             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                               {isActive
@@ -2182,9 +2182,9 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
                               }
                               {people.map(p => (
                                 <div key={p} onClick={e => { if (!selected) e.stopPropagation(); }}
-                                  style={{ display: "flex", alignItems: "center", gap: 4, background: `${col.accent}22`, border: `1px solid ${col.accent}55`, borderRadius: 6, padding: "5px 8px" }}>
-                                  <span style={{ fontSize: 12, color: col.accent, fontWeight: 600, flex: 1, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p}</span>
-                                  <button onClick={e => { e.stopPropagation(); rem(sys, c.key, p); }} style={{ background: "none", border: "none", color: col.accent, cursor: "pointer", fontSize: 15, padding: "0 2px", lineHeight: 1, opacity: .6, flexShrink: 0 }}>×</button>
+                                  style={{ display: "flex", alignItems: "center", gap: 4, background: `${col.accent}22`, border: `1px solid ${col.accent}55`, borderRadius: 6, padding: "7px 10px" }}>
+                                  <span style={{ fontSize: 14, color: col.accent, fontWeight: 600, flex: 1, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p}</span>
+                                  <button onClick={e => { e.stopPropagation(); rem(sys, c.key, p); }} style={{ background: "none", border: "none", color: col.accent, cursor: "pointer", fontSize: 17, padding: "0 2px", lineHeight: 1, opacity: .6, flexShrink: 0 }}>×</button>
                                 </div>
                               ))}
                               {!hasContent && !isActive && (
@@ -2205,8 +2205,8 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
     </div>
   );
 }
-const PTH = { padding: "11px 8px", textAlign: "center", borderRadius: 7, fontWeight: 700, background: "rgba(255,255,255,0.06)", color: "#8892b0", border: "1px solid rgba(255,255,255,0.08)" };
-const PTD = { padding: "8px 7px", borderRadius: 8, fontSize: 13 };
+const PTH = { padding: "14px 10px", textAlign: "center", borderRadius: 7, fontWeight: 700, background: "rgba(255,255,255,0.06)", color: "#8892b0", border: "1px solid rgba(255,255,255,0.08)" };
+const PTD = { padding: "10px 9px", borderRadius: 8, fontSize: 14 };
 
 /* ── ASSIGN DETAIL MODAL ── */
 function AssignDetailModal({ a, sysMap, mgr, onClose, onEdit, onDelete }) {
@@ -2561,10 +2561,10 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
 
         return (
           <div>
-            {/* Date nav */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-              <NavBtn onClick={() => navDay(-1)}><I n="cR" s={14} /></NavBtn>
-              <div style={{ flex: 1, textAlign: 'center' }}>
+            {/* Date nav — direction:ltr so ‹=prev is always left, ›=next is always right */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, direction: 'ltr' }}>
+              <NavBtn onClick={() => navDay(-1)}><I n="cL" s={14} /></NavBtn>
+              <div style={{ flex: 1, textAlign: 'center', direction: 'rtl' }}>
                 <div style={{ fontWeight: 700, fontSize: 17, color: '#fff' }}>
                   {selNum} {MONTHS_HE[selMon]} {year}
                 </div>
@@ -2572,7 +2572,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                   יום {DAY_LONG[selDow]}{selDate === today ? ' — היום' : ''}
                 </div>
               </div>
-              <NavBtn onClick={() => navDay(1)}><I n="cL" s={14} /></NavBtn>
+              <NavBtn onClick={() => navDay(1)}><I n="cR" s={14} /></NavBtn>
             </div>
 
             {/* Summary bar */}
@@ -2684,14 +2684,14 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
 
         return (
           <div>
-            {/* Week nav */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 16 }}>
-              <NavBtn onClick={() => navWeek(-1)}><I n="cR" s={14} /></NavBtn>
-              <div style={{ textAlign: 'center' }}>
+            {/* Week nav — direction:ltr so ‹=prev left, ›=next right */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 16, direction: 'ltr' }}>
+              <NavBtn onClick={() => navWeek(-1)}><I n="cL" s={14} /></NavBtn>
+              <div style={{ textAlign: 'center', direction: 'rtl' }}>
                 <div style={{ fontWeight: 700, fontSize: 15, color: '#fff' }}>{startLabel} — {endLabel}</div>
                 <div style={{ fontSize: 12, color: '#8892b0' }}>{year}</div>
               </div>
-              <NavBtn onClick={() => navWeek(1)}><I n="cL" s={14} /></NavBtn>
+              <NavBtn onClick={() => navWeek(1)}><I n="cR" s={14} /></NavBtn>
             </div>
 
             {/* 7-column day grid */}
@@ -2770,14 +2770,14 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
 
         return (
           <div>
-            {/* Month nav */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 14 }}>
-              <NavBtn onClick={() => setSelMonth(m => (m + 11) % 12)}><I n="cR" s={14} /></NavBtn>
-              <div style={{ textAlign: 'center', minWidth: 130 }}>
+            {/* Month nav — direction:ltr so ‹=prev left, ›=next right */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 14, direction: 'ltr' }}>
+              <NavBtn onClick={() => setSelMonth(m => (m + 11) % 12)}><I n="cL" s={14} /></NavBtn>
+              <div style={{ textAlign: 'center', minWidth: 130, direction: 'rtl' }}>
                 <div style={{ fontWeight: 700, fontSize: 18, color: '#fff' }}>{MONTHS_HE[selMonth]}</div>
                 <div style={{ fontSize: 13, color: '#8892b0' }}>{year}</div>
               </div>
-              <NavBtn onClick={() => setSelMonth(m => (m + 1) % 12)}><I n="cL" s={14} /></NavBtn>
+              <NavBtn onClick={() => setSelMonth(m => (m + 1) % 12)}><I n="cR" s={14} /></NavBtn>
             </div>
 
             {/* Section tabs */}
