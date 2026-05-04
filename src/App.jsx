@@ -547,6 +547,11 @@ export default function App() {
     if (msg) toast(msg);
   }, [toast]);
 
+  // Must be defined before any early return — hooks must always run in the same order
+  const saveTabLabels = useCallback((labels) => {
+    save({ ...data, tabLabels: labels });
+  }, [data, save]);
+
   // ── Activity log helper ──
   const addLog = (nd, action, detail = "") => {
     const who = mgrNameRef.current;
@@ -592,9 +597,6 @@ export default function App() {
   const sysColorMap = Object.fromEntries((data.systems || DEF.systems).map((s, i) => [s, pal(data.systemColors?.[s] ?? i)]));
   // Tab labels stored in Redis via the main data object — shared across all users
   const tabLabels = data?.tabLabels || {};
-  const saveTabLabels = useCallback((labels) => {
-    save({ ...data, tabLabels: labels });
-  }, [data, save]);
 
   const TABS = [
     { id: "calendar", label: tabLabels.calendar || "לוח שבועי",    icon: "cal"  },
