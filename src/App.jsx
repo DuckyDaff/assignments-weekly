@@ -586,14 +586,11 @@ export default function App() {
   );
 
   const sysColorMap = Object.fromEntries(data.systems.map((s, i) => [s, pal(data.systemColors?.[s] ?? i)]));
-  const DEFAULT_TAB_LABELS = {
-    calendar: "לוח שבועי", board: "לוח שיבוצים",
-    annual: "תוכנית שנתית", me: myName ? myName.split(" ")[0] : "שלי", settings: "הגדרות",
-  };
-  const [tabLabels, setTabLabels] = useState(() => {
-    try { return { ...DEFAULT_TAB_LABELS, ...JSON.parse(localStorage.getItem("tabLabels") || "{}") }; } catch { return DEFAULT_TAB_LABELS; }
-  });
-  const saveTabLabels = (labels) => { setTabLabels(labels); localStorage.setItem("tabLabels", JSON.stringify(labels)); };
+  // Tab labels stored in Redis via the main data object — shared across all users
+  const tabLabels = data?.tabLabels || {};
+  const saveTabLabels = useCallback((labels) => {
+    save({ ...data, tabLabels: labels });
+  }, [data, save]);
 
   const TABS = [
     { id: "calendar", label: tabLabels.calendar || "לוח שבועי",    icon: "cal"  },
