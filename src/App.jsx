@@ -429,16 +429,18 @@ export default function App() {
   const isSavingRef = useRef(false);
 
   const applyFetch = useCallback(d => {
-    if (!d || typeof d !== "object") { setData(prev => prev || DEF); return; }
-    // Guard: if the response looks like an error object (no systems/sections/assignments), fall back to DEF
-    if (!d.systems && !d.sections && !d.assignments) { setData(prev => prev || DEF); return; }
-    if (!d.sections?.length && d.people?.length) {
-      const migrated = { ...d, sections: getSections(d) };
-      delete migrated.people;
-      setData(migrated);
-    } else {
-      setData(d);
+    // If response is not a valid data object, fall back to DEF
+    if (!d || typeof d !== "object" || (!d.systems && !d.sections && !d.assignments)) {
+      setData(prev => prev || DEF);
+      return;
     }
+    // Always merge with DEF so all required fields are guaranteed to exist
+    let merged = { ...DEF, ...d };
+    if (!merged.sections?.length && d.people?.length) {
+      merged = { ...merged, sections: getSections(d) };
+      delete merged.people;
+    }
+    setData(merged);
   }, []);
 
   // Initial load
@@ -587,7 +589,7 @@ export default function App() {
     </div>
   );
 
-  const sysColorMap = Object.fromEntries(data.systems.map((s, i) => [s, pal(data.systemColors?.[s] ?? i)]));
+  const sysColorMap = Object.fromEntries((data.systems || DEF.systems).map((s, i) => [s, pal(data.systemColors?.[s] ?? i)]));
   // Tab labels stored in Redis via the main data object — shared across all users
   const tabLabels = data?.tabLabels || {};
   const saveTabLabels = useCallback((labels) => {
