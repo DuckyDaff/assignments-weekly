@@ -430,6 +430,8 @@ export default function App() {
 
   const applyFetch = useCallback(d => {
     if (!d || typeof d !== "object") return;
+    // Guard: if the response looks like an error object (no systems/sections/assignments), ignore it
+    if (!d.systems && !d.sections && !d.assignments) return;
     if (!d.sections?.length && d.people?.length) {
       const migrated = { ...d, sections: getSections(d) };
       delete migrated.people;
