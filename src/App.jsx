@@ -429,9 +429,9 @@ export default function App() {
   const isSavingRef = useRef(false);
 
   const applyFetch = useCallback(d => {
-    if (!d || typeof d !== "object") return;
-    // Guard: if the response looks like an error object (no systems/sections/assignments), ignore it
-    if (!d.systems && !d.sections && !d.assignments) return;
+    if (!d || typeof d !== "object") { setData(prev => prev || DEF); return; }
+    // Guard: if the response looks like an error object (no systems/sections/assignments), fall back to DEF
+    if (!d.systems && !d.sections && !d.assignments) { setData(prev => prev || DEF); return; }
     if (!d.sections?.length && d.people?.length) {
       const migrated = { ...d, sections: getSections(d) };
       delete migrated.people;
