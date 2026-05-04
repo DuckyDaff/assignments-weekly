@@ -586,12 +586,21 @@ export default function App() {
   );
 
   const sysColorMap = Object.fromEntries(data.systems.map((s, i) => [s, pal(data.systemColors?.[s] ?? i)]));
+  const DEFAULT_TAB_LABELS = {
+    calendar: "לוח שבועי", board: "לוח שיבוצים",
+    annual: "תוכנית שנתית", me: myName ? myName.split(" ")[0] : "שלי", settings: "הגדרות",
+  };
+  const [tabLabels, setTabLabels] = useState(() => {
+    try { return { ...DEFAULT_TAB_LABELS, ...JSON.parse(localStorage.getItem("tabLabels") || "{}") }; } catch { return DEFAULT_TAB_LABELS; }
+  });
+  const saveTabLabels = (labels) => { setTabLabels(labels); localStorage.setItem("tabLabels", JSON.stringify(labels)); };
+
   const TABS = [
-    { id: "calendar", label: "לוח שבועי",    icon: "cal"  },
-    { id: "board",    label: "לוח שיבוצים", icon: "grid" },
-    { id: "annual",   label: "תוכנית שנתית", icon: "calY" },
-    { id: "me",       label: myName ? myName.split(" ")[0] : "שלי", icon: "user" },
-    { id: "settings", label: "הגדרות",       icon: "cog"  },
+    { id: "calendar", label: tabLabels.calendar || "לוח שבועי",    icon: "cal"  },
+    { id: "board",    label: tabLabels.board    || "לוח שיבוצים",  icon: "grid" },
+    { id: "annual",   label: tabLabels.annual   || "תוכנית שנתית", icon: "calY" },
+    { id: "me",       label: tabLabels.me       || (myName ? myName.split(" ")[0] : "שלי"), icon: "user" },
+    { id: "settings", label: tabLabels.settings || "הגדרות",       icon: "cog"  },
   ];
 
   const openAdd = () => setModal({ t: "assign", mode: "add" });
@@ -631,7 +640,7 @@ export default function App() {
           {tab === "calendar" && <CalendarView wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onCopy={copyFromPrev} onView={a => setViewAssign(a)} onPlan={() => setPlanner(true)} />}
           {tab === "annual"   && <AnnualView  annualData={annualData} onSaveDay={saveAnnualDay} mgr={mgr} myName={myName} />}
           {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} annualData={annualData} setMyName={n => { setMyName(n); if (n) localStorage.setItem("myName", n); else localStorage.removeItem("myName"); }} onView={a => setViewAssign(a)} onChangeName={() => setShowWelcome(true)} pushStatus={pushStatus} onEnablePush={() => registerPush(myName, remindersOn).then(() => setPushStatus(Notification?.permission || "default"))} remindersOn={remindersOn} onToggleReminders={v => { setRemindersOn(v); localStorage.setItem("remindersOn", v); updateReminderPref(v); }} />}
-          {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} mgrName={mgrName} toast={toast} onSyncAnnual={syncAnnualSections} />}
+          {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} mgrName={mgrName} toast={toast} onSyncAnnual={syncAnnualSections} tabLabels={tabLabels} onSaveTabLabels={saveTabLabels} />}
         </main>
 
         <BottomNav tab={tab} setTab={setTab} TABS={TABS} />
@@ -1330,7 +1339,7 @@ const DEFAULT_LEGEND = [
   { id: 'shift',    name: 'משמרות',      codes: ['י', 'ל', 'Y', 'L'] },
   { id: 'oncall',   name: 'כוננות',      codes: ['כ', 'כש', 'כמ', 'כמש'] },
   { id: 'absent',   name: 'היעדרויות',   codes: ['ח', 'מיל', 'מ', 'פ', 'מנוחה', 'ק'] },
-  { id: 'away',     name: 'חוץ לבסיס',  codes: ['חיפה', 'הרצליה', 'ראש פינה', 'PBB', 'רמון'] },
+  { id: 'away',     name: 'שת"פ',        codes: ['חיפה', 'הרצליה', 'ראש פינה', 'רמון'] },
   { id: 'training', name: 'הכשרות',      codes: ['ב. חשמל', 'ב. כללית', 'השתלמות', 'ניקיון תחנות'] },
 ];
 
@@ -1435,8 +1444,49 @@ function LegendEditor() {
   );
 }
 
+/* ── TABS EDITOR (master only) ── */
+const TAB_DEFS = [
+  { id: "calendar", defaultLabel: "לוח שבועי" },
+  { id: "board",    defaultLabel: "לוח שיבוצים" },
+  { id: "annual",   defaultLabel: "תוכנית שנתית" },
+  { id: "me",       defaultLabel: "שלי" },
+  { id: "settings", defaultLabel: "הגדרות" },
+];
+function TabsEditor({ tabLabels, onSave }) {
+  const [draft, setDraft] = useState({ ...tabLabels });
+  const changed = TAB_DEFS.some(t => (draft[t.id] || t.defaultLabel) !== (tabLabels[t.id] || t.defaultLabel));
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: "#8892b0", marginBottom: 16 }}>שנה את שמות הטאבים בסרגל הניווט העליון. השינויים נשמרים מיידית בדפדפן.</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {TAB_DEFS.map(t => (
+          <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 12, color: "#556", minWidth: 90, textAlign: "right" }}>{t.defaultLabel}</span>
+            <span style={{ color: "#334" }}>→</span>
+            <input value={draft[t.id] || t.defaultLabel}
+              onChange={e => setDraft(d => ({ ...d, [t.id]: e.target.value }))}
+              style={{ ...inp, flex: 1, fontSize: 13 }} />
+            {(draft[t.id] && draft[t.id] !== t.defaultLabel) && (
+              <button onClick={() => setDraft(d => ({ ...d, [t.id]: t.defaultLabel }))}
+                style={{ background: "none", border: "none", color: "#556", cursor: "pointer", fontSize: 12 }}>↺</button>
+            )}
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+        <PillBtn onClick={() => onSave(draft)} disabled={!changed}>שמור שמות</PillBtn>
+        {changed && <button onClick={() => setDraft({ ...tabLabels })}
+          style={{ background: "none", border: "1px solid #334", borderRadius: 8, padding: "6px 14px", color: "#556", cursor: "pointer", fontSize: 13 }}>בטל שינויים</button>}
+      </div>
+      <div style={{ marginTop: 14, padding: "10px 14px", background: "rgba(74,158,255,0.06)", border: "1px solid rgba(74,158,255,0.15)", borderRadius: 9, fontSize: 11, color: "#556" }}>
+        💡 השמות נשמרים בדפדפן בלבד. כדי לאפס — לחץ על ↺ ליד כל טאב ושמור.
+      </div>
+    </div>
+  );
+}
+
 /* ── SETTINGS ── */
-function SettingsView({ data, save, mgr, mgrName, toast, onSyncAnnual }) {
+function SettingsView({ data, save, mgr, mgrName, toast, onSyncAnnual, tabLabels, onSaveTabLabels }) {
   const isMaster = mgrName === "מנהל ראשי";
   const [st, setSt]     = useState("sys");
   const [vSys, setVSys] = useState("");
@@ -1453,7 +1503,7 @@ function SettingsView({ data, save, mgr, mgrName, toast, onSyncAnnual }) {
     { id: "ppl",    l: "אנשי צוות" },
     { id: "legend", l: "מקרא" },
     { id: "log",    l: "יומן" },
-    ...(isMaster ? [{ id: "mgrs", l: "מנהלים" }, { id: "sec", l: "אבטחה" }] : []),
+    ...(isMaster ? [{ id: "mgrs", l: "מנהלים" }, { id: "tabs", l: "טאבים" }, { id: "sec", l: "אבטחה" }] : []),
   ];
   return (
     <div style={{ maxWidth: 540, margin: "0 auto" }}>
@@ -1467,6 +1517,9 @@ function SettingsView({ data, save, mgr, mgrName, toast, onSyncAnnual }) {
       {st === "legend" && <LegendEditor />}
       {st === "log"    && <ActivityLog data={data} />}
       {st === "mgrs"   && isMaster && <ManagersEditor data={data} save={save} toast={toast} />}
+      {st === "tabs"   && isMaster && (
+        <TabsEditor tabLabels={tabLabels} onSave={labels => { onSaveTabLabels(labels); toast("שמות הטאבים עודכנו ✓"); }} />
+      )}
       {st === "sec"    && isMaster && (
         <div>
           <label style={lbl}>שנה קוד PIN ראשי</label>
@@ -2397,7 +2450,7 @@ const CAT_COURSE   = new Set(['ק']);
 const CAT_RESERVE  = new Set(['מיל']);
 const CAT_FREE     = new Set(['פ','מנוחה']);
 const CAT_UNAVAIL  = new Set(['ח','מיל','מ','פ','מנוחה','ק']); // kept for backward compat
-const CAT_AWAY     = new Set(['חיפה','הרצליה','ראש פינה','PBB','רמון']);
+const CAT_AWAY     = new Set(['חיפה','הרצליה','ראש פינה','רמון']);
 const CAT_TRAINING = new Set(['ב. חשמל','ב. כללית','השתלמות','ניקיון תחנות','ב. שמיעה','ס. רפואי','ר. גובה','ר. מלגזה','ע. ראשונה']);
 
 function classifyStatus(code) {
@@ -2426,7 +2479,7 @@ const CAT_STYLE = {
   reserve:  { bg: '#922b21', light: '#2a0c08', label: '🪖 מילואים',            labelShort: 'מיל׳'    },
   free:     { bg: '#7f8c8d', light: '#1a2020', label: '💤 פנוי / מנוחה',       labelShort: 'פנוי'    },
   unavail:  { bg: '#e74c3c', light: '#3a0c0c', label: '🔴 לא זמינים',         labelShort: 'חסרים'   },
-  away:     { bg: '#16a085', light: '#0a2a24', label: '✈️ מחוץ לבסיס',        labelShort: 'בחוץ'    },
+  away:     { bg: '#16a085', light: '#0a2a24', label: '🤝 שת"פ',              labelShort: 'שת"פ'    },
   training: { bg: '#8e44ad', light: '#2a1040', label: '📚 הכשרה / בטיחות',    labelShort: 'הכשרה'   },
 };
 
@@ -2505,7 +2558,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
   const STATUS_OPTIONS = [
     '', 'י', 'ל', 'Y', 'L', 'כ', 'כש', 'כמ', 'כמש',
     'ח', 'מיל', 'מ', 'פ', 'מנוחה', 'ק',
-    'חיפה', 'הרצליה', 'ראש פינה', 'PBB', 'רמון',
+    'חיפה', 'הרצליה', 'ראש פינה', 'רמון',
     'ב. חשמל', 'ב. כללית', 'השתלמות', 'ניקיון תחנות',
   ];
 
