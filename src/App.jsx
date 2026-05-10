@@ -2556,7 +2556,10 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
   const year     = annualData.year || 2026;
   const sections = annualData.sections || [];
   const days     = annualData.days || {};
-  const today    = new Date().toISOString().slice(0, 10);
+  // Use local date to avoid UTC offset issues (Israel is UTC+3, midnight local = prev day UTC)
+  const todayD   = new Date();
+  const today    = `${todayD.getFullYear()}-${String(todayD.getMonth()+1).padStart(2,'0')}-${String(todayD.getDate()).padStart(2,'0')}`;
+  const isoLocal = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 
   const STATUS_OPTIONS = [
     '', 'י', 'ל', 'Y', 'L', 'כ', 'כש', 'כמ', 'כמש',
@@ -2566,10 +2569,9 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
   ];
 
   function navDay(delta) {
-    const d = new Date(selDate + 'T00:00:00');
+    const d = new Date(selDate + 'T12:00:00'); // noon avoids UTC-offset date shift
     d.setDate(d.getDate() + delta);
-    const iso = d.toISOString().slice(0, 10);
-    setSelDate(iso);
+    setSelDate(isoLocal(d));
     setSelMonth(d.getMonth());
     setEditCell(null);
   }
@@ -2633,9 +2635,9 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
         return (
           <div>
             {/* Date nav — RTL: first in DOM = right visually = prev, last in DOM = left visually = next */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 14 }}>
               <NavBtn onClick={() => navDay(-1)}><I n="cR" s={14} /></NavBtn>
-              <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ textAlign: 'center' }}>
                 <div style={{ fontWeight: 700, fontSize: 17, color: '#fff' }}>
                   {selNum} {MONTHS_HE[selMon]} {year}
                 </div>
@@ -2746,7 +2748,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
         function navWeek(delta) {
           const d = new Date(anchor);
           d.setDate(d.getDate() + delta * 7);
-          setSelDate(d.toISOString().slice(0, 10));
+          setSelDate(isoLocal(d));
           setSelMonth(d.getMonth());
         }
 
@@ -2863,6 +2865,29 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                   </button>
                 );
               })}
+            </div>
+
+            {/* ── Legend strip at top of table ── */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10, padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+              {legendGroups.map(group => group.codes.map(code => {
+                const st = statusStyle(code);
+                const isActive = paintCode === code;
+                return (
+                  <div key={code}
+                    draggable={!!mgr}
+                    onDragStart={mgr ? () => { dragCode.current = code; setPaintCode(null); } : undefined}
+                    onDragEnd={mgr ? () => { dragCode.current = null; } : undefined}
+                    onClick={mgr ? () => setPaintCode(isActive ? null : code) : undefined}
+                    title={st?.label || code}
+                    style={{ background: st?.bg || '#1a2a3a', color: '#fff', borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 700, cursor: mgr ? 'pointer' : 'default', userSelect: 'none', boxShadow: isActive ? `0 0 0 2px #fff, 0 0 0 4px ${st?.bg || '#4a9eff'}` : 'none', transform: isActive ? 'scale(1.1)' : 'scale(1)', transition: 'all .12s', whiteSpace: 'nowrap' }}>
+                    {isActive ? `✓ ${code}` : code}
+                  </div>
+                );
+              }))}
+              {mgr && paintCode !== null && (
+                <button onClick={() => setPaintCode(null)}
+                  style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 5, color: '#8892b0', fontSize: 10, cursor: 'pointer', padding: '2px 8px', fontWeight: 600 }}>✕ בטל צביעה</button>
+              )}
             </div>
 
             {/* Main area: legend sidebar (manager) + grid */}
