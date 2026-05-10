@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef, createContext, useContext, Fragment } from "react";
 
 const MobileCtx = createContext(false);
+// ── Legend color context — version counter; consuming subscribes to color updates ──
+const LegendCtx = createContext(0);
 function useMobile() {
   const [m, setM] = useState(() => window.innerWidth <= 768);
   useEffect(() => {
@@ -164,6 +166,18 @@ function secPal(data, sectionName, fallbackIdx) {
   return pal(fallbackIdx);
 }
 
+/* ── LEGEND COLOR OVERRIDE MAP ── */
+// Module-level cache: code → hex color (from legend group colors set in LegendEditor)
+// Initialized from localStorage on page load; updated whenever LegendEditor saves.
+const _legendColors = {};
+function _refreshLegendColors(groups) {
+  for (const k in _legendColors) delete _legendColors[k];
+  for (const g of (groups || [])) {
+    if (g.color) for (const code of (g.codes || [])) _legendColors[code] = g.color;
+  }
+}
+try { _refreshLegendColors(JSON.parse(localStorage.getItem("legendGroups"))); } catch {}
+
 /* ── ANNUAL PLAN STATUS HELPERS ── */
 const STATUS_MAP = {
   'י':   { bg: '#27ae60', label: 'יום' },
@@ -205,7 +219,9 @@ const CONFLICT_CODES = new Set([
 ]);
 function statusStyle(code) {
   if (!code) return null;
-  return STATUS_MAP[code] || { bg: '#1a4a3a', label: code };
+  const base = STATUS_MAP[code] || { bg: '#1a4a3a', label: code };
+  const legendBg = _legendColors[code];
+  return legendBg ? { ...base, bg: legendBg } : base;
 }
 function wkDayToDate(wk, dayKey) {
   const { sun } = wDates(wk);
@@ -392,6 +408,12 @@ export default function App() {
   const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem("myName"));
   const [pushStatus, setPushStatus] = useState(() => (typeof Notification !== "undefined" ? Notification.permission : null) || "default"); // "default"|"granted"|"denied"
   const [remindersOn, setRemindersOn] = useState(() => localStorage.getItem("remindersOn") !== "false"); // default true
+  const [legendVer, setLegendVer] = useState(0); // incremented when legend colors change → triggers re-renders
+  useEffect(() => {
+    const h = () => setLegendVer(v => v + 1);
+    window.addEventListener('legend-updated', h);
+    return () => window.removeEventListener('legend-updated', h);
+  }, []);
   const [mgrName, setMgrName] = useState("");     // שם המנהל הנוכחי
   const mgrNameRef = useRef("");
   useEffect(() => { mgrNameRef.current = mgrName; }, [mgrName]);
@@ -632,6 +654,7 @@ export default function App() {
   const openAdd = () => setModal({ t: "assign", mode: "add" });
 
   return (
+    <LegendCtx.Provider value={legendVer}>
     <MobileCtx.Provider value={mob}>
       <style>{CSS}</style>
       <div dir="rtl" style={{ minHeight: "100vh", background: "#080c18", color: "#dde2f0", fontFamily: "'Segoe UI','Arial Hebrew',Arial,sans-serif", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
@@ -688,6 +711,7 @@ export default function App() {
       {showWelcome && data && <WelcomeModal data={data} myName={myName} onSelect={n => { setMyName(n); localStorage.setItem("myName", n); setShowWelcome(false); }} onSkip={() => setShowWelcome(false)} />}
       {showAbsenceModal && <AbsenceModal data={data} annualData={annualData} onClose={() => setShowAbsenceModal(false)} onSave={async (range) => { await saveAbsenceRange(range); setShowAbsenceModal(false); toast(`✓ עודכן ${range.person} — ${range.fromDate} עד ${range.toDate}`); }} />}
     </MobileCtx.Provider>
+    </LegendCtx.Provider>
   );
 }
 
@@ -821,6 +845,7 @@ function EmptyWeek({ mgr, prevCount, onAdd, onCopy }) {
 /* ── BOARD VIEW ── */
 function BoardView({ wk, setWk, weekA, prevA, data, sysMap, mgr, filterPerson, setFilterPerson, onAdd, onEdit, onDelete, onCopy, onCSV, onPrint, onView }) {
   const mob = useContext(MobileCtx);
+  useContext(LegendCtx); // re-render when legend colors change
   const filtered = filterPerson ? weekA.filter(a => (a.assignees || []).includes(filterPerson)) : weekA;
   return (
     <div>
@@ -934,6 +959,7 @@ const ActionBtn = ({ onClick, color, title, children }) => (
 /* ── CALENDAR VIEW ── */
 function CalendarView({ wk, setWk, weekA, prevA, data, sysMap, mgr, onAdd, onEdit, onCopy, onView, onPlan }) {
   const mob = useContext(MobileCtx);
+  useContext(LegendCtx); // re-render when legend colors change
   const [mode, setMode] = useState("sys");
   const todayKey     = todayDayKey();
   const activeSys    = [...new Set(data.systems.filter(s => weekA.some(a => a.system === s)))];
@@ -1156,6 +1182,7 @@ const TD = { padding: "7px 9px", borderRadius: 7, fontSize: 12, minHeight: 36 };
 
 /* ── MY VIEW ── */
 function MyView({ wk, setWk, weekA, data, sysMap, myName, annualData, setMyName, onView, onChangeName, pushStatus, onEnablePush, remindersOn, onToggleReminders }) {
+  useContext(LegendCtx); // re-render when legend colors change
   const todayKey      = todayDayKey();
   const isTodayWork   = isWorkDay(todayKey);
   const isCurrentWeek = wk === wKey(new Date());
@@ -1400,6 +1427,8 @@ function LegendEditor() {
   function saveAll(g, u) {
     setGroups(g);      localStorage.setItem("legendGroups",     JSON.stringify(g));
     setUnassigned(u);  localStorage.setItem("legendUnassigned", JSON.stringify(u));
+    _refreshLegendColors(g); // update module-level color map immediately
+    window.dispatchEvent(new CustomEvent('legend-updated')); // trigger app re-render
   }
 
   function addCode() {
@@ -2256,6 +2285,7 @@ const PLAN_COLS = [
 
 function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
   const mob = useContext(MobileCtx);
+  useContext(LegendCtx); // re-render when legend colors change
 
   const [planWk, setPlanWk] = useState(wk);
   const planWeekA = data.assignments.filter(a => a.week === planWk);
@@ -3196,6 +3226,7 @@ function PersonChip({ person, code, isMe }) {
 /* ── DASHBOARD VIEW ── */
 function DashboardView({ annualData, weekA, data, sysMap, myName, mgr, onView, setTab }) {
   const mob = useContext(MobileCtx);
+  useContext(LegendCtx); // re-render when legend colors change
   const today   = new Date().toISOString().slice(0, 10);
   const todayD  = new Date(today + 'T00:00:00');
   const todayDow = todayD.getDay();
@@ -3356,6 +3387,7 @@ function DashboardView({ annualData, weekA, data, sysMap, myName, mgr, onView, s
 
 function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast }) {
   const mob = useContext(MobileCtx);
+  useContext(LegendCtx); // re-render when legend colors change
   // lens: 'daily' | 'monthly' | 'personal'
   const [lens,      setLens]      = useState('daily');
   const [selDate,   setSelDate]   = useState(() => new Date().toISOString().slice(0, 10));
