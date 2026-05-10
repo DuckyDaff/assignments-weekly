@@ -2314,16 +2314,32 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
   const doAdd   = (sys, col, p) => setGrid(g => { const k = ck(sys,col); return { ...g, [k]: [...new Set([...(g[k]||[]),p])] }; });
   const rem     = (sys, col, p) => setGrid(g => { const k = ck(sys,col); return { ...g, [k]: (g[k]||[]).filter(x=>x!==p) }; });
 
+  const SHIFT_CODES_PLAN = new Set(['י','ל','Y','L']);
+  // People who belong to a משמרת section
+  const shiftPeopleSet = new Set(
+    getSections(data).filter(s => s.name.includes('משמרת')).flatMap(s => s.people || [])
+  );
+
   const add = (sys, col, p) => {
     // Check annual plan availability for that specific day
     // Check both slot 1 (statuses) and slot 2 (statuses2 — used for shift/oncall in משמרת sections)
     const iso   = wkDayToDate(planWk, col);
     const dayD  = iso ? (annualData?.days?.[iso] || {}) : {};
     const code  = dayD.statuses2?.[p] || dayD.statuses?.[p] || "";
-    if (code && CONFLICT_CODES.has(code)) {
-      const st = statusStyle(code);
-      setConflict({ sys, col, person: p, code, label: st?.label || code, iso });
-      return;
+
+    if (shiftPeopleSet.has(p)) {
+      // Shift worker: must have an active shift code (י/ל/Y/L) on this date
+      if (!SHIFT_CODES_PLAN.has(code)) {
+        setConflict({ sys, col, person: p, code, label: code || '—', iso, shiftRequired: true });
+        return;
+      }
+    } else {
+      // Regular worker: block if any conflict code (unavailable / away / training)
+      if (code && CONFLICT_CODES.has(code)) {
+        const st = statusStyle(code);
+        setConflict({ sys, col, person: p, code, label: st?.label || code, iso });
+        return;
+      }
     }
     doAdd(sys, col, p);
   };
@@ -2369,24 +2385,42 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
       {/* ── Conflict warning overlay ── */}
       {conflict && (
         <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(4px)" }}>
-          <div dir="rtl" style={{ background: "#0f1525", border: "1px solid rgba(231,76,60,0.4)", borderRadius: 18, padding: "26px 24px", maxWidth: 380, width: "100%", boxShadow: "0 24px 60px rgba(0,0,0,0.8)" }}>
-            <div style={{ fontSize: 32, textAlign: "center", marginBottom: 10 }}>⚠️</div>
-            <div style={{ fontWeight: 700, fontSize: 16, color: "#fff", textAlign: "center", marginBottom: 6 }}>עובד לא זמין</div>
+          <div dir="rtl" style={{ background: "#0f1525", border: `1px solid ${conflict.shiftRequired ? 'rgba(230,126,34,0.4)' : 'rgba(231,76,60,0.4)'}`, borderRadius: 18, padding: "26px 24px", maxWidth: 380, width: "100%", boxShadow: "0 24px 60px rgba(0,0,0,0.8)" }}>
+            <div style={{ fontSize: 32, textAlign: "center", marginBottom: 10 }}>{conflict.shiftRequired ? '🚫' : '⚠️'}</div>
+            <div style={{ fontWeight: 700, fontSize: 16, color: "#fff", textAlign: "center", marginBottom: 6 }}>
+              {conflict.shiftRequired ? 'לא ניתן לשבץ' : 'עובד לא זמין'}
+            </div>
             <div style={{ textAlign: "center", marginBottom: 16 }}>
               <span style={{ fontWeight: 700, color: "#4a9eff" }}>{conflict.person}</span>
-              <span style={{ color: "#8892b0" }}> מסומן/ת כ</span>
-              <span style={{ display: "inline-block", background: statusStyle(conflict.code)?.bg || "#e74c3c", color: "#fff", borderRadius: 6, padding: "2px 10px", fontSize: 13, fontWeight: 700, margin: "0 4px" }}>{conflict.label}</span>
+              {conflict.shiftRequired ? (
+                <>
+                  <span style={{ color: "#8892b0" }}> אינו/ה במשמרת בתאריך זה</span>
+                  {conflict.code
+                    ? <><span style={{ color: "#8892b0" }}> — מסומן/ת כ</span><span style={{ display: "inline-block", background: statusStyle(conflict.code)?.bg || "#555", color: "#fff", borderRadius: 6, padding: "2px 10px", fontSize: 13, fontWeight: 700, margin: "0 4px" }}>{conflict.code}</span></>
+                    : <span style={{ color: "#8892b0" }}> — אין סימון ביום זה</span>
+                  }
+                </>
+              ) : (
+                <>
+                  <span style={{ color: "#8892b0" }}> מסומן/ת כ</span>
+                  <span style={{ display: "inline-block", background: statusStyle(conflict.code)?.bg || "#e74c3c", color: "#fff", borderRadius: 6, padding: "2px 10px", fontSize: 13, fontWeight: 700, margin: "0 4px" }}>{conflict.label}</span>
+                </>
+              )}
               <div style={{ fontSize: 12, color: "#556", marginTop: 6 }}>{conflict.iso}</div>
             </div>
-            <div style={{ fontSize: 13, color: "#8892b0", textAlign: "center", marginBottom: 20 }}>האם לשבץ בכל זאת?</div>
+            <div style={{ fontSize: 13, color: "#8892b0", textAlign: "center", marginBottom: 20 }}>
+              {conflict.shiftRequired ? 'ניתן לשבץ עובדי משמרת רק ביום שיש להם משמרת (י/ל/Y/L)' : 'האם לשבץ בכל זאת?'}
+            </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => { doAdd(conflict.sys, conflict.col, conflict.person); setConflict(null); }}
-                style={{ flex: 1, padding: "11px", background: "rgba(231,76,60,0.15)", border: "1px solid rgba(231,76,60,0.4)", borderRadius: 10, color: "#e74c3c", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-                שבץ בכל זאת
-              </button>
+              {!conflict.shiftRequired && (
+                <button onClick={() => { doAdd(conflict.sys, conflict.col, conflict.person); setConflict(null); }}
+                  style={{ flex: 1, padding: "11px", background: "rgba(231,76,60,0.15)", border: "1px solid rgba(231,76,60,0.4)", borderRadius: 10, color: "#e74c3c", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                  שבץ בכל זאת
+                </button>
+              )}
               <button onClick={() => setConflict(null)}
-                style={{ flex: 1, padding: "11px", background: "linear-gradient(135deg,#4a9eff,#3d7fc4)", border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-                ביטול
+                style={{ flex: conflict.shiftRequired ? undefined : 1, width: conflict.shiftRequired ? '100%' : undefined, padding: "11px", background: "linear-gradient(135deg,#4a9eff,#3d7fc4)", border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                {conflict.shiftRequired ? 'הבנתי' : 'ביטול'}
               </button>
             </div>
           </div>
