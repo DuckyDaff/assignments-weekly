@@ -3237,7 +3237,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
               {/* ── People × Days grid ── */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${sc.accent}55`, boxShadow: `0 0 0 1px rgba(0,0,0,0.4)`, display: 'flex', justifyContent: 'center' }}>
-                  <table style={{ borderCollapse: 'collapse', width: Math.max(320, people.length * 66 + 72), direction: 'rtl', flexShrink: 0 }}>
+                  <table style={{ borderCollapse: 'collapse', width: Math.max(320, people.length * 88 + 80), direction: 'rtl', flexShrink: 0 }}>
                     <thead>
                       {/* Person name headers — colSpan=2 (main 2/3 + secondary 1/3) */}
                       <tr style={{ background: `${sc.accent}30` }}>
@@ -3266,8 +3266,8 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                       <tr style={{ background: `${sc.accent}22` }}>
                         {people.map((person) => (
                           <Fragment key={person}>
-                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#778', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `3px solid rgba(255,255,255,0.55)`, textAlign: 'center', minWidth: 44, letterSpacing: 0.3 }}>ראשי</th>
-                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#667', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `1px solid rgba(255,255,255,0.13)`, textAlign: 'center', minWidth: 22, letterSpacing: 0.3 }}>מש׳</th>
+                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#778', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `3px solid rgba(255,255,255,0.55)`, textAlign: 'center', minWidth: 60, letterSpacing: 0.3 }}>ראשי</th>
+                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#667', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `1px solid rgba(255,255,255,0.13)`, textAlign: 'center', minWidth: 28, letterSpacing: 0.3 }}>מש׳</th>
                           </Fragment>
                         ))}
                       </tr>
@@ -3341,12 +3341,12 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                               const cellH = { display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 28, fontWeight: 700, color: '#fff', userSelect: 'none', lineHeight: 1 };
                               return (
                                 <Fragment key={person}>
-                                  <td {...makeTd(key1, 1, code1, st1, hover1, 44, '3px', '3px solid rgba(255,255,255,0.55)', emptyCellBg)}>
+                                  <td {...makeTd(key1, 1, code1, st1, hover1, 60, '3px', '3px solid rgba(255,255,255,0.55)', emptyCellBg)}>
                                     {code1
                                       ? <div style={{ ...cellH, fontSize: 12 }}>{code1}</div>
                                       : <div style={{ ...cellH, fontSize: 14, opacity: 0.2, color: '#aaa' }}>{hover1 ? '+' : ''}</div>}
                                   </td>
-                                  <td {...makeTd(key2, 2, code2, st2, hover2, 22, '2px', '1px solid rgba(255,255,255,0.13)', isWeekend ? 'rgba(100,100,130,0.15)' : 'rgba(0,0,0,0.1)')}>
+                                  <td {...makeTd(key2, 2, code2, st2, hover2, 28, '2px', '1px solid rgba(255,255,255,0.13)', isWeekend ? 'rgba(100,100,130,0.15)' : 'rgba(0,0,0,0.1)')}>
                                     {code2
                                       ? <div style={{ ...cellH, fontSize: 9 }}>{code2}</div>
                                       : <div style={{ ...cellH, fontSize: 12, opacity: 0.2, color: '#aaa' }}>{hover2 ? '+' : ''}</div>}
