@@ -3183,28 +3183,6 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
               })}
             </div>
 
-            {/* ── Legend strip at top of table ── */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10, padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
-              {legendGroups.map(group => group.codes.map(code => {
-                const st = statusStyle(code);
-                const isActive = paintCode === code;
-                return (
-                  <div key={code}
-                    draggable={!!mgr}
-                    onDragStart={mgr ? () => { dragCode.current = code; setPaintCode(null); } : undefined}
-                    onDragEnd={mgr ? () => { dragCode.current = null; } : undefined}
-                    onClick={mgr ? () => setPaintCode(isActive ? null : code) : undefined}
-                    title={st?.label || code}
-                    style={{ background: st?.bg || '#1a2a3a', color: '#fff', borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 700, cursor: mgr ? 'pointer' : 'default', userSelect: 'none', boxShadow: isActive ? `0 0 0 2px #fff, 0 0 0 4px ${st?.bg || '#4a9eff'}` : 'none', transform: isActive ? 'scale(1.1)' : 'scale(1)', transition: 'all .12s', whiteSpace: 'nowrap' }}>
-                    {isActive ? `✓ ${code}` : code}
-                  </div>
-                );
-              }))}
-              {mgr && paintCode !== null && (
-                <button onClick={() => setPaintCode(null)}
-                  style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 5, color: '#8892b0', fontSize: 10, cursor: 'pointer', padding: '2px 8px', fontWeight: 600 }}>✕ בטל צביעה</button>
-              )}
-            </div>
 
             {/* Main area: legend sidebar (manager) + grid */}
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
