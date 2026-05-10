@@ -3239,8 +3239,8 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
               {/* ── People × Days grid ── */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${sc.accent}55`, boxShadow: `0 0 0 1px rgba(0,0,0,0.4)`, display: 'flex', justifyContent: 'center' }}>
-                  <div style={{ width: `${tableWidthPct}%`, minWidth: Math.max(280, people.length * 88 + 80) }}>
-                  <table style={{ borderCollapse: 'collapse', width: '100%', direction: 'rtl' }}>
+                  <div style={{ width: `${tableWidthPct}%` }}>
+                  <table style={{ borderCollapse: 'collapse', width: '100%', direction: 'rtl', tableLayout: 'fixed' }}>
                     <thead>
                       {/* Person name headers — colSpan=2 (main 2/3 + secondary 1/3) */}
                       <tr style={{ background: `${sc.accent}30` }}>
@@ -3269,8 +3269,8 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                       <tr style={{ background: `${sc.accent}22` }}>
                         {people.map((person) => (
                           <Fragment key={person}>
-                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#778', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `3px solid rgba(255,255,255,0.55)`, textAlign: 'center', minWidth: 60, letterSpacing: 0.3 }}>ראשי</th>
-                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#667', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `1px solid rgba(255,255,255,0.13)`, textAlign: 'center', minWidth: 28, letterSpacing: 0.3 }}>מש׳</th>
+                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#778', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `3px solid rgba(255,255,255,0.55)`, textAlign: 'center', width: '67%', letterSpacing: 0.3 }}>ראשי</th>
+                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#667', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `1px solid rgba(255,255,255,0.13)`, textAlign: 'center', width: '33%', letterSpacing: 0.3 }}>מש׳</th>
                           </Fragment>
                         ))}
                       </tr>
@@ -3313,7 +3313,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                               const key2   = `${iso}|${person}|2`;
                               const hover1 = hoverCell === key1;
                               const hover2 = hoverCell === key2;
-                              const makeTd = (key, slot, code, st, isHover, minW, padR, borderR, bg2) => ({
+                              const makeTd = (key, slot, code, st, isHover, _minW, padR, borderR, bg2) => ({
                                 draggable:   mgr && !!code,
                                 onDragStart: mgr && code ? (e => { e.stopPropagation(); dragCode.current = code; dragSource.current = { iso, person, slot }; }) : undefined,
                                 onDragEnd:   mgr ? (() => { dragCode.current = null; dragSource.current = null; setHoverCell(null); }) : undefined,
@@ -3339,7 +3339,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                                     setPickerCell({ iso, person, slot, x: r.left, y: r.bottom });
                                   }
                                 }) : undefined,
-                                style: { padding: 0, textAlign: 'center', verticalAlign: 'middle', borderRight: borderR, background: isHover ? 'rgba(74,158,255,0.4)' : (code && st ? st.bg : bg2), outline: isHover ? '2px dashed #4a9eff' : 'none', outlineOffset: '-2px', transition: 'background .1s', minWidth: minW, cursor: mgr ? (paintCode !== null ? 'crosshair' : code ? 'grab' : 'pointer') : 'default' },
+                                style: { padding: 0, textAlign: 'center', verticalAlign: 'middle', borderRight: borderR, background: isHover ? 'rgba(74,158,255,0.4)' : (code && st ? st.bg : bg2), outline: isHover ? '2px dashed #4a9eff' : 'none', outlineOffset: '-2px', transition: 'background .1s', cursor: mgr ? (paintCode !== null ? 'crosshair' : code ? 'grab' : 'pointer') : 'default' },
                               });
                               const cellH = { display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 28, fontWeight: 700, color: '#fff', userSelect: 'none', lineHeight: 1 };
                               return (
