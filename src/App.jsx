@@ -3785,6 +3785,63 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast }) {
                       </div>
                     );
                   })()}
+                  {/* Stats box for non-משמרת sections */}
+                  {!sec.name.includes('משמרת') && (() => {
+                    const ONCALL_HRS = { 'כ': 6, 'כמ': 6, 'כש': 10, 'כמש': 10 };
+                    const activePeople = people.filter(p => !p.includes('תקן'));
+                    let totalOncallHrsMonth = 0, totalOncallHrsYear = 0;
+                    let totalAwayDaysMonth = 0, totalAwayDaysYear = 0;
+                    const yearEntries = Object.entries(days).filter(([iso]) => iso.startsWith(String(year)));
+                    for (const p of activePeople) {
+                      for (const { iso } of monthDays) {
+                        const code = (days[iso] || {}).statuses?.[p] || '';
+                        totalOncallHrsMonth += ONCALL_HRS[code] || 0;
+                        if (classifyStatus(code) === 'away') totalAwayDaysMonth++;
+                      }
+                      for (const [, dayData] of yearEntries) {
+                        const code = dayData.statuses?.[p] || '';
+                        totalOncallHrsYear += ONCALL_HRS[code] || 0;
+                        if (classifyStatus(code) === 'away') totalAwayDaysYear++;
+                      }
+                    }
+                    return (
+                      <div style={{ marginBottom: 10, padding: '8px 6px', background: 'rgba(0,0,0,0.25)', border: `1px solid ${sc.accent}33`, borderRadius: 8 }}>
+                        <div style={{ fontSize: 9, color: sc.accent, fontWeight: 700, textAlign: 'center', marginBottom: 7, letterSpacing: 0.5 }}>{MONTHS_HE[selMonth]}</div>
+                        {/* כוננות */}
+                        <div style={{ marginBottom: 6, paddingBottom: 6, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                          <div style={{ fontSize: 9, color: '#e67e22', fontWeight: 700, textAlign: 'center', marginBottom: 3 }}>כוננות</div>
+                          <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+                            <div style={{ textAlign: 'center' }}>
+                              <div style={{ fontSize: 9, color: '#556' }}>חודש</div>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: totalOncallHrsMonth > 0 ? '#e67e22' : '#445', lineHeight: 1 }}>{totalOncallHrsMonth}</div>
+                              <div style={{ fontSize: 8, color: '#445' }}>ש׳</div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                              <div style={{ fontSize: 9, color: '#556' }}>שנה</div>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: '#667', lineHeight: 1 }}>{totalOncallHrsYear}</div>
+                              <div style={{ fontSize: 8, color: '#445' }}>ש׳</div>
+                            </div>
+                          </div>
+                        </div>
+                        {/* שתפ"א */}
+                        <div>
+                          <div style={{ fontSize: 9, color: '#16a085', fontWeight: 700, textAlign: 'center', marginBottom: 3 }}>שתפ״א</div>
+                          <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+                            <div style={{ textAlign: 'center' }}>
+                              <div style={{ fontSize: 9, color: '#556' }}>חודש</div>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: totalAwayDaysMonth > 0 ? '#16a085' : '#445', lineHeight: 1 }}>{totalAwayDaysMonth}</div>
+                              <div style={{ fontSize: 8, color: '#445' }}>ימים</div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                              <div style={{ fontSize: 9, color: '#556' }}>שנה</div>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: '#667', lineHeight: 1 }}>{totalAwayDaysYear}</div>
+                              <div style={{ fontSize: 8, color: '#445' }}>ימים</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {/* Header: mode indicator */}
                   <div style={{ marginBottom: 8, textAlign: 'center' }}>
                     {paintCode !== null ? (
@@ -4018,6 +4075,73 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast }) {
                                   <td colSpan={2} style={{ textAlign: 'center', padding: '5px 2px', borderRight: '3px solid rgba(255,255,255,0.55)' }}>
                                     <span style={{ fontSize: 13, fontWeight: 700, color }}>{hrs}</span>
                                     {nominal > 0 && <span style={{ fontSize: 9, color: '#445', marginRight: 1 }}>/{nominal}</span>}
+                                  </td>
+                                </Fragment>
+                              );
+                            })}
+                          </tr>
+                        </tfoot>
+                      );
+                    })()}
+
+                    {/* ── כוננות + שתפ"א footer (non-משמרת sections only) ── */}
+                    {!sec.name.includes('משמרת') && (() => {
+                      const ONCALL_HRS = { 'כ': 6, 'כמ': 6, 'כש': 10, 'כמש': 10 };
+                      const yearEntries = Object.entries(days).filter(([iso]) => iso.startsWith(String(year)));
+                      const tdLabel = { padding: '5px 8px', position: 'sticky', right: 0, background: '#080c18', zIndex: 1, whiteSpace: 'nowrap', verticalAlign: 'middle', borderLeft: '1px solid rgba(255,255,255,0.1)', willChange: 'transform' };
+                      return (
+                        <tfoot>
+                          {/* ── Row 1: כוננות hours ── */}
+                          <tr style={{ background: 'rgba(0,0,0,0.35)', borderTop: `2px solid rgba(230,126,34,0.5)` }}>
+                            <td style={tdLabel}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: '#e67e22' }}>כוננות</div>
+                              <div style={{ fontSize: 9, color: '#556' }}>שעות</div>
+                            </td>
+                            {people.map(person => {
+                              if (person.includes('תקן')) return <Fragment key={person}><td colSpan={2} style={{ background: 'rgba(0,0,0,0.25)', borderRight: '3px dashed rgba(255,255,255,0.1)' }} /></Fragment>;
+                              let monthHrs = 0;
+                              for (const { iso } of monthDays) {
+                                const code = (days[iso] || {}).statuses?.[person] || '';
+                                monthHrs += ONCALL_HRS[code] || 0;
+                              }
+                              let yearHrs = 0;
+                              for (const [, dayData] of yearEntries) {
+                                const code = dayData.statuses?.[person] || '';
+                                yearHrs += ONCALL_HRS[code] || 0;
+                              }
+                              return (
+                                <Fragment key={person}>
+                                  <td colSpan={2} style={{ textAlign: 'center', padding: '4px 2px', borderRight: '3px solid rgba(255,255,255,0.55)' }}>
+                                    <div><span style={{ fontSize: 13, fontWeight: 700, color: monthHrs > 0 ? '#e67e22' : '#445' }}>{monthHrs}</span><span style={{ fontSize: 9, color: '#556', marginRight: 2 }}>ש׳</span></div>
+                                    <div style={{ marginTop: 1 }}><span style={{ fontSize: 10, color: '#667' }}>{yearHrs}</span><span style={{ fontSize: 8, color: '#445', marginRight: 2 }}>שנה</span></div>
+                                  </td>
+                                </Fragment>
+                              );
+                            })}
+                          </tr>
+                          {/* ── Row 2: שתפ"א days ── */}
+                          <tr style={{ background: 'rgba(0,0,0,0.25)', borderTop: `1px solid rgba(22,160,133,0.4)` }}>
+                            <td style={{ ...tdLabel, background: '#080c18' }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: '#16a085' }}>שתפ״א</div>
+                              <div style={{ fontSize: 9, color: '#556' }}>ימים</div>
+                            </td>
+                            {people.map(person => {
+                              if (person.includes('תקן')) return <Fragment key={person}><td colSpan={2} style={{ background: 'rgba(0,0,0,0.25)', borderRight: '3px dashed rgba(255,255,255,0.1)' }} /></Fragment>;
+                              let monthCount = 0;
+                              for (const { iso } of monthDays) {
+                                const code = (days[iso] || {}).statuses?.[person] || '';
+                                if (classifyStatus(code) === 'away') monthCount++;
+                              }
+                              let yearCount = 0;
+                              for (const [, dayData] of yearEntries) {
+                                const code = dayData.statuses?.[person] || '';
+                                if (classifyStatus(code) === 'away') yearCount++;
+                              }
+                              return (
+                                <Fragment key={person}>
+                                  <td colSpan={2} style={{ textAlign: 'center', padding: '4px 2px', borderRight: '3px solid rgba(255,255,255,0.55)' }}>
+                                    <div><span style={{ fontSize: 13, fontWeight: 700, color: monthCount > 0 ? '#16a085' : '#445' }}>{monthCount}</span><span style={{ fontSize: 9, color: '#556', marginRight: 2 }}>ימים</span></div>
+                                    <div style={{ marginTop: 1 }}><span style={{ fontSize: 10, color: '#667' }}>{yearCount}</span><span style={{ fontSize: 8, color: '#445', marginRight: 2 }}>שנה</span></div>
                                   </td>
                                 </Fragment>
                               );
