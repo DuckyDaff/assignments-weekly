@@ -3475,6 +3475,11 @@ function DashboardView({ annualData, weekA, data, sysMap, myName, mgr, onView, s
         if (!g) { g = { site: code, people: [] }; bySite.push(g); }
         g.people.push({ person, code });
       });
+      const savedVehicles = todayData.vehicleAssignments || {};
+      const vehicleMap    = autoVehicles(bySite, savedVehicles);
+      // detect conflicts: same vehicle assigned to 2+ sites
+      const usedVehicles  = {};
+      for (const [site, v] of Object.entries(vehicleMap)) { if (v) { if (!usedVehicles[v]) usedVehicles[v] = []; usedVehicles[v].push(site); } }
       return (
         <div style={{ marginBottom: 8, border: `1px solid ${st.bg}30`, borderRadius: 10, overflow: 'hidden' }}>
           <div style={{ background: `${st.bg}1a`, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -3483,14 +3488,25 @@ function DashboardView({ annualData, weekA, data, sysMap, myName, mgr, onView, s
             <span style={{ marginRight: 'auto', background: `${st.bg}30`, color: st.bg, borderRadius: 10, padding: '0 7px', fontSize: 10, fontWeight: 700 }}>{people.length}</span>
           </div>
           <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {bySite.map(({ site, people: sp }, si) => (
-              <div key={site} style={{ paddingBottom: si < bySite.length - 1 ? 6 : 0, borderBottom: si < bySite.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
-                <div style={{ fontSize: 10, color: st.bg, fontWeight: 700, marginBottom: 4 }}>📍 {site} <span style={{ fontWeight: 400, opacity: .7 }}>({sp.length})</span></div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                  {sp.map(({ person, code }) => <Badge key={person} person={person} code={null} />)}
+            {bySite.map(({ site, people: sp }, si) => {
+              const vehicle  = vehicleMap[site] || '';
+              const conflict = vehicle && (usedVehicles[vehicle]?.length || 0) > 1;
+              return (
+                <div key={site} style={{ paddingBottom: si < bySite.length - 1 ? 6 : 0, borderBottom: si < bySite.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                  <div style={{ fontSize: 10, color: st.bg, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>📍 {site} <span style={{ fontWeight: 400, opacity: .7 }}>({sp.length})</span></span>
+                    {vehicle && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: conflict ? 'rgba(231,76,60,0.18)' : 'rgba(74,158,255,0.13)', border: `1px solid ${conflict ? '#e74c3c' : '#4a9eff'}55`, borderRadius: 6, padding: '1px 6px', fontSize: 9, color: conflict ? '#e74c3c' : '#4a9eff', fontWeight: 700 }}>
+                        🚗 {vehicle}{conflict ? ' ⚠️' : ''}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {sp.map(({ person }) => <Badge key={person} person={person} code={null} />)}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       );
