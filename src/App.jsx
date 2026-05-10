@@ -3205,8 +3205,14 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast }) {
                 <div style={{ fontWeight: 700, fontSize: 17, color: '#fff' }}>
                   {selNum} {MONTHS_HE[selMon]} {year}
                 </div>
-                <div style={{ fontSize: 12, color: '#8892b0' }}>
+                <div style={{ fontSize: 12, color: '#8892b0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                   יום {DAY_LONG[selDow]}{selDate === today ? ' — היום' : ''}
+                  {selDate !== today && (
+                    <button onClick={() => { setSelDate(today); setSelMonth(new Date().getMonth()); }}
+                      style={{ background: 'rgba(74,158,255,0.15)', border: '1px solid rgba(74,158,255,0.35)', borderRadius: 10, padding: '1px 8px', fontSize: 10, color: '#4a9eff', cursor: 'pointer', fontWeight: 700, lineHeight: 1.6 }}>
+                      היום
+                    </button>
+                  )}
                 </div>
               </div>
               <NavBtn onClick={() => navDay(1)}><I n="cL" s={14} /></NavBtn>
