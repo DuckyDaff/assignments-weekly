@@ -1648,7 +1648,7 @@ function NominalHoursEditor({ annualData, onSave, toast }) {
   const doSave = () => {
     const parsed = {};
     for (let m = 1; m <= 12; m++) {
-      const v = parseInt(hours[String(m)], 10);
+      const v = parseFloat(hours[String(m)]);
       if (isNaN(v) || v < 0) { toast(`ערך לא תקין לחודש ${m}`, "error"); return; }
       parsed[String(m)] = v;
     }
@@ -1667,7 +1667,7 @@ function NominalHoursEditor({ annualData, onSave, toast }) {
           <div key={m} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9, padding: "8px 10px" }}>
             <div style={{ fontSize: 10, color: "#8892b0", marginBottom: 5, fontWeight: 700 }}>{MONTHS_HE_FULL[m - 1]}</div>
             <input
-              type="number" min="0" max="400"
+              type="number" min="0" max="400" step="0.5"
               value={hours[String(m)] ?? 182}
               onChange={e => setHours(h => ({ ...h, [String(m)]: e.target.value }))}
               style={{ ...inp, textAlign: "center", padding: "6px 4px", fontSize: 14 }}
