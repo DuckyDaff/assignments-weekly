@@ -1773,8 +1773,11 @@ function ActivityLog({ data }) {
 }
 function SectionsEditor({ data, save, toast, onSyncAnnual }) {
   const sections = getSections(data);
-  const [vals,       setVals]       = useState(() => Object.fromEntries(sections.map(s => [s.name, ""])));
-  const [newSecName, setNewSecName] = useState("");
+  const [vals,        setVals]        = useState(() => Object.fromEntries(sections.map(s => [s.name, ""])));
+  const [newSecName,  setNewSecName]  = useState("");
+  const [colorPick,   setColorPick]   = useState(null);   // secName | null
+  // per-section drag state: { secName, dragIdx, overIdx }
+  const [dragState,   setDragState]   = useState({ secName: null, dragIdx: null, overIdx: null });
 
   // Save weekly assignments + sync annual plan sections
   const saveAndSync = (newSections, msg) => {
@@ -1806,6 +1809,18 @@ function SectionsEditor({ data, save, toast, onSyncAnnual }) {
     saveAndSync(newSections, `${person} הועבר/ה ל${toSec}`);
   };
 
+  const reorderPerson = (secName, fromIdx, toIdx) => {
+    if (fromIdx === toIdx) return;
+    const newSections = sections.map(s => {
+      if (s.name !== secName) return s;
+      const arr = [...s.people];
+      const [item] = arr.splice(fromIdx, 1);
+      arr.splice(toIdx, 0, item);
+      return { ...s, people: arr };
+    });
+    saveAndSync(newSections, "סדר אנשים עודכן");
+  };
+
   const addSection = () => {
     const name = newSecName.trim();
     if (!name) return;
@@ -1822,15 +1837,26 @@ function SectionsEditor({ data, save, toast, onSyncAnnual }) {
     saveAndSync(sections.filter(s => s.name !== secName), `מדור "${secName}" נמחק`);
   };
 
+  const setSecColor = (secName, palIdx) => {
+    save({ ...data, sectionColors: { ...(data.sectionColors || {}), [secName]: palIdx } });
+    setColorPick(null);
+  };
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }} onClick={() => setColorPick(null)}>
       {sections.map((sec, si) => {
         const c = secPal(data, sec.name, si);
+        const isPickingColor = colorPick === sec.name;
         return (
           <div key={sec.name} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${c.accent}22`, borderRadius: 12, padding: "14px 16px" }}>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: c.accent, flexShrink: 0 }} />
+              {/* Color dot — click to open palette */}
+              <div
+                onClick={e => { e.stopPropagation(); setColorPick(isPickingColor ? null : sec.name); }}
+                title="שנה צבע מדור"
+                style={{ width: 14, height: 14, borderRadius: "50%", background: c.accent, flexShrink: 0, cursor: "pointer", border: isPickingColor ? "2px solid #fff" : "2px solid transparent", transition: "border .15s" }}
+              />
               <span style={{ fontWeight: 700, fontSize: 13, color: c.accent }}>{sec.name}</span>
               <span style={{ fontSize: 11, color: "#556", marginRight: "auto" }}>{sec.people.length} אנשים</span>
               <button onClick={() => removeSection(sec.name)} title="מחק מדור (רק אם ריק)"
@@ -1839,38 +1865,66 @@ function SectionsEditor({ data, save, toast, onSyncAnnual }) {
                 <I n="trash" s={13} />
               </button>
             </div>
+
+            {/* Color palette picker */}
+            {isPickingColor && (
+              <div onClick={e => e.stopPropagation()}
+                style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 12, background: "rgba(0,0,0,0.3)", borderRadius: 8, padding: "10px 12px" }}>
+                {PALETTE.map((p, pi) => (
+                  <button key={pi} onClick={() => setSecColor(sec.name, pi)} title={`צבע ${pi + 1}`}
+                    style={{ width: 22, height: 22, borderRadius: "50%", background: p.accent, border: (data.sectionColors?.[sec.name] ?? (SEC_COLOR_DEFAULTS[sec.name] ?? si)) === pi ? "3px solid #fff" : "3px solid transparent", cursor: "pointer", padding: 0, flexShrink: 0 }} />
+                ))}
+              </div>
+            )}
+
             {/* Add person */}
             <div style={{ display: "flex", gap: 7, marginBottom: 10 }}>
               <input value={vals[sec.name] || ""} onChange={e => setVals(v => ({ ...v, [sec.name]: e.target.value }))} onKeyDown={e => e.key === "Enter" && addPerson(sec.name)} placeholder="שם מלא" style={inp} />
               <PillBtn onClick={() => addPerson(sec.name)} color={c.accent}>הוסף</PillBtn>
             </div>
-            {/* People list */}
+
+            {/* People list — draggable */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {sec.people.map(person => (
-                <div key={person} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRight: `3px solid ${c.accent}`, borderRadius: 8 }}
-                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.07)"}
-                  onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}>
-                  <span style={{ fontSize: 13, flex: 1 }}>{person}</span>
-                  <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
-                    {/* Move to another section */}
-                    {sections.length > 1 && (
-                      <select onChange={e => { if (e.target.value) movePerson(person, sec.name, e.target.value); e.target.value = ""; }}
-                        defaultValue=""
-                        style={{ ...inp, padding: "3px 6px", fontSize: 10, width: "auto", cursor: "pointer", color: "#8892b0" }}>
-                        <option value="">העבר ל…</option>
-                        {sections.filter(s => s.name !== sec.name).map(s => (
-                          <option key={s.name} value={s.name}>{s.name}</option>
-                        ))}
-                      </select>
-                    )}
-                    <button onClick={() => removePerson(sec.name, person)}
-                      style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", opacity: .7 }}
-                      onMouseEnter={e => e.currentTarget.style.opacity = "1"} onMouseLeave={e => e.currentTarget.style.opacity = ".7"}>
-                      <I n="trash" s={14} />
-                    </button>
+              {sec.people.map((person, pi) => {
+                const isDragging = dragState.secName === sec.name && dragState.dragIdx === pi;
+                const isOver     = dragState.secName === sec.name && dragState.overIdx === pi;
+                return (
+                  <div key={person}
+                    draggable
+                    onDragStart={() => setDragState({ secName: sec.name, dragIdx: pi, overIdx: pi })}
+                    onDragOver={e => { e.preventDefault(); setDragState(d => ({ ...d, overIdx: pi })); }}
+                    onDragEnd={() => {
+                      if (dragState.secName === sec.name && dragState.dragIdx !== null && dragState.overIdx !== null)
+                        reorderPerson(sec.name, dragState.dragIdx, dragState.overIdx);
+                      setDragState({ secName: null, dragIdx: null, overIdx: null });
+                    }}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 12px", background: isDragging ? `${c.accent}18` : isOver ? `${c.accent}12` : "rgba(255,255,255,0.04)", border: `1px solid ${isOver && !isDragging ? c.accent + "55" : "rgba(255,255,255,0.07)"}`, borderRight: `3px solid ${c.accent}`, borderRadius: 8, opacity: isDragging ? .5 : 1, transition: "background .1s, opacity .1s", cursor: "grab" }}
+                    onMouseEnter={e => { if (!isDragging) e.currentTarget.style.background = "rgba(255,255,255,0.07)"; }}
+                    onMouseLeave={e => { if (!isDragging) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}>
+                    {/* Drag handle */}
+                    <span style={{ color: "#445", fontSize: 14, marginLeft: 8, cursor: "grab", userSelect: "none", lineHeight: 1 }} title="גרור לסדר מחדש">⠿</span>
+                    <span style={{ fontSize: 13, flex: 1 }}>{person}</span>
+                    <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                      {/* Move to another section */}
+                      {sections.length > 1 && (
+                        <select onChange={e => { if (e.target.value) movePerson(person, sec.name, e.target.value); e.target.value = ""; }}
+                          defaultValue=""
+                          style={{ ...inp, padding: "3px 6px", fontSize: 10, width: "auto", cursor: "pointer", color: "#8892b0" }}>
+                          <option value="">העבר ל…</option>
+                          {sections.filter(s => s.name !== sec.name).map(s => (
+                            <option key={s.name} value={s.name}>{s.name}</option>
+                          ))}
+                        </select>
+                      )}
+                      <button onClick={() => removePerson(sec.name, person)}
+                        style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", padding: 4, borderRadius: 6, display: "flex", alignItems: "center", opacity: .7 }}
+                        onMouseEnter={e => e.currentTarget.style.opacity = "1"} onMouseLeave={e => e.currentTarget.style.opacity = ".7"}>
+                        <I n="trash" s={14} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {sec.people.length === 0 && <div style={{ fontSize: 12, color: "#445", fontStyle: "italic", padding: "4px 2px" }}>אין אנשים במדור זה</div>}
             </div>
           </div>
