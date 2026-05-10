@@ -3396,6 +3396,35 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
               {/* ── Legend palette (manager only) — drag OR click to paint ── */}
               {mgr && !mob && (
                 <div style={{ width: 114, flexShrink: 0, background: 'rgba(255,255,255,0.04)', border: `1px solid ${paintCode !== null ? 'rgba(74,158,255,0.5)' : 'rgba(255,255,255,0.09)'}`, borderRadius: 10, padding: '10px 8px', transition: 'border .2s' }}>
+                  {/* Hours summary for משמרת sections */}
+                  {sec.name.includes('משמרת') && (() => {
+                    const SHIFT_CODES_S = new Set(['י', 'ל', 'Y', 'L']);
+                    const nominal = annualData.nominalHours?.[String(selMonth + 1)] ?? annualData.nominalHours?.[selMonth + 1] ?? 182;
+                    const shiftPeople = people.filter(p => !p.includes('תקן'));
+                    let totalCount = 0;
+                    for (const p of shiftPeople) {
+                      for (const { iso } of monthDays) {
+                        if (SHIFT_CODES_S.has(days[iso]?.statuses?.[p] || '')) totalCount++;
+                      }
+                    }
+                    const totalHours = totalCount * 12;
+                    const color = totalHours >= nominal ? '#2ecc71' : totalHours >= nominal * 0.9 ? '#f39c12' : '#e74c3c';
+                    return (
+                      <div style={{ marginBottom: 10, padding: '8px 6px', background: 'rgba(0,0,0,0.25)', border: `1px solid ${sc.accent}33`, borderRadius: 8 }}>
+                        <div style={{ fontSize: 9, color: sc.accent, fontWeight: 700, textAlign: 'center', marginBottom: 7, letterSpacing: 0.5 }}>שעות {MONTHS_HE[selMonth]}</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                          <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: 9, color: '#667', marginBottom: 2 }}>נומינלי</div>
+                            <div style={{ fontSize: 17, fontWeight: 700, color: '#ccd6f6', lineHeight: 1 }}>{nominal}</div>
+                          </div>
+                          <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 5, textAlign: 'center' }}>
+                            <div style={{ fontSize: 9, color: '#667', marginBottom: 2 }}>סה״כ</div>
+                            <div style={{ fontSize: 17, fontWeight: 700, color, lineHeight: 1 }}>{totalHours}</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {/* Header: mode indicator */}
                   <div style={{ marginBottom: 8, textAlign: 'center' }}>
                     {paintCode !== null ? (
