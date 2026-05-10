@@ -1431,6 +1431,8 @@ function LegendEditor() {
   const [newGroupName, setNewGroupName] = useState("");
   const [dropTarget,   setDropTarget]   = useState(null); // groupId | "unassigned" | null
   const [colorPick,    setColorPick]    = useState(null); // groupId | null
+  const [groupDragId,  setGroupDragId]  = useState(null); // id of group being reordered
+  const [groupOverId,  setGroupOverId]  = useState(null); // id of group being dragged over
   const dragRef = useRef(null);
 
   function saveAll(g, u) {
@@ -1449,7 +1451,23 @@ function LegendEditor() {
     setNewCode("");
   }
 
+  function onGroupDrop(toId) {
+    if (!groupDragId || !toId || toId === 'unassigned') { setGroupDragId(null); setGroupOverId(null); setDropTarget(null); return; }
+    if (groupDragId !== toId) {
+      const ng = [...groups];
+      const fromIdx = ng.findIndex(g => g.id === groupDragId);
+      const toIdx   = ng.findIndex(g => g.id === toId);
+      if (fromIdx !== -1 && toIdx !== -1) {
+        const [moved] = ng.splice(fromIdx, 1);
+        ng.splice(toIdx, 0, moved);
+        saveAll(ng, unassigned);
+      }
+    }
+    setGroupDragId(null); setGroupOverId(null); setDropTarget(null);
+  }
+
   function onDrop(toTarget) {
+    if (groupDragId) { onGroupDrop(toTarget); return; }
     if (!dragRef.current) return;
     const { code, fromGroupId } = dragRef.current;
     dragRef.current = null;
@@ -1561,12 +1579,19 @@ function LegendEditor() {
           const isPicking = colorPick === group.id;
           return (
           <div key={group.id}
-            onDragOver={e => { e.preventDefault(); setDropTarget(group.id); }}
-            onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDropTarget(null); }}
+            onDragOver={e => { e.preventDefault(); if (groupDragId) setGroupOverId(group.id); else setDropTarget(group.id); }}
+            onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) { setDropTarget(null); setGroupOverId(null); } }}
             onDrop={e => { e.preventDefault(); onDrop(group.id); }}
-            style={{ border: `2px solid ${dropTarget === group.id ? gc : "rgba(255,255,255,0.1)"}`, borderRadius: 12, overflow: "hidden", transition: "border-color .15s", background: dropTarget === group.id ? `${gc}0a` : "transparent" }}>
+            style={{ border: `2px solid ${(groupDragId ? groupOverId === group.id : dropTarget === group.id) ? gc : "rgba(255,255,255,0.1)"}`, borderRadius: 12, overflow: "hidden", transition: "border-color .15s, opacity .15s", background: (groupDragId ? groupOverId === group.id : dropTarget === group.id) ? `${gc}0a` : "transparent", opacity: groupDragId === group.id ? 0.4 : 1 }}>
             {/* Group header */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: `${gc}12`, borderBottom: `1px solid ${gc}30` }}>
+              {/* Drag handle for group reorder */}
+              <span
+                draggable
+                onDragStart={e => { e.stopPropagation(); setGroupDragId(group.id); }}
+                onDragEnd={() => { setGroupDragId(null); setGroupOverId(null); }}
+                title="גרור לשינוי סדר"
+                style={{ cursor: "grab", color: "#445", fontSize: 14, lineHeight: 1, flexShrink: 0, userSelect: "none", paddingLeft: 2 }}>⠿</span>
               {/* Color dot */}
               <div
                 onClick={e => { e.stopPropagation(); setColorPick(isPicking ? null : group.id); }}
@@ -1683,7 +1708,9 @@ function ReportsEditor({ data, annualData }) {
   const computeStats = (person, isos) => {
     let oncall = 0, away = 0;
     for (const iso of isos) {
-      const code = (days[iso] || {}).statuses?.[person] || '';
+      const d = days[iso] || {};
+      // Check both slot 2 (after migration) and slot 1 (legacy)
+      const code = d.statuses2?.[person] || d.statuses?.[person] || '';
       oncall += ONCALL_HRS[code] || 0;
       if (classifyStatus(code) === 'away') away++;
     }
@@ -4210,12 +4237,13 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast }) {
                     const yearEntries = Object.entries(days).filter(([iso]) => iso.startsWith(String(year)));
                     for (const p of activePeople) {
                       for (const { iso } of monthDays) {
-                        const code = (days[iso] || {}).statuses?.[p] || '';
+                        const d = days[iso] || {};
+                        const code = d.statuses2?.[p] || d.statuses?.[p] || '';
                         totalOncallHrsMonth += ONCALL_HRS[code] || 0;
                         if (classifyStatus(code) === 'away') totalAwayDaysMonth++;
                       }
                       for (const [, dayData] of yearEntries) {
-                        const code = dayData.statuses?.[p] || '';
+                        const code = dayData.statuses2?.[p] || dayData.statuses?.[p] || '';
                         totalOncallHrsYear += ONCALL_HRS[code] || 0;
                         if (classifyStatus(code) === 'away') totalAwayDaysYear++;
                       }
@@ -4520,12 +4548,13 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast }) {
                               if (person.includes('תקן')) return <Fragment key={person}><td colSpan={2} style={{ background: 'rgba(0,0,0,0.25)', borderRight: '3px dashed rgba(255,255,255,0.1)' }} /></Fragment>;
                               let monthHrs = 0;
                               for (const { iso } of monthDays) {
-                                const code = (days[iso] || {}).statuses?.[person] || '';
+                                const d = days[iso] || {};
+                                const code = d.statuses2?.[person] || d.statuses?.[person] || '';
                                 monthHrs += ONCALL_HRS[code] || 0;
                               }
                               let yearHrs = 0;
                               for (const [, dayData] of yearEntries) {
-                                const code = dayData.statuses?.[person] || '';
+                                const code = dayData.statuses2?.[person] || dayData.statuses?.[person] || '';
                                 yearHrs += ONCALL_HRS[code] || 0;
                               }
                               return (
