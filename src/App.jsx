@@ -652,7 +652,7 @@ export default function App() {
         <main className="main-pad" style={{ flex: 1, padding: "20px 18px", maxWidth: 1320, margin: "0 auto", width: "100%" }}>
           {tab === "board"    && <BoardView    wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} filterPerson={filterPerson} setFilterPerson={setFilterPerson} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onDelete={deleteAssign} onCopy={copyFromPrev} onCSV={() => doExportCSV(wk, weekA)} onPrint={() => doPrint(wk, weekA, data.systems)} onView={a => setViewAssign(a)} />}
           {tab === "calendar" && <CalendarView wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onCopy={copyFromPrev} onView={a => setViewAssign(a)} onPlan={() => setPlanner(true)} />}
-          {tab === "annual"   && <AnnualView  annualData={annualData} onSaveDay={saveAnnualDay} mgr={mgr} mgrName={mgrName} myName={myName} />}
+          {tab === "annual"   && <AnnualView  annualData={annualData} onSaveDay={saveAnnualDay} mgr={mgr} mgrName={mgrName} myName={myName} toast={toast} />}
           {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} annualData={annualData} setMyName={n => { setMyName(n); if (n) localStorage.setItem("myName", n); else localStorage.removeItem("myName"); }} onView={a => setViewAssign(a)} onChangeName={() => setShowWelcome(true)} pushStatus={pushStatus} onEnablePush={() => registerPush(myName, remindersOn).then(() => setPushStatus(Notification?.permission || "default"))} remindersOn={remindersOn} onToggleReminders={v => { setRemindersOn(v); localStorage.setItem("remindersOn", v); updateReminderPref(v); }} />}
           {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} mgrName={mgrName} toast={toast} onSyncAnnual={syncAnnualSections} tabLabels={tabLabels} onSaveTabLabels={saveTabLabels} annualData={annualData} onSaveNominalHours={saveNominalHours} />}
         </main>
@@ -2926,7 +2926,7 @@ function PersonChip({ person, code, isMe }) {
   );
 }
 
-function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
+function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast }) {
   const mob = useContext(MobileCtx);
   // lens: 'daily' | 'monthly' | 'personal'
   const [lens,      setLens]      = useState('daily');
@@ -2967,6 +2967,8 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
     try { return JSON.parse(localStorage.getItem("legendGroups")) || DEFAULT_LEGEND; } catch { return DEFAULT_LEGEND; }
   });
   const [clearMonthConfirm, setClearMonthConfirm] = useState(false);
+  const [migrateConfirm, setMigrateConfirm] = useState(false);
+  const [migrating, setMigrating] = useState(false);
 
   // Keyboard shortcuts: Ctrl+Z = undo, Ctrl+Y / Ctrl+Shift+Z = redo
   // Using refs so the effect never needs to re-register
@@ -3821,6 +3823,52 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
                             🗑 ניקוי חודש
                           </button>
                         )
+                    )}
+                    {/* Migrate shift data slot 1→2 — mesheret section, managers only */}
+                    {isShiftSec && mgr && (
+                      migrateConfirm ? (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{ fontSize: 10, color: '#e67e22' }}>להעביר את כל המשמרות לעמודה המשנית?</span>
+                          <button disabled={migrating} onClick={async () => {
+                            const MIGRATE_CODES = new Set(['י', 'ל', 'Y', 'L', 'כ', 'כש', 'כמ', 'כמש']);
+                            const shiftPeople = [...new Set(
+                              sections.filter(s => s.name.includes('משמרת'))
+                                      .flatMap(s => (s.people || []).filter(p => !p.includes('נוסף') && !p.includes('תקן')))
+                            )];
+                            setMigrating(true);
+                            let count = 0;
+                            for (const [iso, dayData] of Object.entries(days)) {
+                              const s1 = { ...(dayData.statuses  || {}) };
+                              const s2 = { ...(dayData.statuses2 || {}) };
+                              let changed = false;
+                              for (const p of shiftPeople) {
+                                const code = s1[p];
+                                if (code && MIGRATE_CODES.has(code)) {
+                                  s2[p] = code; delete s1[p]; changed = true;
+                                }
+                              }
+                              if (changed) {
+                                await onSaveDay({ date: iso, statuses: s1, statuses2: s2 });
+                                await new Promise(r => setTimeout(r, 15));
+                                count++;
+                              }
+                            }
+                            setMigrating(false); setMigrateConfirm(false);
+                            toast?.(`✓ הועברו ${count} ימים לעמודה המשנית`);
+                          }} style={{ padding: '3px 8px', borderRadius: 6, background: migrating ? 'rgba(255,255,255,0.06)' : 'rgba(230,126,34,0.25)', border: '1px solid rgba(230,126,34,0.5)', color: migrating ? '#445' : '#e67e22', fontSize: 10, cursor: migrating ? 'default' : 'pointer', fontWeight: 700 }}>
+                            {migrating ? '⏳ מעביר...' : 'העבר'}
+                          </button>
+                          <button onClick={() => setMigrateConfirm(false)} disabled={migrating}
+                            style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#556', fontSize: 10, cursor: 'pointer' }}>
+                            ביטול
+                          </button>
+                        </span>
+                      ) : (
+                        <button onClick={() => setMigrateConfirm(true)}
+                          style={{ padding: '3px 10px', borderRadius: 6, background: 'rgba(230,126,34,0.08)', border: '1px solid rgba(230,126,34,0.2)', color: '#e67e22', fontSize: 10, cursor: 'pointer' }}>
+                          📦 העבר ל-מש׳/כ׳
+                        </button>
+                      )
                     )}
                   </div>
                 )}
