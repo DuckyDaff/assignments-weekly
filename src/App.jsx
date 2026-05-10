@@ -3830,10 +3830,16 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast }) {
                         <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                           <span style={{ fontSize: 10, color: '#e67e22' }}>להעביר את כל המשמרות לעמודה המשנית?</span>
                           <button disabled={migrating} onClick={async () => {
-                            const MIGRATE_CODES = new Set(['י', 'ל', 'Y', 'L', 'כ', 'כש', 'כמ', 'כמש']);
+                            const SHIFT_CODES_MIG  = new Set(['י', 'ל', 'Y', 'L']);
+                            const ONCALL_CODES_MIG = new Set(['כ', 'כש', 'כמ', 'כמש']);
+                            // משמרות — רק אנשי סקציית משמרת
                             const shiftPeople = [...new Set(
                               sections.filter(s => s.name.includes('משמרת'))
                                       .flatMap(s => (s.people || []).filter(p => !p.includes('נוסף') && !p.includes('תקן')))
+                            )];
+                            // כוננות — כל האנשים בכל הסקציות
+                            const allPeople = [...new Set(
+                              sections.flatMap(s => (s.people || []).filter(p => !p.includes('נוסף') && !p.includes('תקן')))
                             )];
                             setMigrating(true);
                             let count = 0;
@@ -3841,9 +3847,17 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast }) {
                               const s1 = { ...(dayData.statuses  || {}) };
                               const s2 = { ...(dayData.statuses2 || {}) };
                               let changed = false;
+                              // העברת משמרות (י/ל/Y/L) לאנשי משמרת בלבד
                               for (const p of shiftPeople) {
                                 const code = s1[p];
-                                if (code && MIGRATE_CODES.has(code)) {
+                                if (code && SHIFT_CODES_MIG.has(code)) {
+                                  s2[p] = code; delete s1[p]; changed = true;
+                                }
+                              }
+                              // העברת כוננות (כ/כש/כמ/כמש) לכל האנשים
+                              for (const p of allPeople) {
+                                const code = s1[p];
+                                if (code && ONCALL_CODES_MIG.has(code)) {
                                   s2[p] = code; delete s1[p]; changed = true;
                                 }
                               }
