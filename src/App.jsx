@@ -56,7 +56,7 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 async function registerPush(name, reminders = true) {
-  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return null;
   try {
     const reg = await navigator.serviceWorker.register("/sw.js");
     await navigator.serviceWorker.ready;
@@ -379,7 +379,7 @@ export default function App() {
   const [modal, setModal]   = useState(null);
   const [myName, setMyName] = useState(() => localStorage.getItem("myName") || "");
   const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem("myName"));
-  const [pushStatus, setPushStatus] = useState(() => Notification?.permission || "default"); // "default"|"granted"|"denied"
+  const [pushStatus, setPushStatus] = useState(() => (typeof Notification !== "undefined" ? Notification.permission : null) || "default"); // "default"|"granted"|"denied"
   const [remindersOn, setRemindersOn] = useState(() => localStorage.getItem("remindersOn") !== "false"); // default true
   const [mgrName, setMgrName] = useState("");     // שם המנהל הנוכחי
   const mgrNameRef = useRef("");
@@ -414,14 +414,15 @@ export default function App() {
   // When myName is set and permission is "default", auto-ask
   useEffect(() => {
     if (!myName) return;
-    if (Notification?.permission !== "default") {
-      setPushStatus(Notification?.permission);
+    const notifPerm = typeof Notification !== "undefined" ? Notification.permission : null;
+    if (notifPerm !== "default") {
+      setPushStatus(notifPerm || "default");
       return;
     }
     // Wait a moment before asking so it doesn't pop up immediately on first load
     const t = setTimeout(() => {
-      registerPush(myName).then(sub => {
-        setPushStatus(Notification?.permission || "default");
+      registerPush(myName).then(() => {
+        setPushStatus((typeof Notification !== "undefined" ? Notification.permission : null) || "default");
       });
     }, 3000);
     return () => clearTimeout(t);
@@ -642,7 +643,7 @@ export default function App() {
         <main className="main-pad" style={{ flex: 1, padding: "20px 18px", maxWidth: 1320, margin: "0 auto", width: "100%" }}>
           {tab === "board"    && <BoardView    wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} filterPerson={filterPerson} setFilterPerson={setFilterPerson} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onDelete={deleteAssign} onCopy={copyFromPrev} onCSV={() => doExportCSV(wk, weekA)} onPrint={() => doPrint(wk, weekA, data.systems)} onView={a => setViewAssign(a)} />}
           {tab === "calendar" && <CalendarView wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onCopy={copyFromPrev} onView={a => setViewAssign(a)} onPlan={() => setPlanner(true)} />}
-          {tab === "annual"   && <AnnualView  annualData={annualData} onSaveDay={saveAnnualDay} mgr={mgr} myName={myName} />}
+          {tab === "annual"   && <AnnualView  annualData={annualData} onSaveDay={saveAnnualDay} mgr={mgr} mgrName={mgrName} myName={myName} />}
           {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} annualData={annualData} setMyName={n => { setMyName(n); if (n) localStorage.setItem("myName", n); else localStorage.removeItem("myName"); }} onView={a => setViewAssign(a)} onChangeName={() => setShowWelcome(true)} pushStatus={pushStatus} onEnablePush={() => registerPush(myName, remindersOn).then(() => setPushStatus(Notification?.permission || "default"))} remindersOn={remindersOn} onToggleReminders={v => { setRemindersOn(v); localStorage.setItem("remindersOn", v); updateReminderPref(v); }} />}
           {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} mgrName={mgrName} toast={toast} onSyncAnnual={syncAnnualSections} tabLabels={tabLabels} onSaveTabLabels={saveTabLabels} />}
         </main>
@@ -734,7 +735,7 @@ function WeekNav({ wk, setWk, children }) {
         <div style={{ flex: 1 }} />
         {/* Center: arrows + week number + dates */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
-          <NavBtn onClick={() => setWk(adjW(wk, -1))}><I n="cL" s={15} /></NavBtn>
+          <NavBtn onClick={() => setWk(adjW(wk, -1))}><I n="cR" s={15} /></NavBtn>
           <div style={{ textAlign: "center", minWidth: mob ? 120 : 165 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
               <span style={{ fontWeight: 700, fontSize: mob ? 15 : 17, color: "#fff" }}>שבוע {wk.split("-W")[1]}</span>
@@ -742,7 +743,7 @@ function WeekNav({ wk, setWk, children }) {
             </div>
             <div style={{ fontSize: 14, color: "#ccd6f6", marginTop: 2, fontWeight: 600, letterSpacing: 0.2 }}>{wLabel(wk)}</div>
           </div>
-          <NavBtn onClick={() => setWk(adjW(wk, 1))}><I n="cR" s={15} /></NavBtn>
+          <NavBtn onClick={() => setWk(adjW(wk, 1))}><I n="cL" s={15} /></NavBtn>
           {!isToday && <button onClick={() => setWk(wKey(new Date()))} style={{ padding: "4px 9px", border: "1px solid rgba(74,158,255,.3)", borderRadius: 8, background: "rgba(74,158,255,.1)", color: "#4a9eff", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>היום</button>}
         </div>
         {/* Right side: action buttons */}
@@ -922,13 +923,13 @@ function CalendarView({ wk, setWk, weekA, prevA, data, sysMap, mgr, onAdd, onEdi
         ? <CalendarMobile weekA={weekA} activeSys={activeSys} activePeople={activePeople} sysMap={sysMap} todayKey={todayKey} mode={mode} onView={onView} />
         : (
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 3, minWidth: 580 }}>
+          <table style={{ width: "auto", borderCollapse: "separate", borderSpacing: 3, minWidth: 580 }}>
             <thead>
               <tr>
-                <th style={{ ...TH, width: 130, textAlign: "right", paddingRight: 14 }}>{mode === "sys" ? "מערכת" : "שם"}</th>
+                <th style={{ ...TH, width: 120, minWidth: 100, textAlign: "right", paddingRight: 14 }}>{mode === "sys" ? "מערכת" : "שם"}</th>
                 {DAYS.map(d => {
                   const isToday = d.key === todayKey;
-                  return <th key={d.key} style={{ ...TH, background: isToday ? "rgba(74,158,255,0.18)" : "rgba(255,255,255,0.05)", color: isToday ? "#4a9eff" : "#8892b0", border: isToday ? "1px solid rgba(74,158,255,0.3)" : "1px solid transparent" }}>
+                  return <th key={d.key} style={{ ...TH, width: 110, minWidth: 70, background: isToday ? "rgba(74,158,255,0.18)" : "rgba(255,255,255,0.05)", color: isToday ? "#4a9eff" : "#8892b0", border: isToday ? "1px solid rgba(74,158,255,0.3)" : "1px solid transparent" }}>
                     {d.long}{isToday && <span style={{ display: "block", fontSize: 8, fontWeight: 700 }}>היום</span>}
                   </th>;
                 })}
@@ -2736,7 +2737,7 @@ function PersonChip({ person, code, isMe }) {
   );
 }
 
-function AnnualView({ annualData, onSaveDay, mgr, myName }) {
+function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
   const mob = useContext(MobileCtx);
   // lens: 'daily' | 'monthly' | 'personal'
   const [lens,      setLens]      = useState('daily');
@@ -2762,12 +2763,34 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
     localStorage.setItem('monthlyColWidths', JSON.stringify(next));
     setColWidthsTick(t => t + 1);
   };
+  const isMainMgr = mgr && mgrName === 'מנהל ראשי';
+
+  // ── Undo / Redo ────────────────────────────────────────────────
+  const [undoStack, setUndoStack] = useState([]); // [{label, snaps:[{date,statuses,statuses2}]}]
+  const [redoStack, setRedoStack] = useState([]);
+  const undoFnRef = useRef(null);
+  const redoFnRef = useRef(null);
+
   const dragCode   = useRef(null);
   const dragSource = useRef(null); // { iso, person, slot } — source cell when dragging from table
   const resizeDrag = useRef(null); // { startX, startTblW, secName, people }
   const [legendGroups] = useState(() => {
     try { return JSON.parse(localStorage.getItem("legendGroups")) || DEFAULT_LEGEND; } catch { return DEFAULT_LEGEND; }
   });
+  const [clearMonthConfirm, setClearMonthConfirm] = useState(false);
+
+  // Keyboard shortcuts: Ctrl+Z = undo, Ctrl+Y / Ctrl+Shift+Z = redo
+  // Using refs so the effect never needs to re-register
+  useEffect(() => {
+    const handler = e => {
+      if (e.ctrlKey && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undoFnRef.current?.(); }
+      if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) { e.preventDefault(); redoFnRef.current?.(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+  // Reset clear-month confirmation when navigating away
+  useEffect(() => { setClearMonthConfirm(false); }, [selMonth, selSecIdx]);
 
   if (!annualData) {
     return (
@@ -2808,7 +2831,41 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
     setEditCell(null);
   }
 
+  // ── Undo / Redo helpers ──────────────────────────────────────
+  function snapshotDay(iso) {
+    const d = days[iso] || {};
+    return { date: iso, statuses: { ...(d.statuses || {}) }, statuses2: { ...(d.statuses2 || {}) } };
+  }
+  function pushUndoEntry(items) {
+    setUndoStack(s => [...s.slice(-29), { items }]);
+    setRedoStack([]);
+  }
+  function handleUndo() {
+    if (!undoStack.length) return;
+    const entry = undoStack[undoStack.length - 1];
+    const redoItems = entry.items.map(({ date }) => snapshotDay(date));
+    setRedoStack(r => [...r, { items: redoItems }]);
+    setUndoStack(s => s.slice(0, -1));
+    for (const { date, statuses, statuses2 } of entry.items) {
+      onSaveDay({ date, statuses, statuses2 });
+    }
+  }
+  function handleRedo() {
+    if (!redoStack.length) return;
+    const entry = redoStack[redoStack.length - 1];
+    const undoItems = entry.items.map(({ date }) => snapshotDay(date));
+    setUndoStack(s => [...s, { items: undoItems }]);
+    setRedoStack(r => r.slice(0, -1));
+    for (const { date, statuses, statuses2 } of entry.items) {
+      onSaveDay({ date, statuses, statuses2 });
+    }
+  }
+  // Always point refs to the latest functions (called every render)
+  undoFnRef.current = handleUndo;
+  redoFnRef.current = handleRedo;
+
   function saveStatus(person, code) {
+    pushUndoEntry([snapshotDay(selDate)]);
     const dayData = days[selDate] || {};
     const newStatuses = { ...(dayData.statuses || {}) };
     if (code) newStatuses[person] = code; else delete newStatuses[person];
@@ -2867,6 +2924,15 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
             </button>
           ))}
         </div>
+        {/* Undo / Redo — all users */}
+        <button onClick={handleUndo} disabled={!undoStack.length} title="בטל פעולה (Ctrl+Z)"
+          style={{ padding: '8px 10px', background: undoStack.length ? 'rgba(74,158,255,0.1)' : 'rgba(255,255,255,0.04)', border: `1px solid ${undoStack.length ? 'rgba(74,158,255,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, color: undoStack.length ? '#4a9eff' : '#445', fontSize: 16, cursor: undoStack.length ? 'pointer' : 'default', flexShrink: 0, transition: 'all .15s', lineHeight: 1 }}>
+          ↩
+        </button>
+        <button onClick={handleRedo} disabled={!redoStack.length} title="בצע שוב (Ctrl+Y)"
+          style={{ padding: '8px 10px', background: redoStack.length ? 'rgba(74,158,255,0.1)' : 'rgba(255,255,255,0.04)', border: `1px solid ${redoStack.length ? 'rgba(74,158,255,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, color: redoStack.length ? '#4a9eff' : '#445', fontSize: 16, cursor: redoStack.length ? 'pointer' : 'default', flexShrink: 0, transition: 'all .15s', lineHeight: 1 }}>
+          ↪
+        </button>
         {mgr && (
           <button onClick={() => setShiftModal(true)}
             title="שיבוץ אוטומטי למשמרת מסלולים"
@@ -3353,9 +3419,15 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                                 onDrop: e => {
                                   e.preventDefault(); e.stopPropagation(); setHoverCell(null);
                                   if (dragCode.current !== null) {
+                                    const src = dragSource.current;
+                                    // Snapshot all affected days before any change
+                                    const items = [snapshotDay(iso)];
+                                    if (src && !(src.iso === iso && src.person === person && src.slot === slot) && src.iso !== iso) {
+                                      items.push(snapshotDay(src.iso));
+                                    }
+                                    pushUndoEntry(items);
                                     saveStatusForDate(iso, person, dragCode.current, slot);
                                     // Clear source cell if dragging from another cell (move, not copy)
-                                    const src = dragSource.current;
                                     if (src && !(src.iso === iso && src.person === person && src.slot === slot)) {
                                       saveStatusForDate(src.iso, src.person, '', src.slot);
                                     }
@@ -3364,6 +3436,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                                 onClick: mgr ? (e => {
                                   e.stopPropagation();
                                   if (paintCode !== null) {
+                                    pushUndoEntry([snapshotDay(iso)]);
                                     saveStatusForDate(iso, person, paintCode, slot);
                                   } else {
                                     const r = e.currentTarget.getBoundingClientRect();
@@ -3430,6 +3503,52 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                         איפוס
                       </button>
                     )}
+                    {/* Clear month — main manager only, two-click confirmation */}
+                    {isMainMgr && (
+                      clearMonthConfirm
+                        ? (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <span style={{ fontSize: 10, color: '#e74c3c' }}>בטוח?</span>
+                            <button onClick={() => {
+                              // Snapshot all days in selMonth that have any status for this section's people
+                              const secPeople = (sec.people || []).filter(p => !p.includes('נוסף') && !p.includes('תקן'));
+                              const snapItems = monthDays
+                                .filter(({ iso }) => {
+                                  const d = days[iso] || {};
+                                  return secPeople.some(p => d.statuses?.[p] || d.statuses2?.[p]);
+                                })
+                                .map(({ iso }) => snapshotDay(iso));
+                              if (snapItems.length) {
+                                pushUndoEntry(snapItems);
+                                for (const { iso } of monthDays) {
+                                  const d = days[iso] || {};
+                                  const s1 = { ...(d.statuses || {}) };
+                                  const s2 = { ...(d.statuses2 || {}) };
+                                  let changed = false;
+                                  for (const p of secPeople) {
+                                    if (s1[p]) { delete s1[p]; changed = true; }
+                                    if (s2[p]) { delete s2[p]; changed = true; }
+                                  }
+                                  if (changed) onSaveDay({ date: iso, statuses: s1, statuses2: s2 });
+                                }
+                              }
+                              setClearMonthConfirm(false);
+                            }}
+                              style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(231,76,60,0.25)', border: '1px solid rgba(231,76,60,0.5)', color: '#e74c3c', fontSize: 10, cursor: 'pointer', fontWeight: 700 }}>
+                              נקה
+                            </button>
+                            <button onClick={() => setClearMonthConfirm(false)}
+                              style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#556', fontSize: 10, cursor: 'pointer' }}>
+                              ביטול
+                            </button>
+                          </span>
+                        ) : (
+                          <button onClick={() => setClearMonthConfirm(true)}
+                            style={{ padding: '3px 10px', borderRadius: 6, background: 'rgba(231,76,60,0.08)', border: '1px solid rgba(231,76,60,0.2)', color: '#c0392b', fontSize: 10, cursor: 'pointer' }}>
+                            🗑 ניקוי חודש
+                          </button>
+                        )
+                    )}
                   </div>
                 )}
 
@@ -3448,7 +3567,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                             {group.codes.map(code => {
                               const st = statusStyle(code);
                               return (
-                                <div key={code} onClick={() => { saveStatusForDate(pickerCell.iso, pickerCell.person, code, pickerCell.slot); setPickerCell(null); }}
+                                <div key={code} onClick={() => { pushUndoEntry([snapshotDay(pickerCell.iso)]); saveStatusForDate(pickerCell.iso, pickerCell.person, code, pickerCell.slot); setPickerCell(null); }}
                                   style={{ background: st?.bg || '#1a2a3a', color: '#fff', borderRadius: 5, padding: '4px 7px', fontSize: 11, fontWeight: 700, cursor: 'pointer', userSelect: 'none' }}>
                                   {code}
                                 </div>
@@ -3457,7 +3576,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                           </div>
                         </div>
                       ))}
-                      <div onClick={() => { saveStatusForDate(pickerCell.iso, pickerCell.person, '', pickerCell.slot); setPickerCell(null); }}
+                      <div onClick={() => { pushUndoEntry([snapshotDay(pickerCell.iso)]); saveStatusForDate(pickerCell.iso, pickerCell.person, '', pickerCell.slot); setPickerCell(null); }}
                         style={{ background: 'rgba(231,76,60,0.2)', border: '1px dashed rgba(231,76,60,0.5)', color: '#e74c3c', borderRadius: 5, padding: '5px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer', textAlign: 'center', marginTop: 4 }}>
                         🗑 מחק סטטוס
                       </div>
