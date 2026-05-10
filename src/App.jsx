@@ -2438,6 +2438,217 @@ function AssignModal({ mode, a, wk, data, sysMap, onClose, onSave }) {
 }
 
 /* ═══════════════════════════════════════════════════════
+   SHIFT AUTO-ASSIGN MODAL
+═══════════════════════════════════════════════════════ */
+const SHIFT_CYCLE = ['י', 'ל', 'פ', 'פ']; // day → night → off → off
+
+function ShiftAutoAssignModal({ sections, year, selMonth, days, onSaveDay, onClose }) {
+  // Auto-detect "משמרת מסלולים" section
+  const shiftSec = sections.find(s => s.name.includes('משמרת'));
+  const allPeople = (shiftSec?.people || []).filter(p => !p.includes('נוסף'));
+
+  // Build crews: every 4 people = one crew (in order)
+  const crews = [];
+  for (let i = 0; i < allPeople.length; i += 4) {
+    crews.push(allPeople.slice(i, i + 4));
+  }
+
+  // State
+  const [anchorDate,   setAnchorDate]   = useState(() => {
+    // Default: first day of selMonth
+    return `${year}-${String(selMonth + 1).padStart(2, '0')}-01`;
+  });
+  const [anchorCrew,   setAnchorCrew]   = useState(0);   // which crew is on יום on anchor date
+  const [anchorPhase,  setAnchorPhase]  = useState(0);   // phase (0=י,1=ל,2=פ,3=פ) of crew[anchorCrew] on anchorDate
+  const [saving,       setSaving]       = useState(false);
+  const [done,         setDone]         = useState(null); // { month: true } or { year: true }
+
+  if (!shiftSec || crews.length === 0) {
+    return (
+      <Overlay onClose={onClose}>
+        <div dir="rtl" style={{ background: '#0f1525', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 18, padding: '28px 26px', maxWidth: 480 }}>
+          <div style={{ fontWeight: 700, fontSize: 17, color: '#fff', marginBottom: 8 }}>שיבוץ אוטומטי — משמרות</div>
+          <div style={{ color: '#e74c3c', fontSize: 13 }}>לא נמצא מדור "משמרת מסלולים" בנתוני התוכנית השנתית.</div>
+          <button onClick={onClose} style={{ marginTop: 20, padding: '10px 20px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, color: '#8892b0', cursor: 'pointer', fontSize: 13 }}>סגור</button>
+        </div>
+      </Overlay>
+    );
+  }
+
+  // Generate statuses for a date range
+  // For each date in range, for each crew member:
+  //   crewIdx = crew index (0-based)
+  //   phase of crew[crewIdx] on anchorDate = anchorPhase + crewIdx (shifted by crew position relative to anchor crew)
+  //   phase on date D = (basePhase + dayOffset) % 4
+  function generateForRange(startIso, endIso) {
+    const updates = {}; // { iso: { [person]: code } }
+    const start = new Date(startIso + 'T12:00:00');
+    const end   = new Date(endIso   + 'T12:00:00');
+    const anchor = new Date(anchorDate + 'T12:00:00');
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const dayOffset = Math.round((d - anchor) / 864e5); // days from anchor
+      const statuses = {};
+      crews.forEach((crew, ci) => {
+        // Each crew is offset by ci positions from crew[anchorCrew]
+        // crew[anchorCrew] has phase=anchorPhase on anchor date
+        // crew[ci] has phase = (anchorPhase + (ci - anchorCrew) * 1 + 4*99) % 4 on anchor date
+        // Actually: if anchorCrew has phase anchorPhase, then crew ci has phase (anchorPhase + ci - anchorCrew + 4*big) % 4
+        const basePhase = ((anchorPhase + (ci - anchorCrew)) % 4 + 4) % 4;
+        const phase = ((basePhase + dayOffset) % 4 + 4) % 4;
+        const code = SHIFT_CYCLE[phase];
+        for (const person of crew) {
+          if (person && !person.includes('נוסף')) statuses[person] = code;
+        }
+      });
+      updates[iso] = statuses;
+    }
+    return updates;
+  }
+
+  async function applyRange(startIso, endIso, label) {
+    setSaving(true);
+    const updates = generateForRange(startIso, endIso);
+    const isos = Object.keys(updates).sort();
+    for (const iso of isos) {
+      const existing = days[iso] || {};
+      const mergedStatuses = { ...(existing.statuses || {}), ...updates[iso] };
+      await new Promise(resolve => {
+        onSaveDay({ date: iso, statuses: mergedStatuses });
+        setTimeout(resolve, 20); // tiny delay to avoid flooding
+      });
+    }
+    setSaving(false);
+    setDone({ label, count: isos.length });
+  }
+
+  function applyMonth() {
+    const mm   = String(selMonth + 1).padStart(2, '0');
+    const last = new Date(year, selMonth + 1, 0).getDate();
+    applyRange(`${year}-${mm}-01`, `${year}-${mm}-${String(last).padStart(2,'0')}`, `${year}/${mm}`);
+  }
+
+  function applyYear() {
+    applyRange(`${year}-01-01`, `${year}-12-31`, `כל ${year}`);
+  }
+
+  const CYCLE_LABELS = ['י — יום', 'ל — לילה', 'פ — פנוי', 'פ — פנוי'];
+  const CYCLE_COLORS = ['#27ae60', '#2980b9', '#7f8c8d', '#7f8c8d'];
+
+  return (
+    <Overlay onClose={onClose} wide>
+      <div dir="rtl" style={{ background: '#0f1525', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 18, overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,.8)' }}>
+        {/* Header */}
+        <div style={{ padding: '18px 22px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontWeight: 700, fontSize: 16, color: '#fff' }}>🔄 שיבוץ אוטומטי — משמרת מסלולים</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#8892b0', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>✕</button>
+        </div>
+
+        <div style={{ padding: '18px 22px', overflowY: 'auto', maxHeight: '70vh' }}>
+
+          {/* Crews display */}
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#8892b0', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8 }}>משמרות שזוהו</div>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(crews.length, 2)}, 1fr)`, gap: 8 }}>
+              {crews.map((crew, ci) => (
+                <div key={ci} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 12px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#e67e22', marginBottom: 6 }}>משמרת {ci + 1}</div>
+                  {crew.map(p => (
+                    <div key={p} style={{ fontSize: 12, color: p.includes('תקן') ? '#556' : '#ccd6f6', fontStyle: p.includes('תקן') ? 'italic' : 'normal', paddingBottom: 2 }}>
+                      {p.includes('תקן') ? `(${p})` : p}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Rotation cycle info */}
+          <div style={{ background: 'rgba(74,158,255,0.06)', border: '1px solid rgba(74,158,255,0.15)', borderRadius: 10, padding: '10px 14px', marginBottom: 18 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#4a9eff', marginBottom: 6 }}>מחזור סיבוב</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {SHIFT_CYCLE.map((code, i) => (
+                <div key={i} style={{ background: CYCLE_COLORS[i], color: '#fff', borderRadius: 6, padding: '3px 12px', fontSize: 12, fontWeight: 700 }}>
+                  {code}
+                </div>
+              ))}
+              <div style={{ fontSize: 11, color: '#8892b0', alignSelf: 'center', marginRight: 4 }}>→ חוזר על עצמו</div>
+            </div>
+          </div>
+
+          {/* Anchor configuration */}
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#8892b0', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 10 }}>עוגן לחישוב הסיבוב</div>
+
+            <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+              <div style={{ flex: 1 }}>
+                <label style={lbl}>תאריך עוגן</label>
+                <input type="date" value={anchorDate} onChange={e => setAnchorDate(e.target.value)}
+                  style={{ ...inp, width: '100%' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={lbl}>איזו משמרת עובדת ביום בתאריך העוגן?</label>
+                <select value={anchorCrew} onChange={e => setAnchorCrew(Number(e.target.value))}
+                  style={{ ...inp, width: '100%' }}>
+                  {crews.map((crew, ci) => (
+                    <option key={ci} value={ci}>משמרת {ci + 1} — {crew.filter(p => !p.includes('תקן')).join(', ')}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label style={lbl}>שלב הסיבוב של משמרת {anchorCrew + 1} בתאריך העוגן</label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {SHIFT_CYCLE.map((code, pi) => (
+                  <button key={pi} onClick={() => setAnchorPhase(pi)}
+                    style={{ flex: 1, padding: '8px 4px', border: `2px solid ${anchorPhase === pi ? CYCLE_COLORS[pi] : CYCLE_COLORS[pi] + '44'}`, background: anchorPhase === pi ? `${CYCLE_COLORS[pi]}22` : 'rgba(255,255,255,0.03)', color: anchorPhase === pi ? '#fff' : '#8892b0', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700, transition: 'all .12s' }}>
+                    {code}
+                    <div style={{ fontSize: 9, fontWeight: 400, marginTop: 2, opacity: 0.7 }}>{CYCLE_LABELS[pi].split(' — ')[1]}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Preview of today */}
+          {anchorDate && (
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, padding: '10px 14px', marginBottom: 18, fontSize: 12, color: '#8892b0' }}>
+              <span style={{ color: '#4a9eff', fontWeight: 700 }}>סיבוב לדוגמה — {anchorDate}: </span>
+              {crews.map((crew, ci) => {
+                const basePhase = ((anchorPhase + (ci - anchorCrew)) % 4 + 4) % 4;
+                const code = SHIFT_CYCLE[basePhase];
+                return <span key={ci} style={{ marginLeft: 10 }}><span style={{ background: CYCLE_COLORS[basePhase], color: '#fff', borderRadius: 4, padding: '1px 6px', fontSize: 11, fontWeight: 700 }}>{code}</span> משמרת {ci + 1}</span>;
+              })}
+            </div>
+          )}
+
+          {done && (
+            <div style={{ background: 'rgba(39,174,96,0.1)', border: '1px solid rgba(39,174,96,0.3)', borderRadius: 10, padding: '12px 16px', marginBottom: 14, color: '#2ecc71', fontSize: 13, fontWeight: 600 }}>
+              ✓ שובצו {done.count} ימים בהצלחה ({done.label})
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div style={{ padding: '14px 22px', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={applyMonth} disabled={saving}
+            style={{ flex: 1, minWidth: 140, padding: '12px', background: saving ? 'rgba(255,255,255,0.06)' : 'linear-gradient(135deg,#e67e22,#d35400)', border: 'none', borderRadius: 11, color: saving ? '#445' : '#fff', fontWeight: 700, fontSize: 13, cursor: saving ? 'default' : 'pointer', boxShadow: saving ? 'none' : '0 4px 14px rgba(230,126,34,0.4)', transition: 'all .15s' }}>
+            {saving ? '⏳ שומר...' : `📅 שבץ חודש נוכחי`}
+          </button>
+          <button onClick={applyYear} disabled={saving}
+            style={{ flex: 1, minWidth: 140, padding: '12px', background: saving ? 'rgba(255,255,255,0.06)' : 'linear-gradient(135deg,#8e44ad,#6c3483)', border: 'none', borderRadius: 11, color: saving ? '#445' : '#fff', fontWeight: 700, fontSize: 13, cursor: saving ? 'default' : 'pointer', boxShadow: saving ? 'none' : '0 4px 14px rgba(142,68,173,0.4)', transition: 'all .15s' }}>
+            {saving ? '⏳ שומר...' : `📆 שבץ שנה שלמה (${year})`}
+          </button>
+          <button onClick={onClose} style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 11, color: '#8892b0', cursor: 'pointer', fontSize: 13 }}>סגור</button>
+        </div>
+      </div>
+    </Overlay>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════
    ANNUAL PLAN VIEW
 ═══════════════════════════════════════════════════════ */
 const MONTHS_HE  = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
@@ -2537,6 +2748,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
   const [hoverCell,  setHoverCell]  = useState(null); // "iso|person|slot" for drag feedback
   const [pickerCell, setPickerCell] = useState(null); // { iso, person, slot, x, y }
   const [paintCode,  setPaintCode]  = useState(null); // null=off, ''=erase, 'י'=paint
+  const [shiftModal, setShiftModal] = useState(false);
   const dragCode   = useRef(null);
   const dragSource = useRef(null); // { iso, person, slot } — source cell when dragging from table
   const [legendGroups] = useState(() => {
@@ -2613,20 +2825,41 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
 
   return (
     <div>
-      {/* Lens selector */}
-      <div style={{ display: 'flex', marginBottom: 16, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
-        {LENSES.map(l => (
-          <button key={l.id} onClick={() => setLens(l.id)}
-            style={{ flex: 1, padding: '10px 4px', border: 'none', cursor: 'pointer',
-              background: lens === l.id ? 'rgba(74,158,255,0.18)' : 'transparent',
-              color: lens === l.id ? '#4a9eff' : '#556',
-              fontWeight: lens === l.id ? 700 : 400,
-              fontSize: 13,
-              borderBottom: `2px solid ${lens === l.id ? '#4a9eff' : 'transparent'}`,
-              transition: 'all .15s' }}>
-            {l.icon} {l.label}
+      {/* Shift auto-assign modal */}
+      {shiftModal && (
+        <ShiftAutoAssignModal
+          sections={sections}
+          year={year}
+          selMonth={selMonth}
+          days={days}
+          onSaveDay={onSaveDay}
+          onClose={() => setShiftModal(false)}
+        />
+      )}
+
+      {/* Lens selector + manager tools row */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'stretch' }}>
+        <div style={{ flex: 1, display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+          {LENSES.map(l => (
+            <button key={l.id} onClick={() => setLens(l.id)}
+              style={{ flex: 1, padding: '10px 4px', border: 'none', cursor: 'pointer',
+                background: lens === l.id ? 'rgba(74,158,255,0.18)' : 'transparent',
+                color: lens === l.id ? '#4a9eff' : '#556',
+                fontWeight: lens === l.id ? 700 : 400,
+                fontSize: 13,
+                borderBottom: `2px solid ${lens === l.id ? '#4a9eff' : 'transparent'}`,
+                transition: 'all .15s' }}>
+              {l.icon} {l.label}
+            </button>
+          ))}
+        </div>
+        {mgr && (
+          <button onClick={() => setShiftModal(true)}
+            title="שיבוץ אוטומטי למשמרת מסלולים"
+            style={{ padding: '8px 12px', background: 'rgba(230,126,34,0.12)', border: '1px solid rgba(230,126,34,0.3)', borderRadius: 10, color: '#e67e22', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all .15s', flexShrink: 0 }}>
+            🔄 שבץ משמרות
           </button>
-        ))}
+        )}
       </div>
 
       {/* ══ DAILY LENS ══════════════════════════════════════════════ */}
