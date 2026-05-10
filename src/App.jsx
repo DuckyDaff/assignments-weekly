@@ -2502,12 +2502,15 @@ function StatusBadge({ code, small }) {
 function buildDayGroups(dayData, sections) {
   const statuses = dayData?.statuses || {};
   const groups   = { present: [], day: [], night: [], oncall: [], vacation: [], sick: [], course: [], reserve: [], free: [], unavail: [], away: [], training: [] };
-  const allPeople = sections.flatMap(s => s.people).filter(p => !p.includes('נוסף'));
-  for (const person of allPeople) {
-    const code = statuses[person] || '';
-    const cat  = classifyStatus(code);
-    if (cat && groups[cat]) groups[cat].push({ person, code });
-    else if (!code) groups.present.push({ person, code: '' }); // no status = regular day worker
+  for (const sec of sections) {
+    const isShift = sec.name.includes('משמרת'); // shift sections excluded from "day workers"
+    const people  = (sec.people || []).filter(p => !p.includes('נוסף'));
+    for (const person of people) {
+      const code = statuses[person] || '';
+      const cat  = classifyStatus(code);
+      if (cat && groups[cat]) groups[cat].push({ person, code, sec: sec.name });
+      else if (!code && !isShift) groups.present.push({ person, code: '', sec: sec.name }); // day worker
+    }
   }
   return groups;
 }
@@ -2679,6 +2682,54 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
               if (!people.length) return null;
               const emoji = style.label.match(/^\S+/)?.[0] || '';
               const title = style.label.replace(/^\S+\s*/, '');
+
+              // Special render for "present" (day workers) — split by section
+              if (cat === 'present') {
+                const secShort = n => n.replace(/^מדור\s+/, '').replace(/\s+ובקרה$/, '').replace(/\s+מסלולים$/, '');
+                const bySec = [];
+                people.forEach(({ person }) => {
+                  const entry = people.find(p => p.person === person);
+                  const sn = entry?.sec || '';
+                  let g = bySec.find(x => x.sec === sn);
+                  if (!g) { g = { sec: sn, people: [] }; bySec.push(g); }
+                  if (!g.people.includes(person)) g.people.push(person);
+                });
+                return (
+                  <div key={cat} style={{ marginBottom: 12, border: `1px solid ${style.bg}33`, borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ background: `${style.bg}22`, padding: '8px 14px', borderBottom: `1px solid ${style.bg}22`, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 14 }}>{emoji}</span>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: style.bg }}>{title}</span>
+                      <span style={{ marginRight: 'auto', background: `${style.bg}33`, color: style.bg, borderRadius: 10, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>{people.length}</span>
+                    </div>
+                    <div style={{ padding: '10px 12px' }}>
+                      {bySec.map(({ sec, people: sp }, si) => (
+                        <div key={sec} style={{ marginBottom: si < bySec.length - 1 ? 10 : 0 }}>
+                          {bySec.length > 1 && <div style={{ fontSize: 10, color: style.bg, fontWeight: 700, marginBottom: 5, opacity: 0.85 }}>{secShort(sec)} ({sp.length})</div>}
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {sp.map(person => {
+                              const isMe = person === myName;
+                              const isEd = editCell?.person === person;
+                              return (
+                                <div key={person} style={{ display: 'flex', alignItems: 'center', gap: 6, background: isMe ? 'rgba(74,158,255,0.07)' : 'rgba(255,255,255,0.03)', border: isMe ? '1px solid rgba(74,158,255,0.22)' : '1px solid rgba(255,255,255,0.07)', borderRadius: 8, padding: '5px 9px', flexWrap: isEd ? 'wrap' : 'nowrap', maxWidth: isEd ? 340 : 'none' }}>
+                                  <span style={{ fontSize: 12, color: isMe ? '#4a9eff' : '#8892b0', whiteSpace: 'nowrap' }}>{person}</span>
+                                  {mgr && (isEd ? (
+                                    <>{STATUS_OPTIONS.map(opt => (
+                                      <button key={opt||'__none'} onClick={() => { saveStatus(person, opt); setEditCell(null); }} style={{ padding:'2px 7px', fontSize:10, borderRadius:4, border:'none', cursor:'pointer', background: opt==='' ? 'rgba(255,255,255,0.08)' : (statusStyle(opt)?.bg||'rgba(255,255,255,0.08)'), color: '#fff', fontWeight:700, margin:'1px' }}>{opt||'—'}</button>
+                                    ))}<button onClick={() => setEditCell(null)} style={{ padding:'2px 6px', fontSize:10, borderRadius:4, border:'1px solid #333', background:'transparent', color:'#556', cursor:'pointer' }}>✕</button></>
+                                  ) : (
+                                    <button onClick={() => setEditCell({ person })} style={{ background:'rgba(255,255,255,0.06)', border:'none', borderRadius:5, padding:'3px 9px', fontSize:11, color:'#445', cursor:'pointer', fontWeight:700, minWidth:30 }}>—</button>
+                                  ))}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <div key={cat} style={{ marginBottom: 12, border: `1px solid ${style.bg}33`, borderRadius: 12, overflow: 'hidden' }}>
                   <div style={{ background: `${style.bg}22`, padding: '8px 14px', borderBottom: `1px solid ${style.bg}22`, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2796,6 +2847,35 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                         {Object.entries(CAT_STYLE).map(([cat, style]) => {
                           const people = g[cat] || [];
                           if (!people.length) return null;
+
+                          // "present" = day workers, split by section
+                          if (cat === 'present') {
+                            const secShort = n => n.replace(/^מדור\s+/, '').replace(/\s+ובקרה$/, '').replace(/\s+מסלולים$/, '');
+                            const bySec = [];
+                            people.forEach(({ person, sec }) => {
+                              let grp = bySec.find(x => x.sec === (sec||''));
+                              if (!grp) { grp = { sec: sec||'', people: [] }; bySec.push(grp); }
+                              if (!grp.people.includes(person)) grp.people.push(person);
+                            });
+                            return (
+                              <div key={cat}>
+                                {bySec.map(({ sec, people: sp }) => (
+                                  <div key={sec} style={{ marginBottom: 3 }}>
+                                    <div style={{ fontSize: 8, color: style.bg, fontWeight: 700, marginBottom: 1 }}>🏢 {secShort(sec)} ({sp.length})</div>
+                                    {sp.map(person => {
+                                      const isMe = person === myName;
+                                      return (
+                                        <div key={person} style={{ padding: '1px 3px', borderRadius: 3, background: isMe ? 'rgba(74,158,255,0.1)' : 'transparent' }}>
+                                          <span style={{ fontSize: 9, color: isMe ? '#4a9eff' : '#8892b0', whiteSpace: 'nowrap' }}>{person.split(' ')[0]}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          }
+
                           return (
                             <div key={cat}>
                               <div style={{ fontSize: 8, color: style.bg, fontWeight: 700, marginBottom: 2, letterSpacing: '0.3px' }}>{style.labelShort} ({people.length})</div>
