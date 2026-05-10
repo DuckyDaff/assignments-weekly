@@ -2499,7 +2499,7 @@ function ShiftAutoAssignModal({ sections, year, selMonth, days, onSaveDay, onClo
         const phase = ((basePhase + dayOffset) % 4 + 4) % 4;
         const code = SHIFT_CYCLE[phase];
         for (const person of crew) {
-          if (person && !person.includes('נוסף')) statuses[person] = code;
+          if (person && !person.includes('נוסף') && !person.includes('תקן')) statuses[person] = code;
         }
       });
       updates[iso] = statuses;
