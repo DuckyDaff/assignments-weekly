@@ -1574,6 +1574,130 @@ function TabsEditor({ tabLabels, onSave }) {
   );
 }
 
+/* ── REPORTS ── */
+function ReportsEditor({ data, annualData }) {
+  const sections = getSections(data);
+  const nonShiftSecs = sections.filter(s => !s.name.includes('משמרת'));
+  const days  = annualData?.days || {};
+  const year  = annualData?.year || new Date().getFullYear();
+
+  const [selMonth, setSelMonth] = useState(new Date().getMonth()); // 0-based
+  const [view,     setView]     = useState('month'); // 'month' | 'year'
+
+  const ONCALL_HRS = { 'כ': 6, 'כמ': 6, 'כש': 10, 'כמש': 10 };
+
+  // Collect all ISO dates for selected month
+  const monthDays = Object.keys(days)
+    .filter(iso => {
+      const d = new Date(iso + 'T00:00:00');
+      return d.getFullYear() === year && d.getMonth() === selMonth;
+    })
+    .sort();
+
+  // Collect all ISO dates for full year
+  const yearDays = Object.keys(days)
+    .filter(iso => iso.startsWith(String(year)))
+    .sort();
+
+  const computeStats = (person, isos) => {
+    let oncall = 0, away = 0;
+    for (const iso of isos) {
+      const code = (days[iso] || {}).statuses?.[person] || '';
+      oncall += ONCALL_HRS[code] || 0;
+      if (classifyStatus(code) === 'away') away++;
+    }
+    return { oncall, away };
+  };
+
+  const accentOncall = '#e67e22';
+  const accentAway   = '#16a085';
+
+  const StatCell = ({ val, unit, accent, dim }) => (
+    val > 0
+      ? <span style={{ fontSize: dim ? 12 : 15, fontWeight: 700, color: dim ? accent + 'aa' : accent }}>
+          {val}<span style={{ fontSize: dim ? 8 : 10, color: '#667', marginRight: 2 }}>{unit}</span>
+        </span>
+      : <span style={{ fontSize: 13, color: '#334' }}>—</span>
+  );
+
+  return (
+    <div>
+      {/* ── Controls ── */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+        {/* Month selector */}
+        <select value={selMonth} onChange={e => setSelMonth(Number(e.target.value))}
+          style={{ ...inp, padding: '6px 10px', fontSize: 12, width: 'auto' }}>
+          {MONTHS_HE_FULL.map((m, i) => <option key={i} value={i}>{m} {year}</option>)}
+        </select>
+        {/* View toggle */}
+        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+          {[['month', 'חודש'], ['year', 'שנה']].map(([id, lbl]) => (
+            <button key={id} onClick={() => setView(id)}
+              style={{ padding: '6px 14px', border: 'none', background: view === id ? 'rgba(74,158,255,0.2)' : 'transparent', color: view === id ? '#4a9eff' : '#8892b0', fontSize: 11, fontWeight: view === id ? 700 : 400, cursor: 'pointer' }}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {!annualData && (
+        <div style={{ color: '#445', fontSize: 13, fontStyle: 'italic' }}>אין נתוני תוכנית שנתית</div>
+      )}
+
+      {annualData && nonShiftSecs.map((sec, si) => {
+        const sc = secPal(data, sec.name, si);
+        const people = (sec.people || []).filter(p => !p.includes('תקן') && !p.includes('נוסף'));
+        if (!people.length) return null;
+        const isos = view === 'month' ? monthDays : yearDays;
+        const rows = people.map(p => ({ person: p, ...computeStats(p, isos) }));
+
+        // Totals row
+        const totOncall = rows.reduce((s, r) => s + r.oncall, 0);
+        const totAway   = rows.reduce((s, r) => s + r.away,   0);
+
+        return (
+          <div key={sec.name} style={{ marginBottom: 18, background: 'rgba(255,255,255,0.02)', border: `1px solid ${sc.accent}22`, borderRadius: 12, overflow: 'hidden' }}>
+            {/* Section header */}
+            <div style={{ background: `${sc.accent}12`, padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: `1px solid ${sc.accent}22` }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: sc.accent }} />
+              <span style={{ fontWeight: 700, fontSize: 13, color: sc.accent }}>{sec.name}</span>
+              <span style={{ marginRight: 'auto', fontSize: 11, color: '#556' }}>
+                {view === 'month' ? MONTHS_HE_FULL[selMonth] : `שנת ${year}`}
+              </span>
+              <span style={{ fontSize: 11, color: accentOncall, fontWeight: 600 }}>{totOncall}ש׳ כוננות</span>
+              <span style={{ fontSize: 11, color: '#334' }}>·</span>
+              <span style={{ fontSize: 11, color: accentAway,   fontWeight: 600 }}>{totAway} יציאות שתפ״א</span>
+            </div>
+
+            {/* Column headers */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 100px', padding: '6px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.15)' }}>
+              <div style={{ fontSize: 10, color: '#556', fontWeight: 700 }}>עובד</div>
+              <div style={{ textAlign: 'center', fontSize: 10, color: accentOncall, fontWeight: 700 }}>כוננות (שעות)</div>
+              <div style={{ textAlign: 'center', fontSize: 10, color: accentAway,   fontWeight: 700 }}>שתפ״א (ימים)</div>
+            </div>
+
+            {/* Person rows */}
+            {rows.map(({ person, oncall, away }, ri) => (
+              <div key={person} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 100px', padding: '8px 14px', borderBottom: ri < rows.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', background: ri % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.012)', alignItems: 'center' }}>
+                <div style={{ fontSize: 13, color: '#ccd6f6' }}>{person}</div>
+                <div style={{ textAlign: 'center' }}><StatCell val={oncall} unit="ש׳" accent={accentOncall} /></div>
+                <div style={{ textAlign: 'center' }}><StatCell val={away}   unit="י׳" accent={accentAway}   /></div>
+              </div>
+            ))}
+
+            {/* Totals row */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 100px', padding: '7px 14px', background: 'rgba(0,0,0,0.25)', borderTop: `1px solid ${sc.accent}22` }}>
+              <div style={{ fontSize: 11, color: '#8892b0', fontWeight: 700 }}>סה״כ</div>
+              <div style={{ textAlign: 'center' }}><StatCell val={totOncall} unit="ש׳" accent={accentOncall} /></div>
+              <div style={{ textAlign: 'center' }}><StatCell val={totAway}   unit="י׳" accent={accentAway}   /></div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ── SETTINGS ── */
 function SettingsView({ data, save, mgr, mgrName, toast, onSyncAnnual, tabLabels, onSaveTabLabels, annualData, onSaveNominalHours }) {
   const isMaster = mgrName === "מנהל ראשי";
@@ -1588,12 +1712,13 @@ function SettingsView({ data, save, mgr, mgrName, toast, onSyncAnnual, tabLabels
     </div>
   );
   const tabs = [
-    { id: "sys",    l: "מערכות" },
-    { id: "ppl",    l: "אנשי צוות" },
-    { id: "veh",    l: "רכבים" },
-    { id: "hours",  l: "שעות" },
-    { id: "legend", l: "מקרא" },
-    { id: "log",    l: "יומן" },
+    { id: "sys",     l: "מערכות" },
+    { id: "ppl",     l: "אנשי צוות" },
+    { id: "veh",     l: "רכבים" },
+    { id: "hours",   l: "שעות" },
+    { id: "legend",  l: "מקרא" },
+    { id: "reports", l: "דוחות" },
+    { id: "log",     l: "יומן" },
     ...(isMaster ? [{ id: "mgrs", l: "מנהלים" }, { id: "tabs", l: "טאבים" }, { id: "sec", l: "אבטחה" }] : []),
   ];
   return (
@@ -1607,8 +1732,9 @@ function SettingsView({ data, save, mgr, mgrName, toast, onSyncAnnual, tabLabels
       {st === "ppl"    && <SectionsEditor data={data} save={save} toast={toast} onSyncAnnual={onSyncAnnual} />}
       {st === "veh"    && <VehiclesEditor data={data} save={save} toast={toast} />}
       {st === "hours"  && <NominalHoursEditor annualData={annualData} onSave={onSaveNominalHours} toast={toast} />}
-      {st === "legend" && <LegendEditor />}
-      {st === "log"    && <ActivityLog data={data} />}
+      {st === "legend"  && <LegendEditor />}
+      {st === "reports" && <ReportsEditor data={data} annualData={annualData} />}
+      {st === "log"     && <ActivityLog data={data} />}
       {st === "mgrs"   && isMaster && <ManagersEditor data={data} save={save} toast={toast} />}
       {st === "tabs"   && isMaster && (
         <TabsEditor tabLabels={tabLabels} onSave={labels => { onSaveTabLabels(labels); toast("שמות הטאבים עודכנו ✓"); }} />
