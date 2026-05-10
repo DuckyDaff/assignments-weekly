@@ -923,7 +923,7 @@ function CalendarView({ wk, setWk, weekA, prevA, data, sysMap, mgr, onAdd, onEdi
         ? <CalendarMobile weekA={weekA} activeSys={activeSys} activePeople={activePeople} sysMap={sysMap} todayKey={todayKey} mode={mode} onView={onView} />
         : (
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "auto", borderCollapse: "separate", borderSpacing: 3, minWidth: 580 }}>
+          <table style={{ width: "auto", borderCollapse: "separate", borderSpacing: 3, minWidth: 580, margin: "0 auto" }}>
             <thead>
               <tr>
                 <th style={{ ...TH, width: 120, minWidth: 100, textAlign: "right", paddingRight: 14 }}>{mode === "sys" ? "מערכת" : "שם"}</th>
