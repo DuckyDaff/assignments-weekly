@@ -1368,6 +1368,12 @@ const DEFAULT_LEGEND = [
   { id: 'training', name: 'הכשרות',      codes: ['ב. חשמל', 'ב. כללית', 'השתלמות', 'ניקיון תחנות'] },
 ];
 
+const LEGEND_COLORS = [
+  "#4a9eff","#27ae60","#e67e22","#e74c3c","#8e44ad","#16a085",
+  "#f1c40f","#2ecc71","#3498db","#e91e63","#00bcd4","#ff5722",
+  "#9c27b0","#607d8b","#795548","#ff9800",
+];
+
 function LegendEditor() {
   const [groups, setGroups] = useState(() => {
     try { return JSON.parse(localStorage.getItem("legendGroups")) || DEFAULT_LEGEND; } catch { return DEFAULT_LEGEND; }
@@ -1378,6 +1384,7 @@ function LegendEditor() {
   const [newCode,      setNewCode]      = useState("");
   const [newGroupName, setNewGroupName] = useState("");
   const [dropTarget,   setDropTarget]   = useState(null); // groupId | "unassigned" | null
+  const [colorPick,    setColorPick]    = useState(null); // groupId | null
   const dragRef = useRef(null);
 
   function saveAll(g, u) {
@@ -1404,18 +1411,15 @@ function LegendEditor() {
     let ng = groups;
     let nu = unassigned;
 
-    // remove from source
     if (fromGroupId === "unassigned") nu = nu.filter(c => c !== code);
     else ng = ng.map(g => g.id === fromGroupId ? { ...g, codes: g.codes.filter(c => c !== code) } : g);
 
-    // add to target
     if (toTarget === "unassigned") nu = [...nu, code];
     else ng = ng.map(g => g.id === toTarget ? { ...g, codes: [...g.codes, code] } : g);
 
     saveAll(ng, nu);
   }
 
-  // ✕ on a group chip → moves back to unassigned tray
   function unassignCode(groupId, code) {
     saveAll(
       groups.map(g => g.id === groupId ? { ...g, codes: g.codes.filter(c => c !== code) } : g),
@@ -1423,10 +1427,14 @@ function LegendEditor() {
     );
   }
 
-  // ✕ on unassigned chip → permanent delete
   function deleteCode(code) { saveAll(groups, unassigned.filter(c => c !== code)); }
 
   function renameGroup(id, name) { saveAll(groups.map(g => g.id === id ? { ...g, name } : g), unassigned); }
+
+  function setGroupColor(id, color) {
+    saveAll(groups.map(g => g.id === id ? { ...g, color } : g), unassigned);
+    setColorPick(null);
+  }
 
   function removeGroup(id) {
     const dying    = groups.find(g => g.id === id);
@@ -1440,21 +1448,24 @@ function LegendEditor() {
 
   function addGroup() {
     if (!newGroupName.trim()) return;
-    saveAll([...groups, { id: Date.now().toString(36), name: newGroupName.trim(), codes: [] }], unassigned);
+    saveAll([...groups, { id: Date.now().toString(36), name: newGroupName.trim(), codes: [], color: LEGEND_COLORS[groups.length % LEGEND_COLORS.length] }], unassigned);
     setNewGroupName("");
   }
 
   const codeChip = (code, fromGroupId, onRemove, removeTip) => {
     const st = statusStyle(code);
     const isUnassigned = fromGroupId === "unassigned";
+    const grpColor = !isUnassigned ? groups.find(g => g.id === fromGroupId)?.color : null;
+    const chipBg   = grpColor ? `${grpColor}22` : (st ? `${st.bg}22` : "rgba(255,255,255,0.06)");
+    const chipBord = grpColor ? `${grpColor}55` : (st ? `${st.bg}55` : "rgba(255,255,255,0.12)");
     return (
       <div key={code} draggable
         onDragStart={() => { dragRef.current = { code, fromGroupId }; }}
         style={{ display: "flex", alignItems: "center", gap: 6,
-          background: isUnassigned ? "rgba(74,158,255,0.1)" : (st ? `${st.bg}22` : "rgba(255,255,255,0.06)"),
-          border: `1px solid ${isUnassigned ? "rgba(74,158,255,0.35)" : (st ? `${st.bg}55` : "rgba(255,255,255,0.12)")}`,
+          background: isUnassigned ? "rgba(74,158,255,0.1)" : chipBg,
+          border: `1px solid ${isUnassigned ? "rgba(74,158,255,0.35)" : chipBord}`,
           borderRadius: 8, padding: "5px 10px", cursor: "grab", userSelect: "none" }}>
-        <span style={{ background: st?.bg || (isUnassigned ? "#2a4a6a" : "#555"), color: "#fff", borderRadius: 4, padding: "2px 8px", fontSize: 12, fontWeight: 700 }}>{code}</span>
+        <span style={{ background: grpColor || st?.bg || (isUnassigned ? "#2a4a6a" : "#555"), color: "#fff", borderRadius: 4, padding: "2px 8px", fontSize: 12, fontWeight: 700 }}>{code}</span>
         {st?.label && !isUnassigned && <span style={{ fontSize: 11, color: "#8892b0" }}>{st.label}</span>}
         <button onClick={onRemove}
           style={{ background: "none", border: "none", color: isUnassigned ? "#e74c3c" : "#556", cursor: "pointer", fontSize: 13, lineHeight: 1, padding: "0 0 0 2px", opacity: isUnassigned ? .75 : 1 }}
@@ -1464,7 +1475,7 @@ function LegendEditor() {
   };
 
   return (
-    <div>
+    <div onClick={() => setColorPick(null)}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <div style={{ fontSize: 12, color: "#8892b0" }}>הוסף קוד, גרור לקבוצה הרצויה</div>
         <button onClick={() => saveAll(DEFAULT_LEGEND, [])}
@@ -1497,21 +1508,43 @@ function LegendEditor() {
 
       {/* ── Groups ── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {groups.map(group => (
+        {groups.map(group => {
+          const gc = group.color || "#4a9eff";
+          const isPicking = colorPick === group.id;
+          return (
           <div key={group.id}
             onDragOver={e => { e.preventDefault(); setDropTarget(group.id); }}
             onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDropTarget(null); }}
             onDrop={e => { e.preventDefault(); onDrop(group.id); }}
-            style={{ border: `2px solid ${dropTarget === group.id ? "#4a9eff" : "rgba(255,255,255,0.1)"}`, borderRadius: 12, overflow: "hidden", transition: "border-color .15s", background: dropTarget === group.id ? "rgba(74,158,255,0.06)" : "transparent" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "rgba(255,255,255,0.04)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+            style={{ border: `2px solid ${dropTarget === group.id ? gc : "rgba(255,255,255,0.1)"}`, borderRadius: 12, overflow: "hidden", transition: "border-color .15s", background: dropTarget === group.id ? `${gc}0a` : "transparent" }}>
+            {/* Group header */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: `${gc}12`, borderBottom: `1px solid ${gc}30` }}>
+              {/* Color dot */}
+              <div
+                onClick={e => { e.stopPropagation(); setColorPick(isPicking ? null : group.id); }}
+                title="שנה צבע"
+                style={{ width: 14, height: 14, borderRadius: "50%", background: gc, flexShrink: 0, cursor: "pointer", border: isPicking ? "2px solid #fff" : "2px solid transparent", transition: "border .15s" }}
+              />
+              {/* Name input */}
               <input value={group.name} onChange={e => renameGroup(group.id, e.target.value)}
-                style={{ ...inp, padding: "3px 8px", fontSize: 12, fontWeight: 700, flex: 1 }} />
+                style={{ ...inp, padding: "3px 8px", fontSize: 12, fontWeight: 700, flex: 1, color: gc }} />
               <span style={{ fontSize: 10, color: "#445", background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: "2px 8px", whiteSpace: "nowrap" }}>{group.codes.length} קודים</span>
               {groups.length > 1 && (
                 <button onClick={() => removeGroup(group.id)}
                   style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", fontSize: 15, opacity: .6, padding: 2 }} title="מחק קבוצה">✕</button>
               )}
             </div>
+            {/* Color palette */}
+            {isPicking && (
+              <div onClick={e => e.stopPropagation()}
+                style={{ display: "flex", flexWrap: "wrap", gap: 7, padding: "10px 12px", background: "rgba(0,0,0,0.3)", borderBottom: `1px solid ${gc}22` }}>
+                {LEGEND_COLORS.map(c => (
+                  <button key={c} onClick={() => setGroupColor(group.id, c)}
+                    style={{ width: 22, height: 22, borderRadius: "50%", background: c, border: gc === c ? "3px solid #fff" : "3px solid transparent", cursor: "pointer", padding: 0, flexShrink: 0, transition: "border .1s" }} />
+                ))}
+              </div>
+            )}
+            {/* Codes area */}
             <div style={{ padding: "10px 12px", display: "flex", flexWrap: "wrap", gap: 8, minHeight: 54 }}>
               {group.codes.length === 0 && (
                 <span style={{ fontSize: 11, color: "#334", alignSelf: "center", fontStyle: "italic" }}>גרור לכאן קודים…</span>
@@ -1519,7 +1552,7 @@ function LegendEditor() {
               {group.codes.map(code => codeChip(code, group.id, () => unassignCode(group.id, code), "החזר לממתינים"))}
             </div>
           </div>
-        ))}
+        );})}
       </div>
 
       {/* Add new group */}
