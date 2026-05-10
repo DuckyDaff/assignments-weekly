@@ -486,6 +486,15 @@ export default function App() {
     }).catch(() => {});
   }, []);
 
+  const saveNominalHours = useCallback(async (nominalHours) => {
+    setAnnualData(prev => prev ? { ...prev, nominalHours } : prev);
+    await fetch("/api/annual", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nominalHours }),
+    }).catch(() => {});
+  }, []);
+
   const saveAbsenceRange = useCallback(async ({ person, code, fromDate, toDate }) => {
     // Optimistic update: apply to every day in range
     setAnnualData(prev => {
@@ -645,7 +654,7 @@ export default function App() {
           {tab === "calendar" && <CalendarView wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onCopy={copyFromPrev} onView={a => setViewAssign(a)} onPlan={() => setPlanner(true)} />}
           {tab === "annual"   && <AnnualView  annualData={annualData} onSaveDay={saveAnnualDay} mgr={mgr} mgrName={mgrName} myName={myName} />}
           {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} annualData={annualData} setMyName={n => { setMyName(n); if (n) localStorage.setItem("myName", n); else localStorage.removeItem("myName"); }} onView={a => setViewAssign(a)} onChangeName={() => setShowWelcome(true)} pushStatus={pushStatus} onEnablePush={() => registerPush(myName, remindersOn).then(() => setPushStatus(Notification?.permission || "default"))} remindersOn={remindersOn} onToggleReminders={v => { setRemindersOn(v); localStorage.setItem("remindersOn", v); updateReminderPref(v); }} />}
-          {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} mgrName={mgrName} toast={toast} onSyncAnnual={syncAnnualSections} tabLabels={tabLabels} onSaveTabLabels={saveTabLabels} />}
+          {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} mgrName={mgrName} toast={toast} onSyncAnnual={syncAnnualSections} tabLabels={tabLabels} onSaveTabLabels={saveTabLabels} annualData={annualData} onSaveNominalHours={saveNominalHours} />}
         </main>
 
         <BottomNav tab={tab} setTab={setTab} TABS={TABS} />
@@ -879,6 +888,14 @@ function BoardCard({ a, col, mgr, onEdit, onDelete, onView }) {
           {!(a.assignees || []).length && <span style={{ fontSize: 11, color: "#556", fontStyle: "italic" }}>אין אנשים</span>}
         </div>
       </div>
+      {(a.vehicles || []).length > 0 && (
+        <div style={{ padding: "3px 12px 7px" }}>
+          <div style={{ fontSize: 9, color: "#e67e22", fontWeight: 700, letterSpacing: .7, marginBottom: 5, textTransform: "uppercase" }}>🚗 רכבים</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {(a.vehicles || []).map(v => <Chip key={v} label={v} color="#e67e22" />)}
+          </div>
+        </div>
+      )}
       {tasks.length > 0 && (
         <div style={{ padding: "5px 12px 11px" }}>
           <div style={{ fontSize: 9, color: "#8892b0", fontWeight: 700, letterSpacing: .7, marginBottom: 5, textTransform: "uppercase" }}>משימות ({tasks.length})</div>
@@ -1491,7 +1508,7 @@ function TabsEditor({ tabLabels, onSave }) {
 }
 
 /* ── SETTINGS ── */
-function SettingsView({ data, save, mgr, mgrName, toast, onSyncAnnual, tabLabels, onSaveTabLabels }) {
+function SettingsView({ data, save, mgr, mgrName, toast, onSyncAnnual, tabLabels, onSaveTabLabels, annualData, onSaveNominalHours }) {
   const isMaster = mgrName === "מנהל ראשי";
   const [st, setSt]     = useState("sys");
   const [vSys, setVSys] = useState("");
@@ -1506,6 +1523,8 @@ function SettingsView({ data, save, mgr, mgrName, toast, onSyncAnnual, tabLabels
   const tabs = [
     { id: "sys",    l: "מערכות" },
     { id: "ppl",    l: "אנשי צוות" },
+    { id: "veh",    l: "רכבים" },
+    { id: "hours",  l: "שעות" },
     { id: "legend", l: "מקרא" },
     { id: "log",    l: "יומן" },
     ...(isMaster ? [{ id: "mgrs", l: "מנהלים" }, { id: "tabs", l: "טאבים" }, { id: "sec", l: "אבטחה" }] : []),
@@ -1514,11 +1533,13 @@ function SettingsView({ data, save, mgr, mgrName, toast, onSyncAnnual, tabLabels
     <div style={{ maxWidth: 540, margin: "0 auto" }}>
       <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: 4, flexWrap: "wrap" }}>
         {tabs.map(t => (
-          <button key={t.id} onClick={() => setSt(t.id)} style={{ flex: 1, minWidth: 60, padding: "7px 4px", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: st === t.id ? 700 : 400, background: st === t.id ? "rgba(74,158,255,0.2)" : "transparent", color: st === t.id ? "#4a9eff" : "#8892b0" }}>{t.l}</button>
+          <button key={t.id} onClick={() => setSt(t.id)} style={{ flex: 1, minWidth: 55, padding: "7px 4px", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 11, fontWeight: st === t.id ? 700 : 400, background: st === t.id ? "rgba(74,158,255,0.2)" : "transparent", color: st === t.id ? "#4a9eff" : "#8892b0" }}>{t.l}</button>
         ))}
       </div>
       {st === "sys"    && <SystemsEditor data={data} save={save} toast={toast} vSys={vSys} setVSys={setVSys} />}
       {st === "ppl"    && <SectionsEditor data={data} save={save} toast={toast} onSyncAnnual={onSyncAnnual} />}
+      {st === "veh"    && <VehiclesEditor data={data} save={save} toast={toast} />}
+      {st === "hours"  && <NominalHoursEditor annualData={annualData} onSave={onSaveNominalHours} toast={toast} />}
       {st === "legend" && <LegendEditor />}
       {st === "log"    && <ActivityLog data={data} />}
       {st === "mgrs"   && isMaster && <ManagersEditor data={data} save={save} toast={toast} />}
@@ -1576,6 +1597,85 @@ function ManagersEditor({ data, save, toast }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* ── VEHICLES EDITOR ── */
+function VehiclesEditor({ data, save, toast }) {
+  const [newVeh, setNewVeh] = useState("");
+  const vehicles = data.vehicles || [];
+  const add = () => {
+    const v = newVeh.trim();
+    if (!v) { toast("הכנס שם רכב", "error"); return; }
+    if (vehicles.includes(v)) { toast("רכב כבר קיים", "error"); return; }
+    save({ ...data, vehicles: [...vehicles, v] }, `רכב נוסף: ${v}`);
+    setNewVeh("");
+  };
+  const remove = v => save({ ...data, vehicles: vehicles.filter(x => x !== v) }, `רכב הוסר: ${v}`);
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: "#8892b0", marginBottom: 12 }}>ניהול רכבי הצוות — ניתן לשייך רכב לכל שיבוץ</div>
+      <div style={{ display: "flex", gap: 7, marginBottom: 13 }}>
+        <input value={newVeh} onChange={e => setNewVeh(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} placeholder="שם הרכב החדש" style={inp} />
+        <PillBtn onClick={add} color="#e67e22">הוסף</PillBtn>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {vehicles.length === 0 && <div style={{ fontSize: 13, color: "#445", textAlign: "center", padding: 20 }}>אין רכבים מוגדרים</div>}
+        {vehicles.map(v => (
+          <div key={v} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRight: "3px solid #e67e22", borderRadius: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 17 }}>🚗</span>
+              <span style={{ fontWeight: 600, fontSize: 14, color: "#fff" }}>{v}</span>
+            </div>
+            <button onClick={() => remove(v)} style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", padding: 6, opacity: .7 }} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=.7}><I n="trash" s={15} /></button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── NOMINAL HOURS EDITOR ── */
+const MONTHS_HE_FULL = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
+function NominalHoursEditor({ annualData, onSave, toast }) {
+  const nominal = annualData?.nominalHours || {};
+  const [hours, setHours] = useState(() => {
+    const h = {};
+    for (let m = 1; m <= 12; m++) h[String(m)] = nominal[String(m)] ?? nominal[m] ?? 182;
+    return h;
+  });
+  const doSave = () => {
+    const parsed = {};
+    for (let m = 1; m <= 12; m++) {
+      const v = parseInt(hours[String(m)], 10);
+      if (isNaN(v) || v < 0) { toast(`ערך לא תקין לחודש ${m}`, "error"); return; }
+      parsed[String(m)] = v;
+    }
+    onSave(parsed);
+    toast("נומינל שעות עודכן ✓");
+  };
+  if (!annualData) return <div style={{ fontSize: 13, color: "#445", padding: 20, textAlign: "center" }}>טען תוכנית שנתית כדי לערוך נומינל שעות</div>;
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: "#8892b0", marginBottom: 14, lineHeight: 1.6 }}>
+        הגדר שעות נומינליות לכל חודש עבור <strong style={{ color: "#4a9eff" }}>משמרת מסלולים</strong>.<br />
+        כל ביצוע משמרת (י / ל / Y / L) = 12 שעות.
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 14 }}>
+        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+          <div key={m} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9, padding: "8px 10px" }}>
+            <div style={{ fontSize: 10, color: "#8892b0", marginBottom: 5, fontWeight: 700 }}>{MONTHS_HE_FULL[m - 1]}</div>
+            <input
+              type="number" min="0" max="400"
+              value={hours[String(m)] ?? 182}
+              onChange={e => setHours(h => ({ ...h, [String(m)]: e.target.value }))}
+              style={{ ...inp, textAlign: "center", padding: "6px 4px", fontSize: 14 }}
+            />
+          </div>
+        ))}
+      </div>
+      <PillBtn onClick={doSave} color="#4a9eff">שמור נומינל שעות</PillBtn>
     </div>
   );
 }
@@ -2295,6 +2395,14 @@ function AssignDetailModal({ a, sysMap, mgr, onClose, onEdit, onDelete }) {
               {!(a.assignees || []).length && <span style={{ fontSize: 12, color: "#556", fontStyle: "italic" }}>אין אנשים</span>}
             </div>
           </div>
+          {(a.vehicles || []).length > 0 && (
+            <div>
+              <div style={{ fontSize: 10, color: "#e67e22", fontWeight: 700, letterSpacing: .7, marginBottom: 7, textTransform: "uppercase" }}>🚗 רכבים</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                {(a.vehicles || []).map(v => <Chip key={v} label={v} color="#e67e22" />)}
+              </div>
+            </div>
+          )}
           {(a.tasks || []).length > 0 && (
             <div>
               <div style={{ fontSize: 10, color: "#8892b0", fontWeight: 700, letterSpacing: .7, marginBottom: 7, textTransform: "uppercase" }}>משימות ({a.tasks.length})</div>
@@ -2340,12 +2448,13 @@ function AssignDetailModal({ a, sysMap, mgr, onClose, onEdit, onDelete }) {
 function AssignModal({ mode, a, wk, data, sysMap, onClose, onSave }) {
   const mob = useContext(MobileCtx);
   const [form, setForm] = useState(() => a
-    ? { ...a, tasks: [...(a.tasks || [])], days: [...(a.days || ALL_DAYS)], assignees: [...(a.assignees || [])] }
-    : { week: wk, system: data.systems[0] || "", assignees: [], tasks: [], days: [], notes: "" });
+    ? { ...a, tasks: [...(a.tasks || [])], days: [...(a.days || ALL_DAYS)], assignees: [...(a.assignees || [])], vehicles: [...(a.vehicles || [])] }
+    : { week: wk, system: data.systems[0] || "", assignees: [], vehicles: [], tasks: [], days: [], notes: "" });
   const [task, setTask] = useState("");
   const taskRef = useRef();
   const toggleP = p => setForm(f => ({ ...f, assignees: f.assignees.includes(p) ? f.assignees.filter(x => x !== p) : [...f.assignees, p] }));
   const toggleD = k => setForm(f => ({ ...f, days: f.days.includes(k) ? f.days.filter(x => x !== k) : [...f.days, k] }));
+  const toggleV = v => setForm(f => ({ ...f, vehicles: f.vehicles.includes(v) ? f.vehicles.filter(x => x !== v) : [...f.vehicles, v] }));
   const addTask = () => { if (!task.trim()) return; setForm(f => ({ ...f, tasks: [...f.tasks, task.trim()] })); setTask(""); taskRef.current?.focus(); };
   const col = sysMap[form.system] || pal(0);
   return (
@@ -2404,6 +2513,21 @@ function AssignModal({ mode, a, wk, data, sysMap, onClose, onSave }) {
               ))}
             </div>
           </div>
+          {(data.vehicles || []).length > 0 && (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <label style={{ ...lbl, marginBottom: 0 }}>🚗 רכבים</label>
+                {form.vehicles.length > 0 && <span style={{ fontSize: 11, color: "#e67e22", fontWeight: 600 }}>{form.vehicles.length} נבחרו</span>}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                {(data.vehicles || []).map(v => { const sel = form.vehicles.includes(v); return (
+                  <button key={v} onClick={() => toggleV(v)} style={{ padding: "6px 13px", border: `1px solid ${sel ? "#e67e22" : "rgba(255,255,255,0.1)"}`, borderRadius: 20, background: sel ? "rgba(230,126,34,0.2)" : "rgba(255,255,255,0.04)", color: sel ? "#e67e22" : "#8892b0", fontSize: 12, cursor: "pointer", fontWeight: sel ? 700 : 400 }}>
+                    {sel && "✓ "}{v}
+                  </button>
+                ); })}
+              </div>
+            </div>
+          )}
           <div>
             <label style={lbl}>משימות לשבוע</label>
             <div style={{ display: "flex", gap: 7, marginBottom: 8 }}>
@@ -3469,6 +3593,44 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
                         );
                       })}
                     </tbody>
+                    {/* ── Shift hours footer (משמרת sections only) ── */}
+                    {sec.name.includes('משמרת') && (() => {
+                      const SHIFT_CODES = new Set(['י', 'ל', 'Y', 'L']);
+                      const nominal = annualData.nominalHours?.[String(selMonth + 1)] ?? annualData.nominalHours?.[selMonth + 1] ?? 182;
+                      return (
+                        <tfoot>
+                          <tr style={{ background: 'rgba(0,0,0,0.35)', borderTop: `2px solid ${sc.accent}66` }}>
+                            <td style={{ padding: '5px 8px', position: 'sticky', right: 0, background: '#080c18', zIndex: 1, whiteSpace: 'nowrap', verticalAlign: 'middle', borderLeft: '1px solid rgba(255,255,255,0.1)', willChange: 'transform' }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: '#8892b0' }}>שעות</div>
+                              {nominal > 0 && <div style={{ fontSize: 9, color: '#445' }}>/ {nominal}</div>}
+                            </td>
+                            {people.map(person => {
+                              if (person.includes('תקן')) return (
+                                <Fragment key={person}>
+                                  <td colSpan={2} style={{ background: 'rgba(0,0,0,0.25)', borderRight: '3px dashed rgba(255,255,255,0.1)' }} />
+                                </Fragment>
+                              );
+                              let count = 0;
+                              for (const { iso } of monthDays) {
+                                const code = (days[iso]?.statuses?.[person]) || '';
+                                if (SHIFT_CODES.has(code)) count++;
+                              }
+                              const hrs = count * 12;
+                              const ratio = nominal > 0 ? hrs / nominal : 1;
+                              const color = ratio >= 1 ? '#2ecc71' : ratio >= 0.9 ? '#f39c12' : '#e74c3c';
+                              return (
+                                <Fragment key={person}>
+                                  <td colSpan={2} style={{ textAlign: 'center', padding: '5px 2px', borderRight: '3px solid rgba(255,255,255,0.55)' }}>
+                                    <span style={{ fontSize: 13, fontWeight: 700, color }}>{hrs}</span>
+                                    {nominal > 0 && <span style={{ fontSize: 9, color: '#445', marginRight: 1 }}>/{nominal}</span>}
+                                  </td>
+                                </Fragment>
+                              );
+                            })}
+                          </tr>
+                        </tfoot>
+                      );
+                    })()}
                   </table>
                   ); })()}
                 </div>{/* end inner overflowX scroll div */}

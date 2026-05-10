@@ -62,6 +62,13 @@ export default async function handler(req, res) {
         return res.json({ ok: true, sections: plan.sections.length });
       }
 
+      // ── Nominal hours update: { nominalHours: { "1": 182, ... } } ─
+      if (body.nominalHours && typeof body.nominalHours === 'object' && !body.date && !body.fromDate) {
+        plan.nominalHours = body.nominalHours;
+        await redis.set(REDIS_KEY, JSON.stringify(plan));
+        return res.json({ ok: true });
+      }
+
       // ── Range update: { person, code, fromDate, toDate } ─────
       if (body.fromDate && body.toDate && body.person !== undefined) {
         const from = new Date(body.fromDate + "T00:00:00");
