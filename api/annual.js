@@ -69,6 +69,13 @@ export default async function handler(req, res) {
         return res.json({ ok: true });
       }
 
+      // ── Holidays update: { holidays: { "2026-09-22": "ראש השנה א׳", ... } } ─
+      if (body.holidays && typeof body.holidays === 'object' && !body.date && !body.fromDate) {
+        plan.holidays = body.holidays;
+        await redis.set(REDIS_KEY, JSON.stringify(plan));
+        return res.json({ ok: true });
+      }
+
       // ── Range update: { person, code, fromDate, toDate } ─────
       if (body.fromDate && body.toDate && body.person !== undefined) {
         const from = new Date(body.fromDate + "T00:00:00");

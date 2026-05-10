@@ -528,6 +528,15 @@ export default function App() {
     }).catch(() => {});
   }, []);
 
+  const saveHolidays = useCallback(async (holidays) => {
+    setAnnualData(prev => prev ? { ...prev, holidays } : prev);
+    await fetch("/api/annual", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ holidays }),
+    }).catch(() => {});
+  }, []);
+
   const saveAbsenceRange = useCallback(async ({ person, code, fromDate, toDate }) => {
     // Optimistic update: apply to every day in range
     setAnnualData(prev => {
@@ -690,7 +699,7 @@ export default function App() {
           {tab === "calendar" && <CalendarView wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onCopy={copyFromPrev} onView={a => setViewAssign(a)} onPlan={() => setPlanner(true)} />}
           {tab === "annual"   && <AnnualView  annualData={annualData} onSaveDay={saveAnnualDay} mgr={mgr} mgrName={mgrName} myName={myName} toast={toast} />}
           {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} annualData={annualData} setMyName={n => { setMyName(n); if (n) localStorage.setItem("myName", n); else localStorage.removeItem("myName"); }} onView={a => setViewAssign(a)} onChangeName={() => setShowWelcome(true)} pushStatus={pushStatus} onEnablePush={() => registerPush(myName, remindersOn).then(() => setPushStatus(Notification?.permission || "default"))} remindersOn={remindersOn} onToggleReminders={v => { setRemindersOn(v); localStorage.setItem("remindersOn", v); updateReminderPref(v); }} />}
-          {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} mgrName={mgrName} toast={toast} onSyncAnnual={syncAnnualSections} tabLabels={tabLabels} onSaveTabLabels={saveTabLabels} annualData={annualData} onSaveNominalHours={saveNominalHours} />}
+          {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} mgrName={mgrName} toast={toast} onSyncAnnual={syncAnnualSections} tabLabels={tabLabels} onSaveTabLabels={saveTabLabels} annualData={annualData} onSaveNominalHours={saveNominalHours} onSaveHolidays={saveHolidays} />}
         </main>
 
         <BottomNav tab={tab} setTab={setTab} TABS={TABS} />
@@ -1771,7 +1780,7 @@ function ReportsEditor({ data, annualData }) {
 }
 
 /* ── SETTINGS ── */
-function SettingsView({ data, save, mgr, mgrName, toast, onSyncAnnual, tabLabels, onSaveTabLabels, annualData, onSaveNominalHours }) {
+function SettingsView({ data, save, mgr, mgrName, toast, onSyncAnnual, tabLabels, onSaveTabLabels, annualData, onSaveNominalHours, onSaveHolidays }) {
   const isMaster = mgrName === "מנהל ראשי";
   const [st, setSt]     = useState("sys");
   const [vSys, setVSys] = useState("");
@@ -1803,7 +1812,10 @@ function SettingsView({ data, save, mgr, mgrName, toast, onSyncAnnual, tabLabels
       {st === "sys"    && <SystemsEditor data={data} save={save} toast={toast} vSys={vSys} setVSys={setVSys} />}
       {st === "ppl"    && <SectionsEditor data={data} save={save} toast={toast} onSyncAnnual={onSyncAnnual} />}
       {st === "veh"    && <VehiclesEditor data={data} save={save} toast={toast} />}
-      {st === "hours"  && <NominalHoursEditor annualData={annualData} onSave={onSaveNominalHours} toast={toast} />}
+      {st === "hours"  && <>
+        <NominalHoursEditor annualData={annualData} onSave={onSaveNominalHours} toast={toast} />
+        <HolidaysEditor annualData={annualData} onSave={onSaveHolidays} toast={toast} />
+      </>}
       {st === "legend"  && <LegendEditor />}
       {st === "reports" && <ReportsEditor data={data} annualData={annualData} />}
       {st === "log"     && <ActivityLog data={data} />}
@@ -1941,6 +1953,166 @@ function NominalHoursEditor({ annualData, onSave, toast }) {
         ))}
       </div>
       <PillBtn onClick={doSave} color="#4a9eff">שמור נומינל שעות</PillBtn>
+    </div>
+  );
+}
+
+/* ── HOLIDAYS EDITOR ── */
+const JEWISH_HOLIDAYS = [
+  // ימים טובים
+  { name: 'ראש השנה א׳',              type: 'holiday' },
+  { name: 'ראש השנה ב׳',              type: 'holiday' },
+  { name: 'יום כיפור',                type: 'holiday' },
+  { name: 'סוכות (חג ראשון)',          type: 'holiday' },
+  { name: 'שמיני עצרת / שמחת תורה',   type: 'holiday' },
+  { name: 'פסח א׳',                   type: 'holiday' },
+  { name: 'פסח ב׳',                   type: 'holiday' },
+  { name: 'שביעי של פסח',             type: 'holiday' },
+  { name: 'אחרון של פסח',             type: 'holiday' },
+  { name: 'שבועות א׳',                type: 'holiday' },
+  { name: 'שבועות ב׳',                type: 'holiday' },
+  // ימי זכרון ואומה
+  { name: 'יום הזיכרון',              type: 'memorial' },
+  { name: 'יום העצמאות',              type: 'memorial' },
+  { name: 'יום ירושלים',              type: 'memorial' },
+  // פורים
+  { name: 'פורים',                    type: 'holiday' },
+  { name: 'שושן פורים',               type: 'holiday' },
+  // צומות
+  { name: 'צום גדליה',                type: 'fast' },
+  { name: 'צום עשרה בטבת',            type: 'fast' },
+  { name: 'תענית אסתר',               type: 'fast' },
+  { name: 'שבעה עשר בתמוז',           type: 'fast' },
+  { name: 'תשעה באב',                 type: 'fast' },
+  // ערבי חג
+  { name: 'ערב ראש השנה',             type: 'eve' },
+  { name: 'ערב יום כיפור',            type: 'eve' },
+  { name: 'ערב פסח',                  type: 'eve' },
+];
+
+const HOL_TYPE_STYLE = {
+  holiday:  { color: '#e67e22', label: 'חג' },
+  memorial: { color: '#4a9eff', label: 'זיכרון / לאום' },
+  fast:     { color: '#8e44ad', label: 'צום' },
+  eve:      { color: '#7f8c8d', label: 'ערב חג' },
+  custom:   { color: '#2ecc71', label: 'מותאם אישית' },
+};
+
+function HolidaysEditor({ annualData, onSave, toast }) {
+  const savedHolidays = annualData?.holidays || {};
+  // Local state: map of name → date string (yyyy-mm-dd)
+  const [dates, setDates] = useState(() => {
+    // Build reverse map: date → name, then name → date
+    const nameToDate = {};
+    for (const [iso, name] of Object.entries(savedHolidays)) nameToDate[name] = iso;
+    return nameToDate;
+  });
+  const [customName, setCustomName] = useState('');
+  const [customDate, setCustomDate] = useState('');
+
+  const buildHolidaysObj = (d) => {
+    const obj = {};
+    for (const [name, iso] of Object.entries(d)) { if (iso) obj[iso] = name; }
+    return obj;
+  };
+
+  const setDate = (name, iso) => {
+    setDates(prev => {
+      const next = { ...prev, [name]: iso };
+      if (!iso) delete next[name];
+      return next;
+    });
+  };
+
+  const doSave = () => {
+    onSave(buildHolidaysObj(dates));
+    toast('חגים ומועדים עודכנו ✓');
+  };
+
+  const addCustom = () => {
+    if (!customName.trim() || !customDate) return;
+    setDates(prev => ({ ...prev, [customName.trim()]: customDate }));
+    setCustomName(''); setCustomDate('');
+  };
+
+  // custom entries = dates not in JEWISH_HOLIDAYS list
+  const knownNames = new Set(JEWISH_HOLIDAYS.map(h => h.name));
+  const customEntries = Object.entries(dates).filter(([name]) => !knownNames.has(name));
+
+  const sep = (label, color) => (
+    <div style={{ fontSize: 10, color, fontWeight: 700, marginTop: 14, marginBottom: 6, borderBottom: `1px solid ${color}33`, paddingBottom: 4, letterSpacing: 0.5 }}>{label}</div>
+  );
+
+  const groups = [
+    { type: 'holiday',  items: JEWISH_HOLIDAYS.filter(h => h.type === 'holiday') },
+    { type: 'memorial', items: JEWISH_HOLIDAYS.filter(h => h.type === 'memorial') },
+    { type: 'fast',     items: JEWISH_HOLIDAYS.filter(h => h.type === 'fast') },
+    { type: 'eve',      items: JEWISH_HOLIDAYS.filter(h => h.type === 'eve') },
+  ];
+
+  return (
+    <div style={{ marginTop: 28, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 20 }}>
+      <div style={{ fontWeight: 700, fontSize: 14, color: '#ccd6f6', marginBottom: 6 }}>✡️ חגים ומועדים</div>
+      <div style={{ fontSize: 12, color: '#8892b0', marginBottom: 14, lineHeight: 1.6 }}>
+        הגדר תאריכים לחגים — הימים יסומנו אוטומטית באפור בטבלה החודשית ושם החג יופיע בהערות.
+      </div>
+
+      {groups.map(({ type, items }) => {
+        const ts = HOL_TYPE_STYLE[type];
+        return (
+          <div key={type}>
+            {sep(ts.label, ts.color)}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {items.map(h => (
+                <div key={h.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: `1px solid ${dates[h.name] ? ts.color + '33' : 'rgba(255,255,255,0.06)'}` }}>
+                  <span style={{ flex: 1, fontSize: 12, color: dates[h.name] ? '#ccd6f6' : '#6a7a9a' }}>{h.name}</span>
+                  <input
+                    type="date"
+                    value={dates[h.name] || ''}
+                    onChange={e => setDate(h.name, e.target.value)}
+                    style={{ ...inp, padding: '3px 6px', fontSize: 11, width: 130, textAlign: 'center', colorScheme: 'dark' }}
+                  />
+                  {dates[h.name] && (
+                    <button onClick={() => setDate(h.name, '')}
+                      style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px' }}>✕</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Custom entries */}
+      {customEntries.length > 0 && (
+        <>
+          {sep('מותאם אישית', HOL_TYPE_STYLE.custom.color)}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {customEntries.map(([name, iso]) => (
+              <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: `1px solid ${HOL_TYPE_STYLE.custom.color}33` }}>
+                <span style={{ flex: 1, fontSize: 12, color: '#ccd6f6' }}>{name}</span>
+                <input type="date" value={iso} onChange={e => setDate(name, e.target.value)}
+                  style={{ ...inp, padding: '3px 6px', fontSize: 11, width: 130, colorScheme: 'dark' }} />
+                <button onClick={() => setDate(name, '')}
+                  style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px' }}>✕</button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Add custom */}
+      <div style={{ marginTop: 12, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input value={customName} onChange={e => setCustomName(e.target.value)} placeholder="שם חג / אירוע מותאם"
+          style={{ ...inp, flex: 1, minWidth: 120, padding: '5px 8px', fontSize: 12 }} />
+        <input type="date" value={customDate} onChange={e => setCustomDate(e.target.value)}
+          style={{ ...inp, padding: '5px 6px', fontSize: 11, width: 130, colorScheme: 'dark' }} />
+        <PillBtn onClick={addCustom} color="#2ecc71">+ הוסף</PillBtn>
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <PillBtn onClick={doSave} color="#4a9eff">💾 שמור חגים ומועדים</PillBtn>
+      </div>
     </div>
   );
 }
@@ -4192,26 +4364,29 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast }) {
                     </thead>
                     <tbody>
                       {monthDays.map(({ num, iso, dow }, ri) => {
-                        const dayData   = days[iso] || {};
+                        const dayData    = days[iso] || {};
                         const statuses2  = dayData.statuses2 || {};
                         const isToday    = iso === today;
                         const isSat      = dow === 6;
                         const isFri      = dow === 5;
                         const isWeekend  = isFri || isSat;
-                        const rowBg      = isToday ? 'rgba(74,158,255,0.1)' : isWeekend ? 'rgba(100,100,130,0.18)' : ri % 2 === 0 ? 'rgba(255,255,255,0.018)' : 'rgba(0,0,0,0.15)';
-                        const stickyBg   = isToday ? '#0d1e3a' : isWeekend ? '#0d0f1c' : ri % 2 === 0 ? '#0c1022' : '#090d1a';
-                        const emptyCellBg = isWeekend ? 'rgba(100,100,130,0.1)' : 'transparent';
+                        const holidayName = (annualData?.holidays || {})[iso] || null;
+                        const isGray     = isWeekend || !!holidayName;
+                        const rowBg      = isToday ? 'rgba(74,158,255,0.1)' : isGray ? 'rgba(100,100,130,0.18)' : ri % 2 === 0 ? 'rgba(255,255,255,0.018)' : 'rgba(0,0,0,0.15)';
+                        const stickyBg   = isToday ? '#0d1e3a' : isGray ? '#0d0f1c' : ri % 2 === 0 ? '#0c1022' : '#090d1a';
+                        const emptyCellBg = isGray ? 'rgba(100,100,130,0.1)' : 'transparent';
                         return (
                           <tr key={iso}
-                            style={{ background: rowBg, borderBottom: `1px solid rgba(255,255,255,${isWeekend ? '0.1' : '0.06'})` }}>
+                            style={{ background: rowBg, borderBottom: `1px solid rgba(255,255,255,${isGray ? '0.1' : '0.06'})` }}>
                             {/* Date cell — only this navigates to daily lens */}
                             <td onClick={() => { setSelDate(iso); setLens('daily'); }}
-                              style={{ padding: '5px 8px', position: 'sticky', right: 0, background: stickyBg, zIndex: 1, whiteSpace: 'nowrap', verticalAlign: 'middle', borderLeft: `1px solid rgba(255,255,255,0.1)`, borderBottom: `1px solid rgba(255,255,255,${isWeekend ? '0.1' : '0.06'})`, cursor: 'pointer', willChange: 'transform' }}
+                              style={{ padding: '5px 8px', position: 'sticky', right: 0, background: stickyBg, zIndex: 1, whiteSpace: 'nowrap', verticalAlign: 'middle', borderLeft: `1px solid rgba(255,255,255,0.1)`, borderBottom: `1px solid rgba(255,255,255,${isGray ? '0.1' : '0.06'})`, cursor: 'pointer', willChange: 'transform' }}
                               onMouseEnter={e => e.currentTarget.style.background = '#1a2a4a'}
                               onMouseLeave={e => e.currentTarget.style.background = stickyBg}>
-                              <span style={{ fontWeight: 700, color: isToday ? '#4a9eff' : isWeekend ? '#99aacc' : '#ffffff', fontSize: 14 }}>{num}</span>
-                              <span style={{ fontSize: 12, fontWeight: 700, color: isToday ? '#4a9eff' : isWeekend ? '#8899bb' : '#ccd6f6', marginRight: 5 }}>{DAY_SHORT[dow]}</span>
-                              {dayData.notes && <span style={{ fontSize: 10 }}>📝</span>}
+                              <span style={{ fontWeight: 700, color: isToday ? '#4a9eff' : isGray ? '#99aacc' : '#ffffff', fontSize: 14 }}>{num}</span>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: isToday ? '#4a9eff' : isGray ? '#8899bb' : '#ccd6f6', marginRight: 5 }}>{DAY_SHORT[dow]}</span>
+                              {holidayName && <span style={{ fontSize: 9, color: '#e67e22', fontWeight: 700, display: 'block', lineHeight: 1.2, maxWidth: 50, whiteSpace: 'normal', wordBreak: 'break-word' }}>{holidayName}</span>}
+                              {dayData.notes && !holidayName && <span style={{ fontSize: 10 }}>📝</span>}
                             </td>
                             {people.map((person) => {
                               const isVacant = person.includes('תקן');
