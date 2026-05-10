@@ -3236,8 +3236,8 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
 
               {/* ── People × Days grid ── */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${sc.accent}55`, boxShadow: `0 0 0 1px rgba(0,0,0,0.4)` }}>
-                  <table style={{ borderCollapse: 'collapse', width: '100%', direction: 'rtl', minWidth: Math.max(320, people.length * 66 + 72) }}>
+                <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${sc.accent}55`, boxShadow: `0 0 0 1px rgba(0,0,0,0.4)`, display: 'flex', justifyContent: 'center' }}>
+                  <table style={{ borderCollapse: 'collapse', width: Math.max(320, people.length * 66 + 72), direction: 'rtl', flexShrink: 0 }}>
                     <thead>
                       {/* Person name headers — colSpan=2 (main 2/3 + secondary 1/3) */}
                       <tr style={{ background: `${sc.accent}30` }}>
