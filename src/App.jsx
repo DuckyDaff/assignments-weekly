@@ -193,6 +193,16 @@ const STATUS_MAP = {
   'ניקיון תחנות': { bg: '#2c3e50', label: 'ניקיון תחנות' },
 };
 const UNAVAILABLE_CODES = new Set(['ח','מיל','מ','פ','מנוחה','ק']);
+// Codes that also block assignment (away = שתפ"א, training = הכשרות)
+const CONFLICT_CODES = new Set([
+  ...UNAVAILABLE_CODES,
+  // שתפ"א — away sites
+  'חיפה','הרצליה','ראש פינה','רמון',
+  // הכשרות
+  'ב. חשמל','ב. כללית','השתלמות','ניקיון תחנות','ב. שמיעה','ס. רפואי','ר. גובה','ר. מלגזה','ע. ראשונה',
+  // משמרת — shift/oncall codes (slot 2 for shift sections)
+  'י','ל','Y','L','כ','כש','כמ','כמש',
+]);
 function statusStyle(code) {
   if (!code) return null;
   return STATUS_MAP[code] || { bg: '#1a4a3a', label: code };
@@ -2306,9 +2316,11 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
 
   const add = (sys, col, p) => {
     // Check annual plan availability for that specific day
-    const iso  = wkDayToDate(planWk, col);
-    const code = iso ? (annualData?.days?.[iso]?.statuses?.[p] || "") : "";
-    if (code && UNAVAILABLE_CODES.has(code)) {
+    // Check both slot 1 (statuses) and slot 2 (statuses2 — used for shift/oncall in משמרת sections)
+    const iso   = wkDayToDate(planWk, col);
+    const dayD  = iso ? (annualData?.days?.[iso] || {}) : {};
+    const code  = dayD.statuses2?.[p] || dayD.statuses?.[p] || "";
+    if (code && CONFLICT_CODES.has(code)) {
       const st = statusStyle(code);
       setConflict({ sys, col, person: p, code, label: st?.label || code, iso });
       return;
