@@ -3153,9 +3153,11 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
           return { num: i + 1, iso, dow: new Date(year, selMonth, i + 1).getDay() };
         });
 
-        const sec    = sections[selSecIdx] || sections[0];
-        const sc     = sec ? secPal(null, sec.name, selSecIdx) : { accent: '#4a9eff' };
-        const people = (sec?.people || []).filter(p => !p.includes('נוסף'));
+        const sec      = sections[selSecIdx] || sections[0];
+        const sc       = sec ? secPal(null, sec.name, selSecIdx) : { accent: '#4a9eff' };
+        const people   = (sec?.people || []).filter(p => !p.includes('נוסף'));
+        const maxPeople = Math.max(...sections.map(s => (s.people || []).filter(p => !p.includes('נוסף')).length), 1);
+        const tableWidthPct = Math.round(people.length / maxPeople * 100);
 
         return (
           <div>
@@ -3237,7 +3239,8 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
               {/* ── People × Days grid ── */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${sc.accent}55`, boxShadow: `0 0 0 1px rgba(0,0,0,0.4)`, display: 'flex', justifyContent: 'center' }}>
-                  <table style={{ borderCollapse: 'collapse', width: Math.max(320, people.length * 88 + 80), direction: 'rtl', flexShrink: 0 }}>
+                  <div style={{ width: `${tableWidthPct}%`, minWidth: Math.max(280, people.length * 88 + 80) }}>
+                  <table style={{ borderCollapse: 'collapse', width: '100%', direction: 'rtl' }}>
                     <thead>
                       {/* Person name headers — colSpan=2 (main 2/3 + secondary 1/3) */}
                       <tr style={{ background: `${sc.accent}30` }}>
@@ -3359,6 +3362,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                       })}
                     </tbody>
                   </table>
+                  </div>
                 </div>
 
                 {/* ── Status picker popup (manager click on cell) ── */}
