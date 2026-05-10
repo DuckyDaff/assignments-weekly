@@ -3288,6 +3288,69 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast }) {
                 );
               }
 
+              // ── Special render for "away" (שתפ"א) — grouped by site ──
+              if (cat === 'away') {
+                const bySite = [];
+                people.forEach(({ person, code }) => {
+                  let g = bySite.find(x => x.site === code);
+                  if (!g) { g = { site: code, people: [] }; bySite.push(g); }
+                  g.people.push({ person, code });
+                });
+                const renderPersonChipAway = (person, code) => {
+                  const isMe = person === myName;
+                  const isEd = editCell?.person === person;
+                  return (
+                    <div key={person} style={{ display: 'flex', alignItems: 'center', gap: 6, background: isMe ? 'rgba(74,158,255,0.07)' : 'rgba(255,255,255,0.03)', border: isMe ? '1px solid rgba(74,158,255,0.22)' : '1px solid rgba(255,255,255,0.07)', borderRadius: 8, padding: '5px 9px', flexWrap: isEd ? 'wrap' : 'nowrap', maxWidth: isEd ? 340 : 'none' }}>
+                      <span style={{ fontSize: 12, color: isMe ? '#4a9eff' : '#8892b0', whiteSpace: 'nowrap' }}>{person}</span>
+                      {mgr ? (
+                        isEd ? (
+                          <>
+                            {STATUS_OPTIONS.map(opt => (
+                              <button key={opt || '__none'} onClick={() => { saveStatus(person, opt); setEditCell(null); }}
+                                style={{ padding: '2px 7px', fontSize: 10, borderRadius: 4, border: 'none', cursor: 'pointer', background: opt === code ? (statusStyle(opt)?.bg || '#4a9eff') : 'rgba(255,255,255,0.08)', color: opt === code ? '#fff' : '#8892b0', fontWeight: opt === code ? 700 : 400, margin: '1px' }}>
+                                {opt || '—'}
+                              </button>
+                            ))}
+                            <button onClick={() => setEditCell(null)} style={{ padding: '2px 6px', fontSize: 10, borderRadius: 4, border: '1px solid #333', background: 'transparent', color: '#556', cursor: 'pointer' }}>✕</button>
+                          </>
+                        ) : (
+                          <button onClick={() => setEditCell({ person })}
+                            style={{ background: statusStyle(code)?.bg || 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 5, padding: '3px 9px', fontSize: 11, color: code ? '#fff' : '#445', cursor: 'pointer', fontWeight: 700, minWidth: 30, whiteSpace: 'nowrap' }}>
+                            {code || '—'}
+                          </button>
+                        )
+                      ) : (
+                        <span style={{ background: style.bg, borderRadius: 5, padding: '2px 8px', fontSize: 11, color: '#fff', fontWeight: 700 }}>{code}</span>
+                      )}
+                    </div>
+                  );
+                };
+                return (
+                  <div key={cat} style={{ marginBottom: 12, border: `1px solid ${style.bg}33`, borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ background: `${style.bg}22`, padding: '8px 14px', borderBottom: `1px solid ${style.bg}22`, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 14 }}>{emoji}</span>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: style.bg }}>{title}</span>
+                      <span style={{ marginRight: 'auto', background: `${style.bg}33`, color: style.bg, borderRadius: 10, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>{people.length}</span>
+                    </div>
+                    <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+                      {bySite.map(({ site, people: sp }, si) => (
+                        <div key={site} style={{ paddingBottom: si < bySite.length - 1 ? 10 : 0, marginBottom: si < bySite.length - 1 ? 10 : 0, borderBottom: si < bySite.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+                          {/* Site label */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                            <span style={{ fontSize: 10, color: style.bg, fontWeight: 700 }}>📍 {site}</span>
+                            <span style={{ fontSize: 10, color: style.bg, background: `${style.bg}22`, borderRadius: 8, padding: '0 6px', fontWeight: 700 }}>{sp.length}</span>
+                          </div>
+                          {/* People in this site — side by side */}
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingRight: 8 }}>
+                            {sp.map(({ person, code }) => renderPersonChipAway(person, code))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <div key={cat} style={{ marginBottom: 12, border: `1px solid ${style.bg}33`, borderRadius: 12, overflow: 'hidden' }}>
                   <div style={{ background: `${style.bg}22`, padding: '8px 14px', borderBottom: `1px solid ${style.bg}22`, display: 'flex', alignItems: 'center', gap: 8 }}>
