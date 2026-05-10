@@ -2749,9 +2749,19 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
   const [pickerCell, setPickerCell] = useState(null); // { iso, person, slot, x, y }
   const [paintCode,  setPaintCode]  = useState(null); // null=off, ''=erase, 'י'=paint
   const [shiftModal, setShiftModal] = useState(false);
-  const [sectionColWidths, setSectionColWidths] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('monthlyColWidths') || '{}'); } catch { return {}; }
-  });
+  // Read col widths fresh from localStorage every render — avoids stale state on remount
+  const getColWidths = () => { try { return JSON.parse(localStorage.getItem('monthlyColWidths') || '{}'); } catch { return {}; } };
+  const [colWidthsTick, setColWidthsTick] = useState(0); // just a re-render trigger
+  const saveColWidth = (secName, pri) => {
+    const next = { ...getColWidths(), [secName]: pri };
+    localStorage.setItem('monthlyColWidths', JSON.stringify(next));
+    setColWidthsTick(t => t + 1);
+  };
+  const resetColWidth = (secName) => {
+    const next = { ...getColWidths() }; delete next[secName];
+    localStorage.setItem('monthlyColWidths', JSON.stringify(next));
+    setColWidthsTick(t => t + 1);
+  };
   const dragCode   = useRef(null);
   const dragSource = useRef(null); // { iso, person, slot } — source cell when dragging from table
   const resizeDrag = useRef(null); // { startX, startTblW, secName, people }
@@ -3245,7 +3255,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                 <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${sc.accent}55`, boxShadow: `0 0 0 1px rgba(0,0,0,0.4)`, display: 'flex', justifyContent: 'center' }}>
                   {/* COL_W = colPri primary + 28px secondary per person. date col = 68px. */}
                   {(() => { const COL_SEC = 28, COL_DATE = 68;
-                    const COL_PRI = Math.max(28, sectionColWidths[sec.name] ?? 44);
+                    const COL_PRI = Math.max(28, getColWidths()[sec.name] ?? 44);
                     const tblW = COL_DATE + people.length * (COL_PRI + COL_SEC);
                   return (
                   <table style={{ borderCollapse: 'collapse', width: tblW, direction: 'rtl', tableLayout: 'fixed', flexShrink: 0 }}>
@@ -3393,18 +3403,14 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                       onMouseDown={e => {
                         e.preventDefault();
                         const COL_SEC = 28, COL_DATE = 68;
-                        const curPri = Math.max(28, sectionColWidths[sec.name] ?? 44);
+                        const curPri = Math.max(28, getColWidths()[sec.name] ?? 44);
                         const startTblW = COL_DATE + people.length * (curPri + COL_SEC);
                         resizeDrag.current = { startX: e.clientX, startTblW, secName: sec.name, count: people.length };
                         const onMove = ev => {
                           const { startX, startTblW: stw, secName, count } = resizeDrag.current;
                           const delta = ev.clientX - startX;
                           const newPri = Math.max(28, Math.round((stw + delta - COL_DATE - count * COL_SEC) / count));
-                          setSectionColWidths(prev => {
-                            const next = { ...prev, [secName]: newPri };
-                            localStorage.setItem('monthlyColWidths', JSON.stringify(next));
-                            return next;
-                          });
+                          saveColWidth(secName, newPri);
                         };
                         const onUp = () => {
                           document.removeEventListener('mousemove', onMove);
@@ -3418,12 +3424,9 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                       title="גרור שמאלה/ימינה לשינוי רוחב העמודות">
                       ↔ רוחב עמודות
                     </div>
-                    {sectionColWidths[sec.name] != null && (
-                      <button onClick={() => setSectionColWidths(prev => {
-                        const next = { ...prev }; delete next[sec.name];
-                        localStorage.setItem('monthlyColWidths', JSON.stringify(next));
-                        return next;
-                      })} style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#556', fontSize: 10, cursor: 'pointer' }}>
+                    {getColWidths()[sec.name] != null && (
+                      <button onClick={() => resetColWidth(sec.name)}
+                        style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#556', fontSize: 10, cursor: 'pointer' }}>
                         איפוס
                       </button>
                     )}
