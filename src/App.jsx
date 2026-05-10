@@ -299,6 +299,7 @@ const I = ({ n, s = 17 }) => {
     copy:   <><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>,
     filter: <><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></>,
     sun:    <><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></>,
+    home:   <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></>,
   };
   return <svg width={s} height={s} viewBox="0 0 24 24" {...g}>{m[n]}</svg>;
 };
@@ -372,7 +373,7 @@ export default function App() {
   const [tab, setTab]       = useState(() => {
     // If opened via notification click, start on the right tab
     const p = new URLSearchParams(window.location.search).get("tab");
-    return p || "calendar";
+    return p || "dashboard";
   });
   const [wk, setWk]         = useState(wKey(new Date()));
   const [mgr, setMgr]       = useState(false);
@@ -610,6 +611,7 @@ export default function App() {
   const tabLabels = data?.tabLabels || {};
 
   const TABS = [
+    { id: "dashboard", label: "Dashboard",                         icon: "home" },
     { id: "calendar", label: tabLabels.calendar || "לוח שבועי",    icon: "cal"  },
     { id: "board",    label: tabLabels.board    || "לוח שיבוצים",  icon: "grid" },
     { id: "annual",   label: tabLabels.annual   || "תוכנית שנתית", icon: "calY" },
@@ -650,6 +652,7 @@ export default function App() {
         </header>
 
         <main className="main-pad" style={{ flex: 1, padding: "20px 18px", maxWidth: 1320, margin: "0 auto", width: "100%" }}>
+          {tab === "dashboard" && <DashboardView annualData={annualData} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} mgr={mgr} onView={a => setViewAssign(a)} setTab={setTab} />}
           {tab === "board"    && <BoardView    wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} filterPerson={filterPerson} setFilterPerson={setFilterPerson} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onDelete={deleteAssign} onCopy={copyFromPrev} onCSV={() => doExportCSV(wk, weekA)} onPrint={() => doPrint(wk, weekA, data.systems)} onView={a => setViewAssign(a)} />}
           {tab === "calendar" && <CalendarView wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onCopy={copyFromPrev} onView={a => setViewAssign(a)} onPlan={() => setPlanner(true)} />}
           {tab === "annual"   && <AnnualView  annualData={annualData} onSaveDay={saveAnnualDay} mgr={mgr} mgrName={mgrName} myName={myName} toast={toast} />}
@@ -2976,6 +2979,167 @@ function PersonChip({ person, code, isMe }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderRadius: 20, background: isMe ? 'rgba(74,158,255,0.1)' : 'rgba(255,255,255,0.05)', border: isMe ? '1px solid rgba(74,158,255,0.3)' : '1px solid rgba(255,255,255,0.08)' }}>
       <span style={{ fontSize: 12, color: isMe ? '#4a9eff' : '#ccd6f6' }}>{person}</span>
       {code && st && <span style={{ background: st.bg, color: '#fff', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>{code}</span>}
+    </div>
+  );
+}
+
+/* ── DASHBOARD VIEW ── */
+function DashboardView({ annualData, weekA, data, sysMap, myName, mgr, onView, setTab }) {
+  const mob = useContext(MobileCtx);
+  const today   = new Date().toISOString().slice(0, 10);
+  const todayD  = new Date(today + 'T00:00:00');
+  const todayDow = todayD.getDay();
+  const todayNum = todayD.getDate();
+  const todayMon = todayD.getMonth();
+  const year     = todayD.getFullYear();
+
+  const sections   = getSections(data);
+  const days       = annualData?.days || {};
+  const todayData  = days[today] || {};
+  const groups     = buildDayGroups(todayData, sections);
+  const hasGroups  = Object.values(groups).some(g => g.length > 0);
+  const todayDKey  = todayDayKey();
+  const allWeekA   = weekA;
+
+  // Compact person badge
+  const Badge = ({ person, code, style: st }) => {
+    const isMe = person === myName;
+    return (
+      <span style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, color: isMe ? '#4a9eff' : '#aab', background: isMe ? 'rgba(74,158,255,0.1)' : 'rgba(255,255,255,0.05)', border: isMe ? '1px solid rgba(74,158,255,0.28)' : '1px solid rgba(255,255,255,0.07)', borderRadius: 6, padding: '2px 7px', whiteSpace: 'nowrap' }}>
+        {person}
+        {code && st && <span style={{ background: st.bg, color: '#fff', borderRadius: 3, padding: '0 4px', fontSize: 9, fontWeight: 700 }}>{code}</span>}
+      </span>
+    );
+  };
+
+  // Section header with "see all" link
+  const PanelHeader = ({ emoji, label, target }) => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+      <span style={{ fontSize: 14, fontWeight: 700, color: '#ccd6f6' }}>{emoji} {label}</span>
+      <button onClick={() => setTab(target)}
+        style={{ background: 'none', border: 'none', color: '#4a9eff', fontSize: 12, cursor: 'pointer', padding: '2px 8px', borderRadius: 6, fontWeight: 600 }}>
+        הכל ›
+      </button>
+    </div>
+  );
+
+  // Compact category card
+  const CatCard = ({ cat, style: st, people }) => {
+    const emoji = st.label.match(/^\S+/)?.[0] || '';
+    const title = st.label.replace(/^\S+\s*/, '');
+
+    if (cat === 'away') {
+      const bySite = [];
+      people.forEach(({ person, code }) => {
+        let g = bySite.find(x => x.site === code);
+        if (!g) { g = { site: code, people: [] }; bySite.push(g); }
+        g.people.push({ person, code });
+      });
+      return (
+        <div style={{ marginBottom: 8, border: `1px solid ${st.bg}30`, borderRadius: 10, overflow: 'hidden' }}>
+          <div style={{ background: `${st.bg}1a`, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 7 }}>
+            <span style={{ fontSize: 13 }}>{emoji}</span>
+            <span style={{ fontWeight: 700, fontSize: 12, color: st.bg }}>{title}</span>
+            <span style={{ marginRight: 'auto', background: `${st.bg}30`, color: st.bg, borderRadius: 10, padding: '0 7px', fontSize: 10, fontWeight: 700 }}>{people.length}</span>
+          </div>
+          <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {bySite.map(({ site, people: sp }, si) => (
+              <div key={site} style={{ paddingBottom: si < bySite.length - 1 ? 6 : 0, borderBottom: si < bySite.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                <div style={{ fontSize: 10, color: st.bg, fontWeight: 700, marginBottom: 4 }}>📍 {site} <span style={{ fontWeight: 400, opacity: .7 }}>({sp.length})</span></div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {sp.map(({ person, code }) => <Badge key={person} person={person} code={null} />)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    if (cat === 'present') {
+      const secShort = n => n.replace(/^מדור\s+/, '').replace(/\s+ובקרה$/, '').replace(/\s+מסלולים$/, '');
+      const bySec = [];
+      people.forEach(({ person, sec: sn }) => {
+        let g = bySec.find(x => x.sec === sn);
+        if (!g) { g = { sec: sn, people: [] }; bySec.push(g); }
+        if (!g.people.includes(person)) g.people.push(person);
+      });
+      return (
+        <div style={{ marginBottom: 8, border: `1px solid ${st.bg}30`, borderRadius: 10, overflow: 'hidden' }}>
+          <div style={{ background: `${st.bg}1a`, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 7 }}>
+            <span style={{ fontSize: 13 }}>{emoji}</span>
+            <span style={{ fontWeight: 700, fontSize: 12, color: st.bg }}>{title}</span>
+            <span style={{ marginRight: 'auto', background: `${st.bg}30`, color: st.bg, borderRadius: 10, padding: '0 7px', fontSize: 10, fontWeight: 700 }}>{people.length}</span>
+          </div>
+          <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {bySec.map(({ sec, people: sp }, si) => (
+              <div key={sec} style={{ marginBottom: si < bySec.length - 1 ? 6 : 0 }}>
+                {bySec.length > 1 && <div style={{ fontSize: 10, color: st.bg, fontWeight: 700, opacity: .8, marginBottom: 3 }}>{secShort(sec)}</div>}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {sp.map(p => <Badge key={p} person={p} />)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div style={{ marginBottom: 8, border: `1px solid ${st.bg}30`, borderRadius: 10, overflow: 'hidden' }}>
+        <div style={{ background: `${st.bg}1a`, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span style={{ fontSize: 13 }}>{emoji}</span>
+          <span style={{ fontWeight: 700, fontSize: 12, color: st.bg }}>{title}</span>
+          <span style={{ marginRight: 'auto', background: `${st.bg}30`, color: st.bg, borderRadius: 10, padding: '0 7px', fontSize: 10, fontWeight: 700 }}>{people.length}</span>
+        </div>
+        <div style={{ padding: '8px 12px', display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {people.map(({ person, code }) => <Badge key={person} person={person} code={code} style={statusStyle(code)} />)}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      {/* ── Date header ── */}
+      <div style={{ textAlign: 'center', marginBottom: 22 }}>
+        <div style={{ fontSize: 28, fontWeight: 800, color: '#fff', letterSpacing: -0.5 }}>
+          {todayNum} {MONTHS_HE[todayMon]} {year}
+        </div>
+        <div style={{ fontSize: 13, color: '#8892b0', marginTop: 3 }}>יום {DAY_LONG[todayDow]}</div>
+        {todayData.notes && (
+          <div style={{ marginTop: 8, fontSize: 12, color: '#ccd6f6', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '5px 14px', display: 'inline-block' }}>
+            📝 {todayData.notes}
+          </div>
+        )}
+      </div>
+
+      {/* ── Two-panel grid ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '340px 1fr', gap: 20, alignItems: 'start' }}>
+
+        {/* ── LEFT / TOP: Daily plan ── */}
+        <div style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '14px 16px' }}>
+          <PanelHeader emoji="📅" label="תוכנית היום" target="annual" />
+          {!annualData && <div style={{ color: '#445', fontSize: 12, fontStyle: 'italic' }}>טוען...</div>}
+          {annualData && !hasGroups && <div style={{ color: '#445', fontSize: 12, fontStyle: 'italic' }}>לא הוזנו נתונים להיום</div>}
+          {Object.entries(CAT_STYLE).map(([cat, st]) => {
+            const people = groups[cat] || [];
+            if (!people.length) return null;
+            return <CatCard key={cat} cat={cat} style={st} people={people} />;
+          })}
+        </div>
+
+        {/* ── RIGHT / BOTTOM: Weekly assignments ── */}
+        <div style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '14px 16px' }}>
+          <PanelHeader emoji="📋" label="שיבוצים השבוע" target="board" />
+          {allWeekA.length === 0
+            ? <div style={{ color: '#445', fontSize: 12, fontStyle: 'italic' }}>אין שיבוצים לשבוע זה</div>
+            : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
+                {allWeekA.map(a => (
+                  <BoardCard key={a.id} a={a} col={sysMap[a.system] || pal(0)} mgr={false} onEdit={() => {}} onDelete={() => {}} onView={() => onView(a)} />
+                ))}
+              </div>
+          }
+        </div>
+      </div>
     </div>
   );
 }
