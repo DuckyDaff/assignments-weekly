@@ -202,7 +202,8 @@ function wkDayToDate(wk, dayKey) {
   const off = ['sun','mon','tue','wed','thu','fri','sat'].indexOf(dayKey);
   if (off < 0) return null;
   const d = new Date(sun); d.setDate(sun.getDate() + off);
-  return d.toISOString().slice(0, 10);
+  // Use local date components — avoids UTC offset shifting date by one day (Israel = UTC+3)
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 function doExportCSV(wk, list) {
@@ -2473,6 +2474,7 @@ function classifyStatus(code) {
 }
 
 const CAT_STYLE = {
+  present:  { bg: '#2d6a4f', light: '#0a1a12', label: '🏢 עובדי יום',          labelShort: 'ביום'    },
   day:      { bg: '#27ae60', light: '#1a4a2a', label: '☀️ משמרת יום',         labelShort: 'יום'     },
   night:    { bg: '#2980b9', light: '#0d2a40', label: '🌙 משמרת לילה',        labelShort: 'לילה'    },
   oncall:   { bg: '#e67e22', light: '#3a1f00', label: '🔶 כוננות',             labelShort: 'כוננות'  },
@@ -2499,12 +2501,13 @@ function StatusBadge({ code, small }) {
 /* ── Daily briefing helpers ── */
 function buildDayGroups(dayData, sections) {
   const statuses = dayData?.statuses || {};
-  const groups   = { day: [], night: [], oncall: [], vacation: [], sick: [], course: [], reserve: [], free: [], unavail: [], away: [], training: [] };
-  const allPeople = sections.flatMap(s => s.people);
+  const groups   = { present: [], day: [], night: [], oncall: [], vacation: [], sick: [], course: [], reserve: [], free: [], unavail: [], away: [], training: [] };
+  const allPeople = sections.flatMap(s => s.people).filter(p => !p.includes('נוסף'));
   for (const person of allPeople) {
     const code = statuses[person] || '';
     const cat  = classifyStatus(code);
     if (cat && groups[cat]) groups[cat].push({ person, code });
+    else if (!code) groups.present.push({ person, code: '' }); // no status = regular day worker
   }
   return groups;
 }
