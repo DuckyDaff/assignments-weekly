@@ -697,7 +697,7 @@ export default function App() {
           {tab === "dashboard" && <DashboardView annualData={annualData} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} mgr={mgr} onView={a => setViewAssign(a)} setTab={setTab} />}
           {tab === "board"    && <BoardView    wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} filterPerson={filterPerson} setFilterPerson={setFilterPerson} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onDelete={deleteAssign} onCopy={copyFromPrev} onCSV={() => doExportCSV(wk, weekA)} onPrint={() => doPrint(wk, weekA, data.systems)} onView={a => setViewAssign(a)} />}
           {tab === "calendar" && <CalendarView wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onCopy={copyFromPrev} onView={a => setViewAssign(a)} onPlan={() => setPlanner(true)} />}
-          {tab === "annual"   && <AnnualView  annualData={annualData} onSaveDay={saveAnnualDay} mgr={mgr} mgrName={mgrName} myName={myName} toast={toast} />}
+          {tab === "annual"   && <AnnualView  annualData={annualData} onSaveDay={saveAnnualDay} mgr={mgr} mgrName={mgrName} myName={myName} toast={toast} data={data} />}
           {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} annualData={annualData} setMyName={n => { setMyName(n); if (n) localStorage.setItem("myName", n); else localStorage.removeItem("myName"); }} onView={a => setViewAssign(a)} onChangeName={() => setShowWelcome(true)} pushStatus={pushStatus} onEnablePush={() => registerPush(myName, remindersOn).then(() => setPushStatus(Notification?.permission || "default"))} remindersOn={remindersOn} onToggleReminders={v => { setRemindersOn(v); localStorage.setItem("remindersOn", v); updateReminderPref(v); }} />}
           {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} mgrName={mgrName} toast={toast} onSyncAnnual={syncAnnualSections} tabLabels={tabLabels} onSaveTabLabels={saveTabLabels} annualData={annualData} onSaveNominalHours={saveNominalHours} onSaveHolidays={saveHolidays} />}
         </main>
@@ -3584,7 +3584,25 @@ function DashboardView({ annualData, weekA, data, sysMap, myName, mgr, onView, s
   );
 }
 
-function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast }) {
+// ── Vehicle auto-assignment for שתפ"א ──
+const RAMON_VEHICLE   = 'סתריה פיקוד';   // רמון always gets this
+const DEFAULT_VEHICLE = 'טיוטה פיקוד';   // other שתפ"א first priority
+function autoVehicles(bySite, saved) {
+  const res = { ...saved };
+  const hasRamon = bySite.some(g => g.site === 'רמון');
+  for (const { site } of bySite) {
+    if (res[site]) continue; // already manually set
+    if (site === 'רמון') { res[site] = RAMON_VEHICLE; continue; }
+    // Other site: use DEFAULT unless already claimed by another non-ramon site
+    const alreadyUsed = Object.entries(res).some(([s, v]) => s !== site && s !== 'רמון' && v === DEFAULT_VEHICLE);
+    res[site] = alreadyUsed ? '' : DEFAULT_VEHICLE;
+  }
+  // If רמון + another site both want DEFAULT, other site keeps DEFAULT only if
+  // סתריה פיקוד is taken by Ramon and DEFAULT is free
+  return res;
+}
+
+function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data }) {
   const mob = useContext(MobileCtx);
   useContext(LegendCtx); // re-render when legend colors change
   // lens: 'daily' | 'monthly' | 'personal'
@@ -3598,6 +3616,7 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast }) {
   const [pickerCell, setPickerCell] = useState(null); // { iso, person, slot, x, y }
   const [paintCode,  setPaintCode]  = useState(null); // null=off, ''=erase, 'י'=paint
   const [shiftModal, setShiftModal] = useState(false);
+  const [vehiclePick, setVehiclePick] = useState(null); // { date, site } | null — vehicle override picker
   // Read col widths fresh from localStorage every render — avoids stale state on remount
   const getColWidths = () => { try { return JSON.parse(localStorage.getItem('monthlyColWidths') || '{}'); } catch { return {}; } };
   const [colWidthsTick, setColWidthsTick] = useState(0); // just a re-render trigger
@@ -3938,6 +3957,14 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast }) {
                     </div>
                   );
                 };
+                // ── Vehicle assignment per site ──
+                const savedVehicles = selDayData.vehicleAssignments || {};
+                const vehicleMap   = autoVehicles(bySite, savedVehicles);
+                const allVehicles  = (data?.vehicles || []);
+                // Warn if a vehicle is used by >1 site
+                const usedVehicles = {};
+                for (const [s, v] of Object.entries(vehicleMap)) { if (v) { if (!usedVehicles[v]) usedVehicles[v] = []; usedVehicles[v].push(s); } }
+
                 return (
                   <div key={cat} style={{ marginBottom: 12, border: `1px solid ${style.bg}33`, borderRadius: 12, overflow: 'hidden' }}>
                     <div style={{ background: `${style.bg}22`, padding: '8px 14px', borderBottom: `1px solid ${style.bg}22`, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -3946,19 +3973,53 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast }) {
                       <span style={{ marginRight: 'auto', background: `${style.bg}33`, color: style.bg, borderRadius: 10, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>{people.length}</span>
                     </div>
                     <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 0 }}>
-                      {bySite.map(({ site, people: sp }, si) => (
+                      {bySite.map(({ site, people: sp }, si) => {
+                        const vehicle   = vehicleMap[site] || '';
+                        const isConflict = vehicle && (usedVehicles[vehicle]?.length || 0) > 1;
+                        const isPicking  = vehiclePick?.date === selDate && vehiclePick?.site === site;
+                        return (
                         <div key={site} style={{ paddingBottom: si < bySite.length - 1 ? 10 : 0, marginBottom: si < bySite.length - 1 ? 10 : 0, borderBottom: si < bySite.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
-                          {/* Site label */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                          {/* Site label + vehicle badge */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
                             <span style={{ fontSize: 10, color: style.bg, fontWeight: 700 }}>📍 {site}</span>
                             <span style={{ fontSize: 10, color: style.bg, background: `${style.bg}22`, borderRadius: 8, padding: '0 6px', fontWeight: 700 }}>{sp.length}</span>
+                            {/* Vehicle badge */}
+                            {vehicle ? (
+                              <span style={{ fontSize: 10, background: isConflict ? 'rgba(231,76,60,0.2)' : 'rgba(230,126,34,0.15)', border: `1px solid ${isConflict ? 'rgba(231,76,60,0.5)' : 'rgba(230,126,34,0.4)'}`, color: isConflict ? '#e74c3c' : '#e67e22', borderRadius: 8, padding: '1px 7px', fontWeight: 700 }}>
+                                🚗 {vehicle}{isConflict ? ' ⚠️' : ''}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: 10, color: '#556', fontStyle: 'italic' }}>ללא רכב</span>
+                            )}
+                            {/* Manager override */}
+                            {mgr && (
+                              isPicking ? (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                                  {['', ...allVehicles].map(v => (
+                                    <button key={v || '__none'} onClick={() => {
+                                      const newVA = { ...savedVehicles, [site]: v };
+                                      if (!v) delete newVA[site];
+                                      onSaveDay({ date: selDate, vehicleAssignments: newVA });
+                                      setVehiclePick(null);
+                                    }} style={{ fontSize: 9, padding: '1px 6px', borderRadius: 5, border: `1px solid ${(v || '') === (vehicle || '') ? '#e67e22' : 'rgba(255,255,255,0.12)'}`, background: (v || '') === (vehicle || '') ? 'rgba(230,126,34,0.2)' : 'rgba(255,255,255,0.04)', color: v ? '#ccd6f6' : '#556', cursor: 'pointer', fontWeight: (v || '') === (vehicle || '') ? 700 : 400 }}>
+                                      {v || 'ללא'}
+                                    </button>
+                                  ))}
+                                  <button onClick={() => setVehiclePick(null)} style={{ fontSize: 9, padding: '1px 5px', borderRadius: 5, border: '1px solid #334', background: 'transparent', color: '#556', cursor: 'pointer' }}>✕</button>
+                                </span>
+                              ) : (
+                                <button onClick={() => setVehiclePick({ date: selDate, site })}
+                                  style={{ fontSize: 9, padding: '1px 6px', borderRadius: 5, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#667', cursor: 'pointer' }}>✏ רכב</button>
+                              )
+                            )}
                           </div>
-                          {/* People in this site — side by side */}
+                          {/* People in this site */}
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingRight: 8 }}>
                             {sp.map(({ person, code }) => renderPersonChipAway(person, code))}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 );
