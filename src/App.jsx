@@ -3239,12 +3239,24 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
               {/* ── People × Days grid ── */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${sc.accent}55`, boxShadow: `0 0 0 1px rgba(0,0,0,0.4)`, display: 'flex', justifyContent: 'center' }}>
-                  <div style={{ width: `${tableWidthPct}%` }}>
-                  <table style={{ borderCollapse: 'collapse', width: '100%', direction: 'rtl', tableLayout: 'fixed' }}>
+                  {/* COL_W = 44px primary + 28px secondary = 72px per person. date col = 68px. */}
+                  {(() => { const COL_PRI = 44, COL_SEC = 28, COL_DATE = 68;
+                    const tblW = COL_DATE + people.length * (COL_PRI + COL_SEC);
+                  return (
+                  <table style={{ borderCollapse: 'collapse', width: tblW, direction: 'rtl', tableLayout: 'fixed', flexShrink: 0 }}>
+                    <colgroup>
+                      <col width={COL_DATE} />
+                      {people.map(p => (
+                        <Fragment key={p}>
+                          <col width={COL_PRI} />
+                          <col width={COL_SEC} />
+                        </Fragment>
+                      ))}
+                    </colgroup>
                     <thead>
-                      {/* Person name headers — colSpan=2 (main 2/3 + secondary 1/3) */}
+                      {/* Person name headers — colSpan=2 (primary + secondary) */}
                       <tr style={{ background: `${sc.accent}30` }}>
-                        <th rowSpan={2} style={{ padding: '8px 10px', fontSize: 12, color: sc.accent, textAlign: 'right', borderBottom: `2px solid ${sc.accent}66`, borderLeft: `1px solid rgba(255,255,255,0.1)`, width: 68, position: 'sticky', right: 0, background: `${sc.accent}30`, zIndex: 2 }}>יום</th>
+                        <th rowSpan={2} style={{ padding: '8px 10px', fontSize: 12, color: sc.accent, textAlign: 'right', borderBottom: `2px solid ${sc.accent}66`, borderLeft: `1px solid rgba(255,255,255,0.1)`, position: 'sticky', right: 0, background: `${sc.accent}30`, zIndex: 2 }}>יום</th>
                         {people.map((person) => {
                           const isVacant = person.includes('תקן');
                           const [firstName, ...rest] = person.split(' ');
@@ -3267,10 +3279,14 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                       </tr>
                       {/* Slot sub-headers */}
                       <tr style={{ background: `${sc.accent}22` }}>
-                        {people.map((person) => (
+                        {people.map((person) => person.includes('תקן') ? (
                           <Fragment key={person}>
-                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#778', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `3px solid rgba(255,255,255,0.55)`, textAlign: 'center', width: '67%', letterSpacing: 0.3 }}>ראשי</th>
-                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#667', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `1px solid rgba(255,255,255,0.13)`, textAlign: 'center', width: '33%', letterSpacing: 0.3 }}>מש׳</th>
+                            <th colSpan={2} style={{ borderBottom: `2px solid ${sc.accent}88`, borderRight: '3px dashed rgba(255,255,255,0.15)' }} />
+                          </Fragment>
+                        ) : (
+                          <Fragment key={person}>
+                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#778', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `3px solid rgba(255,255,255,0.55)`, textAlign: 'center', letterSpacing: 0.3 }}>ראשי</th>
+                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#667', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `1px solid rgba(255,255,255,0.13)`, textAlign: 'center', letterSpacing: 0.3 }}>מש׳</th>
                           </Fragment>
                         ))}
                       </tr>
@@ -3362,7 +3378,7 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                       })}
                     </tbody>
                   </table>
-                  </div>
+                  ); })()}
                 </div>
 
                 {/* ── Status picker popup (manager click on cell) ── */}
