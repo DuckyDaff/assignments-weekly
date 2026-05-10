@@ -2702,9 +2702,10 @@ function ShiftAutoAssignModal({ sections, year, selMonth, days, onSaveDay, onClo
     const isos = Object.keys(updates).sort();
     for (const iso of isos) {
       const existing = days[iso] || {};
-      const mergedStatuses = { ...(existing.statuses || {}), ...updates[iso] };
+      // Shift codes live in slot 2 (statuses2) for משמרת section
+      const mergedStatuses2 = { ...(existing.statuses2 || {}), ...updates[iso] };
       await new Promise(resolve => {
-        onSaveDay({ date: iso, statuses: mergedStatuses });
+        onSaveDay({ date: iso, statuses2: mergedStatuses2 });
         setTimeout(resolve, 20); // tiny delay to avoid flooding
       });
     }
@@ -3425,6 +3426,9 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
         const sc       = sec ? secPal(null, sec.name, selSecIdx) : { accent: '#4a9eff' };
         const people   = (sec?.people || []).filter(p => !p.includes('נוסף'));
         const maxPeople = Math.max(...sections.map(s => (s.people || []).filter(p => !p.includes('נוסף')).length), 1);
+        // Shift/on-call codes that must live in slot 2 for משמרת sections
+        const SHIFT_FAMILY = new Set(['י', 'ל', 'Y', 'L', 'כ', 'כש', 'כמ', 'כמש']);
+        const isShiftSec = sec?.name?.includes('משמרת') ?? false;
         const tableWidthPct = Math.round(people.length / maxPeople * 100);
 
         return (
@@ -3468,7 +3472,10 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
                     let totalCount = 0;
                     for (const p of shiftPeople) {
                       for (const { iso } of monthDays) {
-                        if (SHIFT_CODES_S.has(days[iso]?.statuses?.[p] || '')) totalCount++;
+                        const d = days[iso] || {};
+                        // slot 2 is canonical for shift codes; fall back to slot 1 for legacy data
+                        const code = d.statuses2?.[p] || d.statuses?.[p] || '';
+                        if (SHIFT_CODES_S.has(code)) totalCount++;
                       }
                     }
                     const totalHours = totalCount * 12;
@@ -3587,8 +3594,8 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
                           </Fragment>
                         ) : (
                           <Fragment key={person}>
-                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#778', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `3px solid rgba(255,255,255,0.55)`, textAlign: 'center', letterSpacing: 0.3 }}>ראשי</th>
-                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#667', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `1px solid rgba(255,255,255,0.13)`, textAlign: 'center', letterSpacing: 0.3 }}>מש׳</th>
+                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#778', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `3px solid rgba(255,255,255,0.55)`, textAlign: 'center', letterSpacing: 0.3 }}>{isShiftSec ? 'אחר' : 'ראשי'}</th>
+                            <th style={{ padding: '3px 2px', fontSize: 9, color: isShiftSec ? sc.accent : '#667', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `1px solid rgba(255,255,255,0.13)`, textAlign: 'center', letterSpacing: 0.3 }}>{isShiftSec ? 'מש׳/כ׳' : 'מש׳'}</th>
                           </Fragment>
                         ))}
                       </tr>
@@ -3641,15 +3648,17 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
                                   e.preventDefault(); e.stopPropagation(); setHoverCell(null);
                                   if (dragCode.current !== null) {
                                     const src = dragSource.current;
+                                    // Auto-redirect shift/on-call codes to slot 2 in משמרת section
+                                    const dropSlot = isShiftSec && dragCode.current !== '' && SHIFT_FAMILY.has(dragCode.current) && slot === 1 ? 2 : slot;
                                     // Snapshot all affected days before any change
                                     const items = [snapshotDay(iso)];
-                                    if (src && !(src.iso === iso && src.person === person && src.slot === slot) && src.iso !== iso) {
+                                    if (src && !(src.iso === iso && src.person === person && src.slot === dropSlot) && src.iso !== iso) {
                                       items.push(snapshotDay(src.iso));
                                     }
                                     pushUndoEntry(items);
-                                    saveStatusForDate(iso, person, dragCode.current, slot);
+                                    saveStatusForDate(iso, person, dragCode.current, dropSlot);
                                     // Clear source cell if dragging from another cell (move, not copy)
-                                    if (src && !(src.iso === iso && src.person === person && src.slot === slot)) {
+                                    if (src && !(src.iso === iso && src.person === person && src.slot === dropSlot)) {
                                       saveStatusForDate(src.iso, src.person, '', src.slot);
                                     }
                                   }
@@ -3657,8 +3666,10 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
                                 onClick: mgr ? (e => {
                                   e.stopPropagation();
                                   if (paintCode !== null) {
+                                    // Auto-redirect shift/on-call paint to slot 2 in משמרת section
+                                    const paintSlot = isShiftSec && paintCode !== '' && SHIFT_FAMILY.has(paintCode) && slot === 1 ? 2 : slot;
                                     pushUndoEntry([snapshotDay(iso)]);
-                                    saveStatusForDate(iso, person, paintCode, slot);
+                                    saveStatusForDate(iso, person, paintCode, paintSlot);
                                   } else {
                                     const r = e.currentTarget.getBoundingClientRect();
                                     setPickerCell({ iso, person, slot, x: r.left, y: r.bottom });
@@ -3688,7 +3699,7 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
                     </tbody>
                     {/* ── Shift hours footer (משמרת sections only) ── */}
                     {sec.name.includes('משמרת') && (() => {
-                      const SHIFT_CODES = new Set(['י', 'ל', 'Y', 'L']);
+                      const SHIFT_CODES = new Set(['י', 'ל', 'Y', 'L']); // only full shifts count for hours
                       const nominal = annualData.nominalHours?.[String(selMonth + 1)] ?? annualData.nominalHours?.[selMonth + 1] ?? 182;
                       return (
                         <tfoot>
@@ -3705,7 +3716,9 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
                               );
                               let count = 0;
                               for (const { iso } of monthDays) {
-                                const code = (days[iso]?.statuses?.[person]) || '';
+                                const d = days[iso] || {};
+                                // slot 2 canonical; fall back to slot 1 for legacy data
+                                const code = d.statuses2?.[person] || d.statuses?.[person] || '';
                                 if (SHIFT_CODES.has(code)) count++;
                               }
                               const hrs = count * 12;
@@ -3818,13 +3831,19 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
                     <div onClick={e => e.stopPropagation()}
                       style={{ position: 'fixed', top: Math.min(pickerCell.y + 4, window.innerHeight - 280), left: Math.max(4, Math.min(pickerCell.x, window.innerWidth - 220)), width: 210, background: '#0d1525', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.7)', padding: '10px 8px', zIndex: 301 }}>
                       <div style={{ fontSize: 10, color: '#4a9eff', fontWeight: 700, marginBottom: 8, textAlign: 'center' }}>
-                        {pickerCell.person.split(' ')[0]} — {pickerCell.slot === 1 ? 'ראשי' : 'משני'}
+                        {pickerCell.person.split(' ')[0]} — {isShiftSec ? (pickerCell.slot === 2 ? 'מש׳/כוננות' : 'אחר') : (pickerCell.slot === 1 ? 'ראשי' : 'משני')}
                       </div>
-                      {legendGroups.map(group => (
+                      {legendGroups.map(group => {
+                        const filteredCodes = group.codes.filter(c =>
+                          !isShiftSec ? true :
+                          pickerCell.slot === 2 ? SHIFT_FAMILY.has(c) : !SHIFT_FAMILY.has(c)
+                        );
+                        if (!filteredCodes.length) return null;
+                        return (
                         <div key={group.id} style={{ marginBottom: 7 }}>
                           <div style={{ fontSize: 9, color: '#556', fontWeight: 600, marginBottom: 4, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 2 }}>{group.name}</div>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                            {group.codes.map(code => {
+                            {filteredCodes.map(code => {
                               const st = statusStyle(code);
                               return (
                                 <div key={code} onClick={() => { pushUndoEntry([snapshotDay(pickerCell.iso)]); saveStatusForDate(pickerCell.iso, pickerCell.person, code, pickerCell.slot); setPickerCell(null); }}
@@ -3835,7 +3854,8 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
                             })}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                       <div onClick={() => { pushUndoEntry([snapshotDay(pickerCell.iso)]); saveStatusForDate(pickerCell.iso, pickerCell.person, '', pickerCell.slot); setPickerCell(null); }}
                         style={{ background: 'rgba(231,76,60,0.2)', border: '1px dashed rgba(231,76,60,0.5)', color: '#e74c3c', borderRadius: 5, padding: '5px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer', textAlign: 'center', marginTop: 4 }}>
                         🗑 מחק סטטוס
