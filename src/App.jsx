@@ -3397,6 +3397,8 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast }) {
   const [clearMonthConfirm, setClearMonthConfirm] = useState(false);
   const [migrateConfirm, setMigrateConfirm] = useState(false);
   const [migrating, setMigrating] = useState(false);
+  const [migrateOncallConfirm, setMigrateOncallConfirm] = useState(false);
+  const [migratingOncall, setMigratingOncall] = useState(false);
 
   // Keyboard shortcuts: Ctrl+Z = undo, Ctrl+Y / Ctrl+Shift+Z = redo
   // Using refs so the effect never needs to re-register
@@ -4446,6 +4448,49 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast }) {
                         )
                     )}
                     {/* Migrate shift data slot 1→2 — mesheret section, managers only */}
+                    {/* Migrate oncall slot 1→2 — non-shift sections, managers only */}
+                    {!isShiftSec && mgr && (
+                      migrateOncallConfirm ? (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{ fontSize: 10, color: '#e67e22' }}>להעביר כוננויות של {sec.name} למשני?</span>
+                          <button disabled={migratingOncall} onClick={async () => {
+                            const ONCALL_CODES_MIG = new Set(['כ', 'כש', 'כמ', 'כמש']);
+                            const secPeople = (sec.people || []).filter(p => !p.includes('נוסף') && !p.includes('תקן'));
+                            setMigratingOncall(true);
+                            let count = 0;
+                            for (const [iso, dayData] of Object.entries(days)) {
+                              const s1 = { ...(dayData.statuses  || {}) };
+                              const s2 = { ...(dayData.statuses2 || {}) };
+                              let changed = false;
+                              for (const p of secPeople) {
+                                const code = s1[p];
+                                if (code && ONCALL_CODES_MIG.has(code)) {
+                                  s2[p] = code; delete s1[p]; changed = true;
+                                }
+                              }
+                              if (changed) {
+                                await onSaveDay({ date: iso, statuses: s1, statuses2: s2 });
+                                await new Promise(r => setTimeout(r, 15));
+                                count++;
+                              }
+                            }
+                            setMigratingOncall(false); setMigrateOncallConfirm(false);
+                            toast?.(`✓ הועברו כוננויות מ-${sec.name} — ${count} ימים`);
+                          }} style={{ padding: '3px 8px', borderRadius: 6, background: migratingOncall ? 'rgba(255,255,255,0.06)' : 'rgba(230,126,34,0.25)', border: '1px solid rgba(230,126,34,0.5)', color: migratingOncall ? '#445' : '#e67e22', fontSize: 10, cursor: migratingOncall ? 'default' : 'pointer', fontWeight: 700 }}>
+                            {migratingOncall ? '⏳ מעביר...' : 'העבר'}
+                          </button>
+                          <button onClick={() => setMigrateOncallConfirm(false)} disabled={migratingOncall}
+                            style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#556', fontSize: 10, cursor: 'pointer' }}>
+                            ביטול
+                          </button>
+                        </span>
+                      ) : (
+                        <button onClick={() => setMigrateOncallConfirm(true)}
+                          style={{ padding: '3px 10px', borderRadius: 6, background: 'rgba(230,126,34,0.08)', border: '1px solid rgba(230,126,34,0.2)', color: '#e67e22', fontSize: 10, cursor: 'pointer' }}>
+                          📦 העבר כוננות למש׳
+                        </button>
+                      )
+                    )}
                     {isShiftSec && mgr && (
                       migrateConfirm ? (
                         <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
