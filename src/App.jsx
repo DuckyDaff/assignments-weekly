@@ -3318,19 +3318,20 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
 
               {/* ── People × Days grid ── */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${sc.accent}55`, boxShadow: `0 0 0 1px rgba(0,0,0,0.4)`, display: 'flex', justifyContent: 'center' }}>
+                <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${sc.accent}55`, boxShadow: `0 0 0 1px rgba(0,0,0,0.4)` }}>
                   {/* COL_W = colPri primary + 28px secondary per person. date col = 68px. */}
                   {(() => { const COL_SEC = 28, COL_DATE = 68;
                     const COL_PRI = Math.max(28, getColWidths()[sec.name] ?? 44);
                     const tblW = COL_DATE + people.length * (COL_PRI + COL_SEC);
+                    const pct = v => `${(v / tblW * 100).toFixed(3)}%`;
                   return (
-                  <table style={{ borderCollapse: 'collapse', width: tblW, direction: 'rtl', tableLayout: 'fixed', flexShrink: 0 }}>
+                  <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: tblW, direction: 'rtl', tableLayout: 'fixed' }}>
                     <colgroup>
-                      <col width={COL_DATE} />
+                      <col width={pct(COL_DATE)} />
                       {people.map(p => (
                         <Fragment key={p}>
-                          <col width={COL_PRI} />
-                          <col width={COL_SEC} />
+                          <col width={pct(COL_PRI)} />
+                          <col width={pct(COL_SEC)} />
                         </Fragment>
                       ))}
                     </colgroup>
