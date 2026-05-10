@@ -3318,7 +3318,10 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
 
               {/* ── People × Days grid ── */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${sc.accent}55`, boxShadow: `0 0 0 1px rgba(0,0,0,0.4)` }}>
+                {/* Outer wrapper: visual border/radius only — no overflow, so sticky works on iOS */}
+                <div style={{ borderRadius: 12, border: `1px solid ${sc.accent}55`, boxShadow: `0 0 0 1px rgba(0,0,0,0.4)`, overflow: 'clip' }}>
+                {/* Inner: horizontal scroll only */}
+                <div style={{ overflowX: 'auto' }}>
                   {/* COL_W = colPri primary + 28px secondary per person. date col = 68px. */}
                   {(() => { const COL_SEC = 28, COL_DATE = 68;
                     const COL_PRI = Math.max(28, getColWidths()[sec.name] ?? 44);
@@ -3338,7 +3341,7 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
                     <thead>
                       {/* Person name headers — colSpan=2 (primary + secondary) */}
                       <tr style={{ background: `${sc.accent}30` }}>
-                        <th rowSpan={2} style={{ padding: '8px 10px', fontSize: 12, color: sc.accent, textAlign: 'right', borderBottom: `2px solid ${sc.accent}66`, borderLeft: `1px solid rgba(255,255,255,0.1)`, position: 'sticky', right: 0, background: `${sc.accent}30`, zIndex: 2 }}>יום</th>
+                        <th rowSpan={2} style={{ padding: '8px 10px', fontSize: 12, color: sc.accent, textAlign: 'right', borderBottom: `2px solid ${sc.accent}66`, borderLeft: `1px solid rgba(255,255,255,0.1)`, position: 'sticky', right: 0, background: `${sc.accent}30`, zIndex: 2, willChange: 'transform' }}>יום</th>
                         {people.map((person) => {
                           const isVacant = person.includes('תקן');
                           const [firstName, ...rest] = person.split(' ');
@@ -3389,7 +3392,7 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
                             style={{ background: rowBg, borderBottom: `1px solid rgba(255,255,255,${isWeekend ? '0.1' : '0.06'})` }}>
                             {/* Date cell — only this navigates to daily lens */}
                             <td onClick={() => { setSelDate(iso); setLens('daily'); }}
-                              style={{ padding: '5px 8px', position: 'sticky', right: 0, background: stickyBg, zIndex: 1, whiteSpace: 'nowrap', verticalAlign: 'middle', borderLeft: `1px solid rgba(255,255,255,0.1)`, borderBottom: `1px solid rgba(255,255,255,${isWeekend ? '0.1' : '0.06'})`, cursor: 'pointer' }}
+                              style={{ padding: '5px 8px', position: 'sticky', right: 0, background: stickyBg, zIndex: 1, whiteSpace: 'nowrap', verticalAlign: 'middle', borderLeft: `1px solid rgba(255,255,255,0.1)`, borderBottom: `1px solid rgba(255,255,255,${isWeekend ? '0.1' : '0.06'})`, cursor: 'pointer', willChange: 'transform' }}
                               onMouseEnter={e => e.currentTarget.style.background = '#1a2a4a'}
                               onMouseLeave={e => e.currentTarget.style.background = stickyBg}>
                               <span style={{ fontWeight: 700, color: isToday ? '#4a9eff' : isWeekend ? '#99aacc' : '#ffffff', fontSize: 14 }}>{num}</span>
@@ -3468,7 +3471,8 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName }) {
                     </tbody>
                   </table>
                   ); })()}
-                </div>
+                </div>{/* end inner overflowX scroll div */}
+                </div>{/* end outer border/radius wrapper */}
 
                 {/* ── Resize handle (manager only) ── */}
                 {mgr && (
