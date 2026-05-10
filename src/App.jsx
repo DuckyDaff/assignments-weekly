@@ -3265,9 +3265,15 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                       <tr style={{ background: `${sc.accent}30` }}>
                         <th rowSpan={2} style={{ padding: '8px 10px', fontSize: 12, color: sc.accent, textAlign: 'right', borderBottom: `2px solid ${sc.accent}66`, borderLeft: `1px solid rgba(255,255,255,0.1)`, width: 68, position: 'sticky', right: 0, background: `${sc.accent}30`, zIndex: 2 }}>יום</th>
                         {people.map((person) => {
+                          const isVacant = person.includes('תקן');
                           const [firstName, ...rest] = person.split(' ');
                           const lastName = rest.join(' ');
                           const isMe = person === myName;
+                          if (isVacant) return (
+                            <th key={person} colSpan={2} style={{ padding: '6px 4px 2px', fontSize: 11, color: '#445', borderBottom: `1px solid ${sc.accent}44`, borderLeft: `1px solid rgba(255,255,255,0.08)`, textAlign: 'center', fontWeight: 400, verticalAlign: 'bottom', borderRight: '3px dashed rgba(255,255,255,0.15)' }}>
+                              <div style={{ lineHeight: 1.4, fontStyle: 'italic', opacity: 0.5 }}>—</div>
+                            </th>
+                          );
                           return (
                             <th key={person} colSpan={2} style={{ padding: '6px 4px 2px', fontSize: 12, color: isMe ? '#4a9eff' : '#dde8ff', borderBottom: `1px solid ${sc.accent}44`, borderLeft: `1px solid rgba(255,255,255,0.08)`, textAlign: 'center', fontWeight: isMe ? 700 : 600, verticalAlign: 'bottom' }}>
                               <div style={{ lineHeight: 1.4 }}>
@@ -3312,6 +3318,12 @@ function AnnualView({ annualData, onSaveDay, mgr, myName }) {
                               {dayData.notes && <span style={{ fontSize: 10 }}>📝</span>}
                             </td>
                             {people.map((person) => {
+                              const isVacant = person.includes('תקן');
+                              if (isVacant) return (
+                                <Fragment key={person}>
+                                  <td colSpan={2} style={{ background: 'rgba(0,0,0,0.25)', borderRight: '3px dashed rgba(255,255,255,0.1)', minWidth: 66 }} />
+                                </Fragment>
+                              );
                               const code1  = dayData.statuses?.[person] || '';
                               const code2  = statuses2[person] || '';
                               const st1    = statusStyle(code1);
