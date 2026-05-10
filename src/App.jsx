@@ -3117,13 +3117,18 @@ function StatusBadge({ code, small }) {
 
 /* ── Daily briefing helpers ── */
 function buildDayGroups(dayData, sections) {
-  const statuses = dayData?.statuses || {};
-  const groups   = { present: [], day: [], night: [], oncall: [], vacation: [], sick: [], course: [], reserve: [], free: [], unavail: [], away: [], training: [] };
+  const statuses  = dayData?.statuses  || {};
+  const statuses2 = dayData?.statuses2 || {};
+  const groups    = { present: [], day: [], night: [], oncall: [], vacation: [], sick: [], course: [], reserve: [], free: [], unavail: [], away: [], training: [] };
   for (const sec of sections) {
     const isShift = sec.name.includes('משמרת'); // shift sections excluded from "day workers"
     const people  = (sec.people || []).filter(p => !p.includes('נוסף'));
     for (const person of people) {
-      const code = statuses[person] || '';
+      // Shift sections: canonical code is in slot 2 (statuses2), fall back to slot 1 for legacy data
+      // Non-shift sections: code is in slot 1 (statuses)
+      const code = isShift
+        ? (statuses2[person] || statuses[person] || '')
+        : (statuses[person] || '');
       const cat  = classifyStatus(code);
       if (cat && groups[cat]) groups[cat].push({ person, code, sec: sec.name });
       else if (!code && !isShift) groups.present.push({ person, code: '', sec: sec.name }); // day worker
