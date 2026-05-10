@@ -1369,87 +1369,151 @@ function LegendEditor() {
   const [groups, setGroups] = useState(() => {
     try { return JSON.parse(localStorage.getItem("legendGroups")) || DEFAULT_LEGEND; } catch { return DEFAULT_LEGEND; }
   });
+  const [unassigned, setUnassigned] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("legendUnassigned")) || []; } catch { return []; }
+  });
+  const [newCode,      setNewCode]      = useState("");
   const [newGroupName, setNewGroupName] = useState("");
-  const [dropTarget, setDropTarget]     = useState(null);
+  const [dropTarget,   setDropTarget]   = useState(null); // groupId | "unassigned" | null
   const dragRef = useRef(null);
 
-  function persist(g) { setGroups(g); localStorage.setItem("legendGroups", JSON.stringify(g)); }
+  function saveAll(g, u) {
+    setGroups(g);      localStorage.setItem("legendGroups",     JSON.stringify(g));
+    setUnassigned(u);  localStorage.setItem("legendUnassigned", JSON.stringify(u));
+  }
 
-  function onDrop(toGroupId) {
+  function addCode() {
+    const c = newCode.trim();
+    if (!c) return;
+    const allExisting = [...unassigned, ...groups.flatMap(g => g.codes)];
+    if (allExisting.includes(c)) return;
+    saveAll(groups, [...unassigned, c]);
+    setNewCode("");
+  }
+
+  function onDrop(toTarget) {
     if (!dragRef.current) return;
     const { code, fromGroupId } = dragRef.current;
-    if (fromGroupId === toGroupId) { dragRef.current = null; return; }
-    persist(groups.map(g => {
-      if (g.id === fromGroupId) return { ...g, codes: g.codes.filter(c => c !== code) };
-      if (g.id === toGroupId)   return { ...g, codes: [...g.codes, code] };
-      return g;
-    }));
     dragRef.current = null;
+    setDropTarget(null);
+    if (fromGroupId === toTarget) return;
+
+    let ng = groups;
+    let nu = unassigned;
+
+    // remove from source
+    if (fromGroupId === "unassigned") nu = nu.filter(c => c !== code);
+    else ng = ng.map(g => g.id === fromGroupId ? { ...g, codes: g.codes.filter(c => c !== code) } : g);
+
+    // add to target
+    if (toTarget === "unassigned") nu = [...nu, code];
+    else ng = ng.map(g => g.id === toTarget ? { ...g, codes: [...g.codes, code] } : g);
+
+    saveAll(ng, nu);
   }
 
-  function removeCode(groupId, code) {
-    persist(groups.map(g => g.id === groupId ? { ...g, codes: g.codes.filter(c => c !== code) } : g));
+  // ✕ on a group chip → moves back to unassigned tray
+  function unassignCode(groupId, code) {
+    saveAll(
+      groups.map(g => g.id === groupId ? { ...g, codes: g.codes.filter(c => c !== code) } : g),
+      [...unassigned, code]
+    );
   }
 
-  function renameGroup(id, name) {
-    persist(groups.map(g => g.id === id ? { ...g, name } : g));
-  }
+  // ✕ on unassigned chip → permanent delete
+  function deleteCode(code) { saveAll(groups, unassigned.filter(c => c !== code)); }
+
+  function renameGroup(id, name) { saveAll(groups.map(g => g.id === id ? { ...g, name } : g), unassigned); }
 
   function removeGroup(id) {
-    const dying = groups.find(g => g.id === id);
+    const dying    = groups.find(g => g.id === id);
     const firstOther = groups.find(g => g.id !== id);
-    persist(groups
-      .filter(g => g.id !== id)
-      .map(g => g.id === firstOther?.id ? { ...g, codes: [...g.codes, ...(dying?.codes || [])] } : g));
+    saveAll(
+      groups.filter(g => g.id !== id)
+            .map(g => g.id === firstOther?.id ? { ...g, codes: [...g.codes, ...(dying?.codes || [])] } : g),
+      unassigned
+    );
   }
 
   function addGroup() {
     if (!newGroupName.trim()) return;
-    persist([...groups, { id: Date.now().toString(36), name: newGroupName.trim(), codes: [] }]);
+    saveAll([...groups, { id: Date.now().toString(36), name: newGroupName.trim(), codes: [] }], unassigned);
     setNewGroupName("");
   }
 
+  const codeChip = (code, fromGroupId, onRemove, removeTip) => {
+    const st = statusStyle(code);
+    const isUnassigned = fromGroupId === "unassigned";
+    return (
+      <div key={code} draggable
+        onDragStart={() => { dragRef.current = { code, fromGroupId }; }}
+        style={{ display: "flex", alignItems: "center", gap: 6,
+          background: isUnassigned ? "rgba(74,158,255,0.1)" : (st ? `${st.bg}22` : "rgba(255,255,255,0.06)"),
+          border: `1px solid ${isUnassigned ? "rgba(74,158,255,0.35)" : (st ? `${st.bg}55` : "rgba(255,255,255,0.12)")}`,
+          borderRadius: 8, padding: "5px 10px", cursor: "grab", userSelect: "none" }}>
+        <span style={{ background: st?.bg || (isUnassigned ? "#2a4a6a" : "#555"), color: "#fff", borderRadius: 4, padding: "2px 8px", fontSize: 12, fontWeight: 700 }}>{code}</span>
+        {st?.label && !isUnassigned && <span style={{ fontSize: 11, color: "#8892b0" }}>{st.label}</span>}
+        <button onClick={onRemove}
+          style={{ background: "none", border: "none", color: isUnassigned ? "#e74c3c" : "#556", cursor: "pointer", fontSize: 13, lineHeight: 1, padding: "0 0 0 2px", opacity: isUnassigned ? .75 : 1 }}
+          title={removeTip}>✕</button>
+      </div>
+    );
+  };
+
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <div style={{ fontSize: 12, color: "#8892b0" }}>גרור קודים בין קבוצות לשינוי הסיווג</div>
-        <button onClick={() => persist(DEFAULT_LEGEND)} style={{ background: "none", border: "1px solid #334", borderRadius: 6, padding: "4px 10px", fontSize: 11, color: "#556", cursor: "pointer" }}>איפוס</button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ fontSize: 12, color: "#8892b0" }}>הוסף קוד, גרור לקבוצה הרצויה</div>
+        <button onClick={() => saveAll(DEFAULT_LEGEND, [])}
+          style={{ background: "none", border: "1px solid #334", borderRadius: 6, padding: "4px 10px", fontSize: 11, color: "#556", cursor: "pointer" }}>איפוס</button>
       </div>
 
+      {/* ── Add new code + unassigned tray ── */}
+      <div style={{ marginBottom: 14, padding: "10px 12px", background: dropTarget === "unassigned" ? "rgba(74,158,255,0.06)" : "rgba(255,255,255,0.03)", border: `2px ${dropTarget === "unassigned" ? "solid rgba(74,158,255,0.5)" : "dashed rgba(255,255,255,0.1)"}`, borderRadius: 12, transition: "border .15s, background .15s" }}
+        onDragOver={e => { e.preventDefault(); setDropTarget("unassigned"); }}
+        onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDropTarget(null); }}
+        onDrop={e => { e.preventDefault(); onDrop("unassigned"); }}>
+        <div style={{ display: "flex", gap: 7, marginBottom: unassigned.length ? 10 : 0 }}>
+          <input value={newCode} onChange={e => setNewCode(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && addCode()}
+            placeholder="הוסף קוד חדש (למשל: מש, ל2, …)" style={{ ...inp, flex: 1 }} />
+          <PillBtn onClick={addCode} color="#4a9eff">+</PillBtn>
+        </div>
+        {unassigned.length > 0 && (
+          <>
+            <div style={{ fontSize: 9, color: "#667", marginBottom: 7, fontWeight: 600 }}>ממתינים לשיוך — גרור לקבוצה:</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+              {unassigned.map(code => codeChip(code, "unassigned", () => deleteCode(code), "מחק לצמיתות"))}
+            </div>
+          </>
+        )}
+        {unassigned.length === 0 && !newCode && (
+          <div style={{ fontSize: 10, color: "#334", textAlign: "center", paddingTop: 4 }}>גרור קוד מקבוצה לכאן להוצאה ממנה</div>
+        )}
+      </div>
+
+      {/* ── Groups ── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {groups.map(group => (
           <div key={group.id}
             onDragOver={e => { e.preventDefault(); setDropTarget(group.id); }}
             onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDropTarget(null); }}
-            onDrop={e => { e.preventDefault(); onDrop(group.id); setDropTarget(null); }}
+            onDrop={e => { e.preventDefault(); onDrop(group.id); }}
             style={{ border: `2px solid ${dropTarget === group.id ? "#4a9eff" : "rgba(255,255,255,0.1)"}`, borderRadius: 12, overflow: "hidden", transition: "border-color .15s", background: dropTarget === group.id ? "rgba(74,158,255,0.06)" : "transparent" }}>
-            {/* Group header */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "rgba(255,255,255,0.04)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
               <input value={group.name} onChange={e => renameGroup(group.id, e.target.value)}
                 style={{ ...inp, padding: "3px 8px", fontSize: 12, fontWeight: 700, flex: 1 }} />
               <span style={{ fontSize: 10, color: "#445", background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: "2px 8px", whiteSpace: "nowrap" }}>{group.codes.length} קודים</span>
               {groups.length > 1 && (
-                <button onClick={() => removeGroup(group.id)} style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", fontSize: 15, opacity: .6, padding: 2 }} title="מחק קבוצה">✕</button>
+                <button onClick={() => removeGroup(group.id)}
+                  style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", fontSize: 15, opacity: .6, padding: 2 }} title="מחק קבוצה">✕</button>
               )}
             </div>
-            {/* Code chips */}
             <div style={{ padding: "10px 12px", display: "flex", flexWrap: "wrap", gap: 8, minHeight: 54 }}>
               {group.codes.length === 0 && (
                 <span style={{ fontSize: 11, color: "#334", alignSelf: "center", fontStyle: "italic" }}>גרור לכאן קודים…</span>
               )}
-              {group.codes.map(code => {
-                const st = statusStyle(code);
-                return (
-                  <div key={code} draggable
-                    onDragStart={() => { dragRef.current = { code, fromGroupId: group.id }; }}
-                    style={{ display: "flex", alignItems: "center", gap: 6, background: st ? `${st.bg}22` : "rgba(255,255,255,0.06)", border: `1px solid ${st ? `${st.bg}55` : "rgba(255,255,255,0.12)"}`, borderRadius: 8, padding: "5px 10px", cursor: "grab", userSelect: "none" }}>
-                    <span style={{ background: st?.bg || "#555", color: "#fff", borderRadius: 4, padding: "2px 8px", fontSize: 12, fontWeight: 700 }}>{code}</span>
-                    {st?.label && <span style={{ fontSize: 11, color: "#8892b0" }}>{st.label}</span>}
-                    <button onClick={() => removeCode(group.id, code)}
-                      style={{ background: "none", border: "none", color: "#556", cursor: "pointer", fontSize: 13, lineHeight: 1, padding: "0 0 0 2px" }} title="הסר">✕</button>
-                  </div>
-                );
-              })}
+              {group.codes.map(code => codeChip(code, group.id, () => unassignCode(group.id, code), "החזר לממתינים"))}
             </div>
           </div>
         ))}
