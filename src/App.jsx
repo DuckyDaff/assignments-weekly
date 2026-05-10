@@ -1343,7 +1343,7 @@ const DEFAULT_LEGEND = [
   { id: 'shift',    name: 'משמרות',      codes: ['י', 'ל', 'Y', 'L'] },
   { id: 'oncall',   name: 'כוננות',      codes: ['כ', 'כש', 'כמ', 'כמש'] },
   { id: 'absent',   name: 'היעדרויות',   codes: ['ח', 'מיל', 'מ', 'פ', 'מנוחה', 'ק'] },
-  { id: 'away',     name: 'שת"פ',        codes: ['חיפה', 'הרצליה', 'ראש פינה', 'רמון'] },
+  { id: 'away',     name: 'שתפ"א',        codes: ['חיפה', 'הרצליה', 'ראש פינה', 'רמון'] },
   { id: 'training', name: 'הכשרות',      codes: ['ב. חשמל', 'ב. כללית', 'השתלמות', 'ניקיון תחנות'] },
 ];
 
@@ -2695,7 +2695,7 @@ const CAT_STYLE = {
   reserve:  { bg: '#922b21', light: '#2a0c08', label: '🪖 מילואים',            labelShort: 'מיל׳'    },
   free:     { bg: '#7f8c8d', light: '#1a2020', label: '💤 פנוי / מנוחה',       labelShort: 'פנוי'    },
   unavail:  { bg: '#e74c3c', light: '#3a0c0c', label: '🔴 לא זמינים',         labelShort: 'חסרים'   },
-  away:     { bg: '#16a085', light: '#0a2a24', label: '🤝 שת"פ',              labelShort: 'שת"פ'    },
+  away:     { bg: '#16a085', light: '#0a2a24', label: '🤝 שתפ"א',              labelShort: 'שתפ"א'    },
   training: { bg: '#8e44ad', light: '#2a1040', label: '📚 הכשרה / בטיחות',    labelShort: 'הכשרה'   },
 };
 
