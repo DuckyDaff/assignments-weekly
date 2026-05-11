@@ -766,13 +766,30 @@ export default function App() {
             ⚠ שגיאת חיבור לשרת — השינויים לא נשמרים
           </div>
         )}
-        <header style={{ background: "linear-gradient(180deg,#0f1525 0%,#0a1020 100%)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 18px", display: "flex", alignItems: "center", height: 56, position: "sticky", top: 0, zIndex: 200, boxShadow: "0 2px 24px rgba(0,0,0,.6)" }}>
-          {/* Logo — right side */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-            <img src="/logo.png" alt="לוגו" style={{ width: 42, height: 42, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
-            {!mob && <span style={{ fontWeight: 700, fontSize: 14, color: "#fff", letterSpacing: .3 }}>מערכת שיבוצים</span>}
-          </div>
-          {/* Nav — absolutely centered regardless of side widths */}
+        <header style={{ background: "linear-gradient(180deg,#0f1525 0%,#0a1020 100%)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 12px", display: "flex", alignItems: "center", height: 56, position: "sticky", top: 0, zIndex: 200, boxShadow: "0 2px 24px rgba(0,0,0,.6)" }}>
+
+          {/* ── RIGHT side ── */}
+          {mob ? (
+            /* Mobile RIGHT: refresh + manager (no logo — watermark already in bg) */
+            <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+              <button onClick={manualRefresh} disabled={isRefreshing} title="רענן"
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, border: "1px solid rgba(255,255,255,.1)", borderRadius: 8, background: "rgba(255,255,255,.04)", color: isRefreshing ? "#4a9eff" : "#8892b0", cursor: isRefreshing ? "default" : "pointer", transition: "all .2s", flexShrink: 0 }}>
+                <span style={{ display: "inline-flex", animation: isRefreshing ? "spin 0.8s linear infinite" : "none" }}><I n="sync" s={15} /></span>
+              </button>
+              <button onClick={() => { if (mgr) { setMgr(false); setMgrName(""); } else setModal({ t: "auth" }); }}
+                style={{ display: "flex", alignItems: "center", gap: 5, padding: "0 10px", height: 34, border: `1px solid ${mgr ? "rgba(39,174,96,.4)" : "rgba(255,255,255,.1)"}`, borderRadius: 8, background: mgr ? "rgba(39,174,96,.1)" : "rgba(255,255,255,.04)", color: mgr ? "#2ecc71" : "#8892b0", cursor: "pointer", fontSize: 12, fontWeight: mgr ? 700 : 400, transition: "all .2s", flexShrink: 0 }}>
+                <I n={mgr ? "unlock" : "lock"} s={14} />{mgr ? (mgrName.split(" ")[0] || "מנהל") : ""}
+              </button>
+            </div>
+          ) : (
+            /* Desktop RIGHT: logo + title */
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+              <img src="/logo.png" alt="לוגו" style={{ width: 42, height: 42, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
+              <span style={{ fontWeight: 700, fontSize: 14, color: "#fff", letterSpacing: .3 }}>מערכת שיבוצים</span>
+            </div>
+          )}
+
+          {/* ── CENTER: nav (desktop) / tab title (mobile) — both absolutely centered ── */}
           {!mob && (
             <nav className="desktop-nav" style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 1 }}>
               {TABS.map(t => (
@@ -783,33 +800,39 @@ export default function App() {
               ))}
             </nav>
           )}
-          {mob && <span style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", fontWeight: 700, fontSize: 15, color: "#fff", pointerEvents: "none", whiteSpace: "nowrap" }}>{TABS.find(t => t.id === tab)?.label}</span>}
-          {/* Action buttons — left side, LTR order: undo | redo | refresh | manager */}
-          <div style={{ display: "flex", alignItems: "center", gap: 5, marginRight: "auto", direction: "ltr" }}>
-            {/* Undo */}
-            <button onClick={() => _globalUndoRef.current?.()} disabled={!undoAvail} title="בטל (Ctrl+Z)"
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, border: `1px solid ${undoAvail ? "rgba(74,158,255,0.35)" : "rgba(255,255,255,0.08)"}`, borderRadius: 8, background: undoAvail ? "rgba(74,158,255,0.1)" : "rgba(255,255,255,0.03)", color: undoAvail ? "#4a9eff" : "#445", cursor: undoAvail ? "pointer" : "default", fontSize: 16, transition: "all .15s", flexShrink: 0, lineHeight: 1 }}>
-              ↩
-            </button>
-            {/* Redo */}
-            <button onClick={() => _globalRedoRef.current?.()} disabled={!redoAvail} title="חזור (Ctrl+Y)"
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, border: `1px solid ${redoAvail ? "rgba(74,158,255,0.35)" : "rgba(255,255,255,0.08)"}`, borderRadius: 8, background: redoAvail ? "rgba(74,158,255,0.1)" : "rgba(255,255,255,0.03)", color: redoAvail ? "#4a9eff" : "#445", cursor: redoAvail ? "pointer" : "default", fontSize: 16, transition: "all .15s", flexShrink: 0, lineHeight: 1 }}>
-              ↪
-            </button>
-            {/* Refresh */}
-            <button onClick={manualRefresh} disabled={isRefreshing} title="רענן נתונים"
-              style={{ display: "flex", alignItems: "center", gap: 5, padding: "0 10px", height: 34, border: "1px solid rgba(255,255,255,.1)", borderRadius: 8, background: "rgba(255,255,255,.04)", color: isRefreshing ? "#4a9eff" : "#8892b0", cursor: isRefreshing ? "default" : "pointer", fontSize: 12, transition: "all .2s", flexShrink: 0 }}>
-              <span style={{ display: "inline-flex", animation: isRefreshing ? "spin 0.8s linear infinite" : "none" }}>
-                <I n="sync" s={14} />
-              </span>
-              {!mob && <span>{isRefreshing ? "מרענן..." : "רענן"}</span>}
-            </button>
-            {/* Manager */}
-            <button onClick={() => { if (mgr) { setMgr(false); setMgrName(""); } else setModal({ t: "auth" }); }}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 11px", height: 34, border: `1px solid ${mgr ? "rgba(39,174,96,.4)" : "rgba(255,255,255,.1)"}`, borderRadius: 8, background: mgr ? "rgba(39,174,96,.1)" : "rgba(255,255,255,.04)", color: mgr ? "#2ecc71" : "#8892b0", cursor: "pointer", fontSize: 12, fontWeight: mgr ? 700 : 400, transition: "all .2s", flexShrink: 0 }}>
-              <I n={mgr ? "unlock" : "lock"} s={14} />{mob ? (mgr ? (mgrName.split(" ")[0]||"מנהל") : "") : (mgr ? mgrName : "כניסת מנהל")}
-            </button>
-          </div>
+          {mob && (
+            <span style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", fontWeight: 700, fontSize: 15, color: "#fff", pointerEvents: "none", whiteSpace: "nowrap" }}>
+              {TABS.find(t => t.id === tab)?.label}
+            </span>
+          )}
+
+          {/* ── LEFT side ── */}
+          {mob ? (
+            /* Mobile LEFT: undo + redo only */
+            <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, direction: "ltr" }}>
+              <button onClick={() => _globalUndoRef.current?.()} disabled={!undoAvail} title="בטל"
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, border: `1px solid ${undoAvail ? "rgba(74,158,255,0.35)" : "rgba(255,255,255,0.08)"}`, borderRadius: 8, background: undoAvail ? "rgba(74,158,255,0.1)" : "rgba(255,255,255,0.03)", color: undoAvail ? "#4a9eff" : "#445", cursor: undoAvail ? "pointer" : "default", fontSize: 17, transition: "all .15s", lineHeight: 1 }}>↩</button>
+              <button onClick={() => _globalRedoRef.current?.()} disabled={!redoAvail} title="חזור"
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, border: `1px solid ${redoAvail ? "rgba(74,158,255,0.35)" : "rgba(255,255,255,0.08)"}`, borderRadius: 8, background: redoAvail ? "rgba(74,158,255,0.1)" : "rgba(255,255,255,0.03)", color: redoAvail ? "#4a9eff" : "#445", cursor: redoAvail ? "pointer" : "default", fontSize: 17, transition: "all .15s", lineHeight: 1 }}>↪</button>
+            </div>
+          ) : (
+            /* Desktop LEFT: undo | redo | refresh | manager */
+            <div style={{ display: "flex", alignItems: "center", gap: 5, marginRight: "auto", direction: "ltr" }}>
+              <button onClick={() => _globalUndoRef.current?.()} disabled={!undoAvail} title="בטל (Ctrl+Z)"
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, border: `1px solid ${undoAvail ? "rgba(74,158,255,0.35)" : "rgba(255,255,255,0.08)"}`, borderRadius: 8, background: undoAvail ? "rgba(74,158,255,0.1)" : "rgba(255,255,255,0.03)", color: undoAvail ? "#4a9eff" : "#445", cursor: undoAvail ? "pointer" : "default", fontSize: 16, transition: "all .15s", flexShrink: 0, lineHeight: 1 }}>↩</button>
+              <button onClick={() => _globalRedoRef.current?.()} disabled={!redoAvail} title="חזור (Ctrl+Y)"
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, border: `1px solid ${redoAvail ? "rgba(74,158,255,0.35)" : "rgba(255,255,255,0.08)"}`, borderRadius: 8, background: redoAvail ? "rgba(74,158,255,0.1)" : "rgba(255,255,255,0.03)", color: redoAvail ? "#4a9eff" : "#445", cursor: redoAvail ? "pointer" : "default", fontSize: 16, transition: "all .15s", flexShrink: 0, lineHeight: 1 }}>↪</button>
+              <button onClick={manualRefresh} disabled={isRefreshing} title="רענן נתונים"
+                style={{ display: "flex", alignItems: "center", gap: 5, padding: "0 10px", height: 34, border: "1px solid rgba(255,255,255,.1)", borderRadius: 8, background: "rgba(255,255,255,.04)", color: isRefreshing ? "#4a9eff" : "#8892b0", cursor: isRefreshing ? "default" : "pointer", fontSize: 12, transition: "all .2s", flexShrink: 0 }}>
+                <span style={{ display: "inline-flex", animation: isRefreshing ? "spin 0.8s linear infinite" : "none" }}><I n="sync" s={14} /></span>
+                <span>{isRefreshing ? "מרענן..." : "רענן"}</span>
+              </button>
+              <button onClick={() => { if (mgr) { setMgr(false); setMgrName(""); } else setModal({ t: "auth" }); }}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 11px", height: 34, border: `1px solid ${mgr ? "rgba(39,174,96,.4)" : "rgba(255,255,255,.1)"}`, borderRadius: 8, background: mgr ? "rgba(39,174,96,.1)" : "rgba(255,255,255,.04)", color: mgr ? "#2ecc71" : "#8892b0", cursor: "pointer", fontSize: 12, fontWeight: mgr ? 700 : 400, transition: "all .2s", flexShrink: 0 }}>
+                <I n={mgr ? "unlock" : "lock"} s={14} />{mgr ? mgrName : "כניסת מנהל"}
+              </button>
+            </div>
+          )}
         </header>
 
         <main className="main-pad" style={{ flex: 1, padding: "20px 18px", maxWidth: 1320, margin: "0 auto", width: "100%" }}>
