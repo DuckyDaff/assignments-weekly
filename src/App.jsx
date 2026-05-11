@@ -326,6 +326,7 @@ const I = ({ n, s = 17 }) => {
     filter: <><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></>,
     sun:    <><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></>,
     home:   <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></>,
+    sync:   <><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></>,
   };
   return <svg width={s} height={s} viewBox="0 0 24 24" {...g}>{m[n]}</svg>;
 };
@@ -335,6 +336,7 @@ const CSS = `
 @keyframes slideIn{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
 @keyframes slideUpSheet{from{transform:translateY(100%)}to{transform:translateY(0)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 input,select,textarea{font-family:inherit}
 input::placeholder,textarea::placeholder{color:#445!important}
@@ -395,7 +397,8 @@ function Overlay({ onClose, children, wide = false }) {
 ═══════════════════════════════════════════════════════ */
 export default function App() {
   const mob = useMobile();
-  const [data, setData]     = useState(null);
+  const [data, setData]         = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [tab, setTab]       = useState(() => {
     // If opened via notification click, start on the right tab
     const p = new URLSearchParams(window.location.search).get("tab");
@@ -506,6 +509,38 @@ export default function App() {
   useEffect(() => {
     fetch("/api/annual").then(r => r.ok ? r.json() : null).then(d => { if (d) setAnnualData(d); }).catch(() => {});
   }, []);
+
+  // Auto-refresh annual data every 30 s
+  useEffect(() => {
+    const poll = () => {
+      if (isSavingRef.current || document.hidden) return;
+      fetch("/api/annual").then(r => r.ok ? r.json() : null).then(d => {
+        if (d) setAnnualData(prev => JSON.stringify(d) !== JSON.stringify(prev) ? d : prev);
+      }).catch(() => {});
+    };
+    const id = setInterval(poll, 30000);
+    document.addEventListener("visibilitychange", poll);
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", poll); };
+  }, []);
+
+  // Manual refresh — reloads both data sources immediately
+  const manualRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      const [d, a] = await Promise.all([
+        fetch("/api/data").then(r => r.json()),
+        fetch("/api/annual").then(r => r.ok ? r.json() : null),
+      ]);
+      applyFetch(d);
+      if (a) setAnnualData(a);
+      toast("הנתונים עודכנו ✓");
+    } catch {
+      toast("שגיאה ברענון", "error");
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing, applyFetch, toast]);
   const saveAnnualDay = useCallback(async patch => {
     setAnnualData(prev => {
       if (!prev) return prev;
@@ -578,9 +613,18 @@ export default function App() {
   }, [annualData]);
 
   const save = useCallback(async (nd, msg) => {
-    setData(nd);
     isSavingRef.current = true;
     try {
+      // ── Stale check: verify nobody saved after us ──────────────────────────
+      const check = await fetch("/api/data").then(r => r.json()).catch(() => null);
+      if (check?.updatedAt && nd.updatedAt && check.updatedAt !== nd.updatedAt) {
+        applyFetch(check);
+        isSavingRef.current = false;
+        toast("⚠️ מנהל אחר עדכן את הנתונים — הנתונים רועננו. נסה שוב.", "error");
+        return;
+      }
+      // ── Optimistic update + PUT ────────────────────────────────────────────
+      setData(nd);
       const r = await fetch("/api/data", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -598,7 +642,7 @@ export default function App() {
       isSavingRef.current = false;
     }
     if (msg) toast(msg);
-  }, [toast]);
+  }, [toast, applyFetch]);
 
   // Must be defined before any early return — hooks must always run in the same order
   const saveTabLabels = useCallback((labels) => {
@@ -700,6 +744,14 @@ export default function App() {
             ))}
           </nav>
           {mob && <span style={{ fontWeight: 700, fontSize: 15, color: "#fff" }}>{TABS.find(t => t.id === tab)?.label}</span>}
+          {/* Refresh button — visible to everyone */}
+          <button onClick={manualRefresh} disabled={isRefreshing} title="רענן נתונים"
+            style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 10px", border: "1px solid rgba(255,255,255,.1)", borderRadius: 9, background: "rgba(255,255,255,.04)", color: isRefreshing ? "#4a9eff" : "#8892b0", cursor: isRefreshing ? "default" : "pointer", fontSize: 12, minHeight: 36, transition: "all .2s" }}>
+            <span style={{ display: "inline-flex", animation: isRefreshing ? "spin 0.8s linear infinite" : "none" }}>
+              <I n="sync" s={14} />
+            </span>
+            {!mob && <span>{isRefreshing ? "מרענן..." : "רענן"}</span>}
+          </button>
           <button onClick={() => { if (mgr) { setMgr(false); setMgrName(""); } else setModal({ t: "auth" }); }}
             style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 11px", border: `1px solid ${mgr ? "rgba(39,174,96,.4)" : "rgba(255,255,255,.1)"}`, borderRadius: 9, background: mgr ? "rgba(39,174,96,.1)" : "rgba(255,255,255,.04)", color: mgr ? "#2ecc71" : "#8892b0", cursor: "pointer", fontSize: 12, fontWeight: mgr ? 700 : 400, transition: "all .2s", minHeight: 36 }}>
             <I n={mgr ? "unlock" : "lock"} s={14} />{mob ? (mgr ? (mgrName.split(" ")[0]||"מנהל") : "") : (mgr ? mgrName : "כניסת מנהל")}
