@@ -5087,12 +5087,20 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
         const stats = { day: 0, night: 0, oncall: 0, vacation: 0, sick: 0, course: 0, reserve: 0, free: 0, unavail: 0, away: 0, training: 0 };
         yearMonths.forEach(({ days: ds }) => ds.forEach(({ cat }) => { if (cat && stats[cat] !== undefined) stats[cat]++; }));
 
+        // Desktop uses larger cells; mobile stays compact
+        const SQ   = mob ? 22 : 32;   // cell size px
+        const GAP  = mob ? 3  : 4;    // gap between cells px
+        const FSQ  = mob ? 8  : 10;   // font inside cell
+        const FNum = mob ? 8  : 9;    // day-number header font
+        const FMon = mob ? 11 : 14;   // month label font
+        const WMon = mob ? 52 : 72;   // month label min-width
+
         return (
-          <div style={{ maxWidth: 900, margin: '0 auto' }}>
+          <div style={{ maxWidth: mob ? 900 : '100%', margin: '0 auto' }}>
             {/* Person picker */}
             <div style={{ marginBottom: 16, textAlign: 'center' }}>
               <select value={person} onChange={e => setSelPerson(e.target.value)}
-                style={{ ...inp, cursor: 'pointer', fontSize: 14, fontWeight: 700, maxWidth: 280 }}>
+                style={{ ...inp, cursor: 'pointer', fontSize: mob ? 14 : 16, fontWeight: 700, maxWidth: mob ? 280 : 360 }}>
                 {sections.map(sec => (
                   <optgroup key={sec.name} label={sec.name}>
                     {sec.people.map(p => <option key={p} value={p}>{p}</option>)}
@@ -5102,11 +5110,11 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
             </div>
 
             {/* Stat chips */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 18, justifyContent: 'center' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: mob ? 6 : 8, marginBottom: 18, justifyContent: 'center' }}>
               {Object.entries(stats).filter(([, v]) => v > 0).map(([cat, count]) => {
                 const st = CAT_STYLE[cat];
                 return (
-                  <span key={cat} style={{ background: `${st.bg}22`, color: st.bg, border: `1px solid ${st.bg}44`, borderRadius: 10, padding: '4px 12px', fontSize: 11, fontWeight: 700 }}>
+                  <span key={cat} style={{ background: `${st.bg}22`, color: st.bg, border: `1px solid ${st.bg}44`, borderRadius: 10, padding: mob ? '4px 12px' : '6px 16px', fontSize: mob ? 11 : 13, fontWeight: 700 }}>
                     {st.labelShort}: {count}
                   </span>
                 );
@@ -5119,14 +5127,14 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
 
                 {/* ── Day-number header: 31 on left → 1 on right ── */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6, paddingBottom: 6, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-                  <div style={{ display: 'flex', gap: 3 }}>
+                  <div style={{ display: 'flex', gap: GAP }}>
                     {Array.from({ length: 31 }, (_, i) => (
-                      <div key={i} style={{ width: 22, textAlign: 'center', fontSize: 8, color: '#4a6a9a', fontWeight: 700, lineHeight: '14px' }}>
+                      <div key={i} style={{ width: SQ, textAlign: 'center', fontSize: FNum, color: '#4a6a9a', fontWeight: 700, lineHeight: '14px' }}>
                         {31 - i}
                       </div>
                     ))}
                   </div>
-                  <div style={{ minWidth: 52 }} />
+                  <div style={{ minWidth: WMon }} />
                 </div>
 
                 {/* ── Month rows: day 1 on the right, day 31 on the left ── */}
@@ -5134,11 +5142,11 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
                   const reversed = [...ds].reverse(); // day-N first, day-1 last (= rightmost)
                   const padCount = 31 - ds.length;
                   return (
-                    <div key={month} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                      <div style={{ display: 'flex', gap: 3 }}>
+                    <div key={month} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: mob ? 4 : 5 }}>
+                      <div style={{ display: 'flex', gap: GAP }}>
                         {/* Leading padding for short months (aligns rightward) */}
                         {Array.from({ length: padCount }, (_, i) => (
-                          <div key={`pad${i}`} style={{ width: 22, height: 22 }} />
+                          <div key={`pad${i}`} style={{ width: SQ, height: SQ }} />
                         ))}
                         {reversed.map(({ iso, d, code, cat, dow }) => {
                           const st      = cat ? CAT_STYLE[cat] : null;
@@ -5148,14 +5156,14 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
                           return (
                             <div key={iso} title={`${d} ${MONTHS_HE[month]}${code ? ` — ${code}` : ''}`}
                               onClick={() => { setSelDate(iso); setSelMonth(month); setLens('daily'); }}
-                              style={{ width: 22, height: 22, borderRadius: 4, background: bg, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: st ? '#fff' : '#334', fontWeight: 700, border: isToday ? '2px solid #4a9eff' : (dow === 5 || dow === 6 || isHol) ? '1px solid rgba(255,255,255,0.06)' : '1px solid transparent', opacity: (dow === 5 || dow === 6 || isHol) && !code ? 0.45 : 1 }}>
-                              {code ? code.slice(0, 2) : ''}
+                              style={{ width: SQ, height: SQ, borderRadius: mob ? 4 : 6, background: bg, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: FSQ, color: st ? '#fff' : '#334', fontWeight: 700, border: isToday ? '2px solid #4a9eff' : (dow === 5 || dow === 6 || isHol) ? '1px solid rgba(255,255,255,0.06)' : '1px solid transparent', opacity: (dow === 5 || dow === 6 || isHol) && !code ? 0.45 : 1 }}>
+                              {code ? code.slice(0, mob ? 2 : 3) : ''}
                             </div>
                           );
                         })}
                       </div>
                       {/* Month label on the right */}
-                      <div style={{ minWidth: 52, fontSize: 11, color: '#4a9eff', fontWeight: 700, whiteSpace: 'nowrap', direction: 'rtl', paddingRight: 6 }}>
+                      <div style={{ minWidth: WMon, fontSize: FMon, color: '#4a9eff', fontWeight: 700, whiteSpace: 'nowrap', direction: 'rtl', paddingRight: 6 }}>
                         {MONTHS_HE[month]}
                       </div>
                     </div>
@@ -5165,10 +5173,10 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
             </div>
 
             {/* Color legend */}
-            <div style={{ marginTop: 20, display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+            <div style={{ marginTop: 20, display: 'flex', flexWrap: 'wrap', gap: mob ? 8 : 12, justifyContent: 'center' }}>
               {Object.entries(CAT_STYLE).map(([cat, st]) => (
-                <span key={cat} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: '#8892b0' }}>
-                  <span style={{ width: 12, height: 12, background: st.bg, borderRadius: 3, display: 'inline-block' }} />
+                <span key={cat} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: mob ? 10 : 12, color: '#8892b0' }}>
+                  <span style={{ width: mob ? 12 : 16, height: mob ? 12 : 16, background: st.bg, borderRadius: mob ? 3 : 4, display: 'inline-block' }} />
                   {st.labelShort}
                 </span>
               ))}
