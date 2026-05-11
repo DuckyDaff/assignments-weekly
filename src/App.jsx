@@ -5026,47 +5026,50 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data }
             <div style={{ overflowX: 'auto', margin: '0 auto' }}>
               <div style={{ display: 'inline-block', direction: 'ltr' }}>
 
-                {/* ── Day-number header ── */}
+                {/* ── Day-number header: 31 on left → 1 on right ── */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6, paddingBottom: 6, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
                   <div style={{ display: 'flex', gap: 3 }}>
                     {Array.from({ length: 31 }, (_, i) => (
                       <div key={i} style={{ width: 22, textAlign: 'center', fontSize: 8, color: '#4a6a9a', fontWeight: 700, lineHeight: '14px' }}>
-                        {i + 1}
+                        {31 - i}
                       </div>
                     ))}
                   </div>
                   <div style={{ minWidth: 52 }} />
                 </div>
 
-                {/* ── Month rows ── */}
-                {yearMonths.map(({ month, days: ds }) => (
-                  <div key={month} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                    {/* Day squares */}
-                    <div style={{ display: 'flex', gap: 3 }}>
-                      {ds.map(({ iso, d, code, cat, dow }) => {
-                        const st    = cat ? CAT_STYLE[cat] : null;
-                        const bg    = st ? statusStyle(code)?.bg || st.bg : 'rgba(255,255,255,0.04)';
-                        const isToday = iso === today;
-                        const isHol   = !!(annualData?.holidays?.[iso]);
-                        return (
-                          <div key={iso} title={`${d} ${MONTHS_HE[month]}${code ? ` — ${code}` : ''}`}
-                            onClick={() => { setSelDate(iso); setSelMonth(month); setLens('daily'); }}
-                            style={{ width: 22, height: 22, borderRadius: 4, background: bg, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: st ? '#fff' : '#334', fontWeight: 700, border: isToday ? '2px solid #4a9eff' : (dow === 5 || dow === 6 || isHol) ? '1px solid rgba(255,255,255,0.06)' : '1px solid transparent', opacity: (dow === 5 || dow === 6 || isHol) && !code ? 0.45 : 1 }}>
-                            {code ? code.slice(0, 2) : ''}
-                          </div>
-                        );
-                      })}
-                      {/* Padding cells so all months are same width */}
-                      {Array.from({ length: 31 - ds.length }, (_, i) => (
-                        <div key={`pad${i}`} style={{ width: 22, height: 22 }} />
-                      ))}
+                {/* ── Month rows: day 1 on the right, day 31 on the left ── */}
+                {yearMonths.map(({ month, days: ds }) => {
+                  const reversed = [...ds].reverse(); // day-N first, day-1 last (= rightmost)
+                  const padCount = 31 - ds.length;
+                  return (
+                    <div key={month} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                      <div style={{ display: 'flex', gap: 3 }}>
+                        {/* Leading padding for short months (aligns rightward) */}
+                        {Array.from({ length: padCount }, (_, i) => (
+                          <div key={`pad${i}`} style={{ width: 22, height: 22 }} />
+                        ))}
+                        {reversed.map(({ iso, d, code, cat, dow }) => {
+                          const st      = cat ? CAT_STYLE[cat] : null;
+                          const bg      = st ? statusStyle(code)?.bg || st.bg : 'rgba(255,255,255,0.04)';
+                          const isToday = iso === today;
+                          const isHol   = !!(annualData?.holidays?.[iso]);
+                          return (
+                            <div key={iso} title={`${d} ${MONTHS_HE[month]}${code ? ` — ${code}` : ''}`}
+                              onClick={() => { setSelDate(iso); setSelMonth(month); setLens('daily'); }}
+                              style={{ width: 22, height: 22, borderRadius: 4, background: bg, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: st ? '#fff' : '#334', fontWeight: 700, border: isToday ? '2px solid #4a9eff' : (dow === 5 || dow === 6 || isHol) ? '1px solid rgba(255,255,255,0.06)' : '1px solid transparent', opacity: (dow === 5 || dow === 6 || isHol) && !code ? 0.45 : 1 }}>
+                              {code ? code.slice(0, 2) : ''}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {/* Month label on the right */}
+                      <div style={{ minWidth: 52, fontSize: 11, color: '#4a9eff', fontWeight: 700, whiteSpace: 'nowrap', direction: 'rtl', paddingRight: 6 }}>
+                        {MONTHS_HE[month]}
+                      </div>
                     </div>
-                    {/* Month label — shown to the right in LTR = right side */}
-                    <div style={{ minWidth: 52, fontSize: 11, color: '#4a9eff', fontWeight: 700, whiteSpace: 'nowrap', direction: 'rtl', paddingRight: 6 }}>
-                      {MONTHS_HE[month]}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
