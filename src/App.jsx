@@ -766,7 +766,7 @@ export default function App() {
             ⚠ שגיאת חיבור לשרת — השינויים לא נשמרים
           </div>
         )}
-        <header style={{ background: "linear-gradient(180deg,#0f1525 0%,#0a1020 100%)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 12px", display: "flex", alignItems: "center", height: 56, position: "sticky", top: 0, zIndex: 200, boxShadow: "0 2px 24px rgba(0,0,0,.6)" }}>
+        <header style={{ background: "linear-gradient(180deg,#0f1525 0%,#0a1020 100%)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 12px", display: "flex", alignItems: "center", height: 56, position: "sticky", top: 0, zIndex: 200, boxShadow: "0 2px 24px rgba(0,0,0,.6)", justifyContent: mob ? "space-between" : undefined }}>
 
           {/* ── RIGHT side ── */}
           {mob ? (
