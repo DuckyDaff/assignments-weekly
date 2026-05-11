@@ -744,18 +744,20 @@ export default function App() {
             ))}
           </nav>
           {mob && <span style={{ fontWeight: 700, fontSize: 15, color: "#fff" }}>{TABS.find(t => t.id === tab)?.label}</span>}
-          {/* Refresh button — visible to everyone */}
-          <button onClick={manualRefresh} disabled={isRefreshing} title="רענן נתונים"
-            style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 10px", border: "1px solid rgba(255,255,255,.1)", borderRadius: 9, background: "rgba(255,255,255,.04)", color: isRefreshing ? "#4a9eff" : "#8892b0", cursor: isRefreshing ? "default" : "pointer", fontSize: 12, minHeight: 36, transition: "all .2s" }}>
-            <span style={{ display: "inline-flex", animation: isRefreshing ? "spin 0.8s linear infinite" : "none" }}>
-              <I n="sync" s={14} />
-            </span>
-            {!mob && <span>{isRefreshing ? "מרענן..." : "רענן"}</span>}
-          </button>
-          <button onClick={() => { if (mgr) { setMgr(false); setMgrName(""); } else setModal({ t: "auth" }); }}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 11px", border: `1px solid ${mgr ? "rgba(39,174,96,.4)" : "rgba(255,255,255,.1)"}`, borderRadius: 9, background: mgr ? "rgba(39,174,96,.1)" : "rgba(255,255,255,.04)", color: mgr ? "#2ecc71" : "#8892b0", cursor: "pointer", fontSize: 12, fontWeight: mgr ? 700 : 400, transition: "all .2s", minHeight: 36 }}>
-            <I n={mgr ? "unlock" : "lock"} s={14} />{mob ? (mgr ? (mgrName.split(" ")[0]||"מנהל") : "") : (mgr ? mgrName : "כניסת מנהל")}
-          </button>
+          {/* Refresh + manager — grouped so they don't shift the nav */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <button onClick={manualRefresh} disabled={isRefreshing} title="רענן נתונים"
+              style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 10px", border: "1px solid rgba(255,255,255,.1)", borderRadius: 9, background: "rgba(255,255,255,.04)", color: isRefreshing ? "#4a9eff" : "#8892b0", cursor: isRefreshing ? "default" : "pointer", fontSize: 12, minHeight: 36, transition: "all .2s" }}>
+              <span style={{ display: "inline-flex", animation: isRefreshing ? "spin 0.8s linear infinite" : "none" }}>
+                <I n="sync" s={14} />
+              </span>
+              {!mob && <span>{isRefreshing ? "מרענן..." : "רענן"}</span>}
+            </button>
+            <button onClick={() => { if (mgr) { setMgr(false); setMgrName(""); } else setModal({ t: "auth" }); }}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 11px", border: `1px solid ${mgr ? "rgba(39,174,96,.4)" : "rgba(255,255,255,.1)"}`, borderRadius: 9, background: mgr ? "rgba(39,174,96,.1)" : "rgba(255,255,255,.04)", color: mgr ? "#2ecc71" : "#8892b0", cursor: "pointer", fontSize: 12, fontWeight: mgr ? 700 : 400, transition: "all .2s", minHeight: 36 }}>
+              <I n={mgr ? "unlock" : "lock"} s={14} />{mob ? (mgr ? (mgrName.split(" ")[0]||"מנהל") : "") : (mgr ? mgrName : "כניסת מנהל")}
+            </button>
+          </div>
         </header>
 
         <main className="main-pad" style={{ flex: 1, padding: "20px 18px", maxWidth: 1320, margin: "0 auto", width: "100%" }}>
