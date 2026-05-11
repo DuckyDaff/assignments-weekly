@@ -32,7 +32,7 @@ export default async function handler(req, res) {
 
   // Save / update subscription
   if (req.method === "POST") {
-    const { subscription, name, reminders } = req.body || {};
+    const { subscription, name, reminders, oncallReminders } = req.body || {};
     if (!subscription || !subscription.endpoint) {
       return res.status(400).json({ error: "missing subscription" });
     }
@@ -42,7 +42,8 @@ export default async function handler(req, res) {
     filtered.push({
       subscription,
       name: name || "",
-      reminders: reminders !== false,   // default true
+      reminders: reminders !== false,               // default true
+      oncallReminders: oncallReminders === true,    // default false
       savedAt: Date.now(),
     });
     await saveSubs(filtered);
@@ -51,15 +52,17 @@ export default async function handler(req, res) {
 
   // Update preferences (reminders toggle) without re-subscribing
   if (req.method === "PATCH") {
-    const { endpoint, reminders } = req.body || {};
+    const { endpoint, reminders, oncallReminders } = req.body || {};
     if (!endpoint) return res.status(400).json({ error: "missing endpoint" });
 
     const subs = await loadSubs();
-    const updated = subs.map(s =>
-      s.subscription?.endpoint === endpoint
-        ? { ...s, reminders: Boolean(reminders) }
-        : s
-    );
+    const updated = subs.map(s => {
+      if (s.subscription?.endpoint !== endpoint) return s;
+      const patch = {};
+      if (reminders !== undefined) patch.reminders = Boolean(reminders);
+      if (oncallReminders !== undefined) patch.oncallReminders = Boolean(oncallReminders);
+      return { ...s, ...patch };
+    });
     await saveSubs(updated);
     return res.status(200).json({ ok: true });
   }

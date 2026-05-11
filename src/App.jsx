@@ -57,6 +57,10 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
 }
 
+// Global undo/redo refs — set by AnnualView, called by App-level keyboard handler
+const _globalUndoRef = { current: null };
+const _globalRedoRef = { current: null };
+
 async function registerPush(name, reminders = true) {
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return null;
   try {
@@ -95,6 +99,22 @@ async function updateReminderPref(reminders) {
     });
   } catch (e) {
     console.warn("Failed to update reminder pref:", e);
+  }
+}
+
+async function updateOncallReminderPref(oncallReminders) {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return;
+    await fetch("/api/subscribe", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: sub.endpoint, oncallReminders }),
+    });
+  } catch (e) {
+    console.warn("Failed to update oncall reminder pref:", e);
   }
 }
 
@@ -340,6 +360,9 @@ const CSS = `
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 input,select,textarea{font-family:inherit}
 input::placeholder,textarea::placeholder{color:#445!important}
+select{background:#0d1628!important;color:#ccd6f6!important;border:1px solid rgba(255,255,255,0.12)!important;border-radius:8px!important;outline:none!important;cursor:pointer}
+select option{background:#0d1628!important;color:#ccd6f6!important}
+select optgroup{background:#0a1020!important;color:#4a9eff!important;font-weight:700}
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:#111}
 ::-webkit-scrollbar-thumb{background:#334;border-radius:3px}
@@ -411,11 +434,24 @@ export default function App() {
   const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem("myName"));
   const [pushStatus, setPushStatus] = useState(() => (typeof Notification !== "undefined" ? Notification.permission : null) || "default"); // "default"|"granted"|"denied"
   const [remindersOn, setRemindersOn] = useState(() => localStorage.getItem("remindersOn") !== "false"); // default true
+  const [oncallRemindersOn, setOncallRemindersOn] = useState(() => localStorage.getItem("oncallRemindersOn") === "true"); // default false
+  const [undoAvail, setUndoAvail] = useState(false);
+  const [redoAvail, setRedoAvail] = useState(false);
   const [legendVer, setLegendVer] = useState(0); // incremented when legend colors change → triggers re-renders
   useEffect(() => {
     const h = () => setLegendVer(v => v + 1);
     window.addEventListener('legend-updated', h);
     return () => window.removeEventListener('legend-updated', h);
+  }, []);
+  // Global Ctrl+Z / Ctrl+Y — work on any tab (AnnualView sets _globalUndoRef/_globalRedoRef)
+  useEffect(() => {
+    const handler = e => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.ctrlKey && e.key === 'z' && !e.shiftKey) { e.preventDefault(); _globalUndoRef.current?.(); }
+      if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) { e.preventDefault(); _globalRedoRef.current?.(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, []);
   const [mgrName, setMgrName] = useState("");     // שם המנהל הנוכחי
   const mgrNameRef = useRef("");
@@ -730,31 +766,47 @@ export default function App() {
             ⚠ שגיאת חיבור לשרת — השינויים לא נשמרים
           </div>
         )}
-        <header style={{ background: "linear-gradient(180deg,#0f1525 0%,#0a1020 100%)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 18px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 56, position: "sticky", top: 0, zIndex: 200, boxShadow: "0 2px 24px rgba(0,0,0,.6)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <header style={{ background: "linear-gradient(180deg,#0f1525 0%,#0a1020 100%)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 18px", display: "flex", alignItems: "center", height: 56, position: "sticky", top: 0, zIndex: 200, boxShadow: "0 2px 24px rgba(0,0,0,.6)" }}>
+          {/* Logo — right side */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             <img src="/logo.png" alt="לוגו" style={{ width: 42, height: 42, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
             {!mob && <span style={{ fontWeight: 700, fontSize: 14, color: "#fff", letterSpacing: .3 }}>מערכת שיבוצים</span>}
           </div>
-          <nav className="desktop-nav" style={{ display: "flex", gap: 1 }}>
-            {TABS.map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 11px", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: tab === t.id ? 700 : 400, background: tab === t.id ? "rgba(74,158,255,0.14)" : "transparent", color: tab === t.id ? "#4a9eff" : "#7a8499", transition: "all .15s", position: "relative" }}>
-                <I n={t.icon} s={13} />{t.label}
-                {tab === t.id && <span style={{ position: "absolute", bottom: -1, left: "20%", right: "20%", height: 2, background: "#4a9eff", borderRadius: 2 }} />}
-              </button>
-            ))}
-          </nav>
-          {mob && <span style={{ fontWeight: 700, fontSize: 15, color: "#fff" }}>{TABS.find(t => t.id === tab)?.label}</span>}
-          {/* Refresh + manager — grouped so they don't shift the nav */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {/* Nav — absolutely centered regardless of side widths */}
+          {!mob && (
+            <nav className="desktop-nav" style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", display: "flex", gap: 1 }}>
+              {TABS.map(t => (
+                <button key={t.id} onClick={() => setTab(t.id)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 11px", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: tab === t.id ? 700 : 400, background: tab === t.id ? "rgba(74,158,255,0.14)" : "transparent", color: tab === t.id ? "#4a9eff" : "#7a8499", transition: "all .15s", position: "relative" }}>
+                  <I n={t.icon} s={13} />{t.label}
+                  {tab === t.id && <span style={{ position: "absolute", bottom: -1, left: "20%", right: "20%", height: 2, background: "#4a9eff", borderRadius: 2 }} />}
+                </button>
+              ))}
+            </nav>
+          )}
+          {mob && <span style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", fontWeight: 700, fontSize: 15, color: "#fff", pointerEvents: "none", whiteSpace: "nowrap" }}>{TABS.find(t => t.id === tab)?.label}</span>}
+          {/* Action buttons — left side, LTR order: undo | redo | refresh | manager */}
+          <div style={{ display: "flex", alignItems: "center", gap: 5, marginRight: "auto", direction: "ltr" }}>
+            {/* Undo */}
+            <button onClick={() => _globalUndoRef.current?.()} disabled={!undoAvail} title="בטל (Ctrl+Z)"
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, border: `1px solid ${undoAvail ? "rgba(74,158,255,0.35)" : "rgba(255,255,255,0.08)"}`, borderRadius: 8, background: undoAvail ? "rgba(74,158,255,0.1)" : "rgba(255,255,255,0.03)", color: undoAvail ? "#4a9eff" : "#445", cursor: undoAvail ? "pointer" : "default", fontSize: 16, transition: "all .15s", flexShrink: 0, lineHeight: 1 }}>
+              ↩
+            </button>
+            {/* Redo */}
+            <button onClick={() => _globalRedoRef.current?.()} disabled={!redoAvail} title="חזור (Ctrl+Y)"
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, border: `1px solid ${redoAvail ? "rgba(74,158,255,0.35)" : "rgba(255,255,255,0.08)"}`, borderRadius: 8, background: redoAvail ? "rgba(74,158,255,0.1)" : "rgba(255,255,255,0.03)", color: redoAvail ? "#4a9eff" : "#445", cursor: redoAvail ? "pointer" : "default", fontSize: 16, transition: "all .15s", flexShrink: 0, lineHeight: 1 }}>
+              ↪
+            </button>
+            {/* Refresh */}
             <button onClick={manualRefresh} disabled={isRefreshing} title="רענן נתונים"
-              style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 10px", border: "1px solid rgba(255,255,255,.1)", borderRadius: 9, background: "rgba(255,255,255,.04)", color: isRefreshing ? "#4a9eff" : "#8892b0", cursor: isRefreshing ? "default" : "pointer", fontSize: 12, minHeight: 36, transition: "all .2s" }}>
+              style={{ display: "flex", alignItems: "center", gap: 5, padding: "0 10px", height: 34, border: "1px solid rgba(255,255,255,.1)", borderRadius: 8, background: "rgba(255,255,255,.04)", color: isRefreshing ? "#4a9eff" : "#8892b0", cursor: isRefreshing ? "default" : "pointer", fontSize: 12, transition: "all .2s", flexShrink: 0 }}>
               <span style={{ display: "inline-flex", animation: isRefreshing ? "spin 0.8s linear infinite" : "none" }}>
                 <I n="sync" s={14} />
               </span>
               {!mob && <span>{isRefreshing ? "מרענן..." : "רענן"}</span>}
             </button>
+            {/* Manager */}
             <button onClick={() => { if (mgr) { setMgr(false); setMgrName(""); } else setModal({ t: "auth" }); }}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 11px", border: `1px solid ${mgr ? "rgba(39,174,96,.4)" : "rgba(255,255,255,.1)"}`, borderRadius: 9, background: mgr ? "rgba(39,174,96,.1)" : "rgba(255,255,255,.04)", color: mgr ? "#2ecc71" : "#8892b0", cursor: "pointer", fontSize: 12, fontWeight: mgr ? 700 : 400, transition: "all .2s", minHeight: 36 }}>
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 11px", height: 34, border: `1px solid ${mgr ? "rgba(39,174,96,.4)" : "rgba(255,255,255,.1)"}`, borderRadius: 8, background: mgr ? "rgba(39,174,96,.1)" : "rgba(255,255,255,.04)", color: mgr ? "#2ecc71" : "#8892b0", cursor: "pointer", fontSize: 12, fontWeight: mgr ? 700 : 400, transition: "all .2s", flexShrink: 0 }}>
               <I n={mgr ? "unlock" : "lock"} s={14} />{mob ? (mgr ? (mgrName.split(" ")[0]||"מנהל") : "") : (mgr ? mgrName : "כניסת מנהל")}
             </button>
           </div>
@@ -764,8 +816,8 @@ export default function App() {
           {tab === "dashboard" && <DashboardView annualData={annualData} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} mgr={mgr} onView={a => setViewAssign(a)} setTab={setTab} />}
           {tab === "board"    && <BoardView    wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} filterPerson={filterPerson} setFilterPerson={setFilterPerson} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onDelete={deleteAssign} onCopy={copyFromPrev} onCSV={() => doExportCSV(wk, weekA)} onPrint={() => doPrint(wk, weekA, data.systems)} onView={a => setViewAssign(a)} />}
           {tab === "calendar" && <CalendarView wk={wk} setWk={setWk} weekA={weekA} prevA={prevA} data={data} sysMap={sysColorMap} mgr={mgr} onAdd={openAdd} onEdit={a => setModal({ t: "assign", mode: "edit", a })} onCopy={copyFromPrev} onView={a => setViewAssign(a)} onPlan={() => setPlanner(true)} />}
-          {tab === "annual"   && <AnnualView  annualData={annualData} onSaveDay={saveAnnualDay} mgr={mgr} mgrName={mgrName} myName={myName} toast={toast} data={data} />}
-          {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} annualData={annualData} setMyName={n => { setMyName(n); if (n) localStorage.setItem("myName", n); else localStorage.removeItem("myName"); }} onView={a => setViewAssign(a)} onChangeName={() => setShowWelcome(true)} pushStatus={pushStatus} onEnablePush={() => registerPush(myName, remindersOn).then(() => setPushStatus(Notification?.permission || "default"))} remindersOn={remindersOn} onToggleReminders={v => { setRemindersOn(v); localStorage.setItem("remindersOn", v); updateReminderPref(v); }} />}
+          {tab === "annual"   && <AnnualView  annualData={annualData} onSaveDay={saveAnnualDay} mgr={mgr} mgrName={mgrName} myName={myName} toast={toast} data={data} onStackChange={(u,r) => { setUndoAvail(u>0); setRedoAvail(r>0); }} />}
+          {tab === "me"       && <MyView       wk={wk} setWk={setWk} weekA={weekA} data={data} sysMap={sysColorMap} myName={myName} annualData={annualData} setMyName={n => { setMyName(n); if (n) localStorage.setItem("myName", n); else localStorage.removeItem("myName"); }} onView={a => setViewAssign(a)} onChangeName={() => setShowWelcome(true)} pushStatus={pushStatus} onEnablePush={() => registerPush(myName, remindersOn).then(() => setPushStatus(Notification?.permission || "default"))} remindersOn={remindersOn} onToggleReminders={v => { setRemindersOn(v); localStorage.setItem("remindersOn", v); updateReminderPref(v); }} oncallRemindersOn={oncallRemindersOn} onToggleOncallReminders={v => { setOncallRemindersOn(v); localStorage.setItem("oncallRemindersOn", v); updateOncallReminderPref(v); }} />}
           {tab === "settings" && <SettingsView data={data} save={save} mgr={mgr} mgrName={mgrName} toast={toast} onSyncAnnual={syncAnnualSections} tabLabels={tabLabels} onSaveTabLabels={saveTabLabels} annualData={annualData} onSaveNominalHours={saveNominalHours} onSaveHolidays={saveHolidays} />}
         </main>
 
@@ -785,7 +837,7 @@ export default function App() {
       {viewAssign && <AssignDetailModal a={viewAssign} sysMap={sysColorMap} mgr={mgr} onClose={() => setViewAssign(null)} onEdit={() => { setModal({ t: "assign", mode: "edit", a: viewAssign }); setViewAssign(null); }} onDelete={() => { deleteAssign(viewAssign.id); setViewAssign(null); }} />}
       {planner && <PlannerView wk={wk} data={data} sysMap={sysColorMap} weekA={weekA} annualData={annualData} onClose={() => setPlanner(false)} onSave={(assignments, planWk) => { const nd = addLog({ ...data, assignments }, "תכנן שבוע", `שבוע ${planWk||wk}`); save(nd, "שבוע תוכנן ✓"); }} />}
       {showWelcome && data && <WelcomeModal data={data} myName={myName} onSelect={n => { setMyName(n); localStorage.setItem("myName", n); setShowWelcome(false); }} onSkip={() => setShowWelcome(false)} />}
-      {showAbsenceModal && <AbsenceModal data={data} annualData={annualData} onClose={() => setShowAbsenceModal(false)} onSave={async (range) => { await saveAbsenceRange(range); setShowAbsenceModal(false); toast(`✓ עודכן ${range.person} — ${range.fromDate} עד ${range.toDate}`); }} />}
+      {showAbsenceModal && <AbsenceModal data={data} annualData={annualData} onClose={() => setShowAbsenceModal(false)} onSave={async (range) => { await saveAbsenceRange(range); setShowAbsenceModal(false); toast(`✓ עודכן ${range.person} — ${fmtDateIL(range.fromDate)} עד ${fmtDateIL(range.toDate)}`); }} />}
     </MobileCtx.Provider>
     </LegendCtx.Provider>
   );
@@ -1257,7 +1309,7 @@ const TH = { padding: "8px 10px", textAlign: "center", borderRadius: 7, fontSize
 const TD = { padding: "7px 9px", borderRadius: 7, fontSize: 12, minHeight: 36 };
 
 /* ── MY VIEW ── */
-function MyView({ wk, setWk, weekA, data, sysMap, myName, annualData, setMyName, onView, onChangeName, pushStatus, onEnablePush, remindersOn, onToggleReminders }) {
+function MyView({ wk, setWk, weekA, data, sysMap, myName, annualData, setMyName, onView, onChangeName, pushStatus, onEnablePush, remindersOn, onToggleReminders, oncallRemindersOn, onToggleOncallReminders }) {
   useContext(LegendCtx); // re-render when legend colors change
   const todayKey      = todayDayKey();
   const isTodayWork   = isWorkDay(todayKey);
@@ -1337,7 +1389,7 @@ function MyView({ wk, setWk, weekA, data, sysMap, myName, annualData, setMyName,
         <div style={{ marginBottom: 16, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "14px 16px" }}>
           <div style={{ fontSize: 12, color: "#ccd6f6", fontWeight: 700, marginBottom: 12 }}>⚙️ הגדרות התראות</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {/* Reminder toggle */}
+            {/* Morning reminder toggle */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
                 <div style={{ fontSize: 13, color: "#ccd6f6", fontWeight: 600 }}>תזכורת בוקר</div>
@@ -1354,6 +1406,26 @@ function MyView({ wk, setWk, weekA, data, sysMap, myName, annualData, setMyName,
                   position: "absolute", top: 2, width: 20, height: 20, borderRadius: 10,
                   background: "#fff", transition: "right .2s",
                   right: remindersOn ? 2 : 22,
+                }} />
+              </button>
+            </div>
+            {/* Oncall reminder toggle */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+              <div>
+                <div style={{ fontSize: 13, color: "#ccd6f6", fontWeight: 600 }}>תזכורת כוננות</div>
+                <div style={{ fontSize: 11, color: "#8892b0", marginTop: 2 }}>קבל תזכורת ב-17:30 אם אתה כונן היום</div>
+              </div>
+              <button
+                onClick={() => onToggleOncallReminders(!oncallRemindersOn)}
+                style={{
+                  width: 44, height: 24, borderRadius: 12, border: "none", cursor: "pointer",
+                  background: oncallRemindersOn ? "#e67e22" : "rgba(255,255,255,0.12)",
+                  position: "relative", transition: "background .2s", flexShrink: 0,
+                }}>
+                <span style={{
+                  position: "absolute", top: 2, width: 20, height: 20, borderRadius: 10,
+                  background: "#fff", transition: "right .2s",
+                  right: oncallRemindersOn ? 2 : 22,
                 }} />
               </button>
             </div>
@@ -3685,7 +3757,7 @@ function autoVehicles(bySite, saved) {
   return res;
 }
 
-function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data }) {
+function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, onStackChange }) {
   const mob = useContext(MobileCtx);
   useContext(LegendCtx); // re-render when legend colors change
   // lens: 'daily' | 'monthly' | 'personal'
@@ -3733,15 +3805,12 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data }
   const [migrateOncallConfirm, setMigrateOncallConfirm] = useState(false);
   const [migratingOncall, setMigratingOncall] = useState(false);
 
-  // Keyboard shortcuts: Ctrl+Z = undo, Ctrl+Y / Ctrl+Shift+Z = redo
-  // Using refs so the effect never needs to re-register
+  // Wire up global refs so App-level Ctrl+Z/Y handler can call these functions
+  // (local refs kept for backward compatibility; global refs enable cross-tab keyboard shortcuts)
   useEffect(() => {
-    const handler = e => {
-      if (e.ctrlKey && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undoFnRef.current?.(); }
-      if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) { e.preventDefault(); redoFnRef.current?.(); }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    _globalUndoRef.current = () => undoFnRef.current?.();
+    _globalRedoRef.current = () => redoFnRef.current?.();
+    return () => { _globalUndoRef.current = null; _globalRedoRef.current = null; };
   }, []);
   // Reset clear-month confirmation when navigating away
   useEffect(() => { setClearMonthConfirm(false); }, [selMonth, selSecIdx]);
@@ -3821,6 +3890,8 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data }
   // Always point refs to the latest functions (called every render)
   undoFnRef.current = handleUndo;
   redoFnRef.current = handleRedo;
+  // Notify App whenever stacks change so the header buttons can enable/disable
+  useEffect(() => { onStackChange?.(undoStack.length, redoStack.length); }, [undoStack, redoStack]); // eslint-disable-line
 
   function saveStatus(person, code) {
     pushUndoEntry([snapshotDay(selDate)]);
@@ -3866,8 +3937,8 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data }
         />
       )}
 
-      {/* Lens selector + manager tools row */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'stretch' }}>
+      {/* Lens selector row */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'stretch' }}>
         <div style={{ flex: 1, display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
           {LENSES.map(l => (
             <button key={l.id} onClick={() => setLens(l.id)}
@@ -3882,15 +3953,6 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data }
             </button>
           ))}
         </div>
-        {/* Undo / Redo — all users */}
-        <button onClick={handleUndo} disabled={!undoStack.length} title="בטל פעולה (Ctrl+Z)"
-          style={{ padding: '8px 10px', background: undoStack.length ? 'rgba(74,158,255,0.1)' : 'rgba(255,255,255,0.04)', border: `1px solid ${undoStack.length ? 'rgba(74,158,255,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, color: undoStack.length ? '#4a9eff' : '#445', fontSize: 16, cursor: undoStack.length ? 'pointer' : 'default', flexShrink: 0, transition: 'all .15s', lineHeight: 1 }}>
-          ↩
-        </button>
-        <button onClick={handleRedo} disabled={!redoStack.length} title="בצע שוב (Ctrl+Y)"
-          style={{ padding: '8px 10px', background: redoStack.length ? 'rgba(74,158,255,0.1)' : 'rgba(255,255,255,0.04)', border: `1px solid ${redoStack.length ? 'rgba(74,158,255,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, color: redoStack.length ? '#4a9eff' : '#445', fontSize: 16, cursor: redoStack.length ? 'pointer' : 'default', flexShrink: 0, transition: 'all .15s', lineHeight: 1 }}>
-          ↪
-        </button>
         {mgr && (
           <button onClick={() => setShiftModal(true)}
             title="שיבוץ אוטומטי למשמרת מסלולים"
@@ -3899,6 +3961,7 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data }
           </button>
         )}
       </div>
+
 
       {/* ══ DAILY LENS ══════════════════════════════════════════════ */}
       {lens === 'daily' && (() => {
@@ -4392,9 +4455,8 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data }
                   {!sec.name.includes('משמרת') && (() => {
                     const ONCALL_HRS = { 'כ': 6, 'כמ': 6, 'כש': 10, 'כמש': 10 };
                     const activePeople = people.filter(p => !p.includes('תקן'));
-                    let totalOncallHrsMonth = 0, totalOncallHrsYear = 0;
-                    let totalAwayDaysMonth = 0, totalAwayDaysYear = 0;
-                    const yearEntries = Object.entries(days).filter(([iso]) => iso.startsWith(String(year)));
+                    let totalOncallHrsMonth = 0;
+                    let totalAwayDaysMonth = 0;
                     for (const p of activePeople) {
                       for (const { iso } of monthDays) {
                         const d = days[iso] || {};
@@ -4402,46 +4464,21 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data }
                         totalOncallHrsMonth += ONCALL_HRS[code] || 0;
                         if (classifyStatus(code) === 'away') totalAwayDaysMonth++;
                       }
-                      for (const [, dayData] of yearEntries) {
-                        const code = dayData.statuses2?.[p] || dayData.statuses?.[p] || '';
-                        totalOncallHrsYear += ONCALL_HRS[code] || 0;
-                        if (classifyStatus(code) === 'away') totalAwayDaysYear++;
-                      }
                     }
                     return (
                       <div style={{ marginBottom: 10, padding: '8px 6px', background: 'rgba(0,0,0,0.25)', border: `1px solid ${sc.accent}33`, borderRadius: 8 }}>
                         <div style={{ fontSize: 9, color: sc.accent, fontWeight: 700, textAlign: 'center', marginBottom: 7, letterSpacing: 0.5 }}>{MONTHS_HE[selMonth]}</div>
                         {/* כוננות */}
-                        <div style={{ marginBottom: 6, paddingBottom: 6, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-                          <div style={{ fontSize: 9, color: '#e67e22', fontWeight: 700, textAlign: 'center', marginBottom: 3 }}>כוננות</div>
-                          <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-                            <div style={{ textAlign: 'center' }}>
-                              <div style={{ fontSize: 9, color: '#556' }}>חודש</div>
-                              <div style={{ fontSize: 15, fontWeight: 700, color: totalOncallHrsMonth > 0 ? '#e67e22' : '#445', lineHeight: 1 }}>{totalOncallHrsMonth}</div>
-                              <div style={{ fontSize: 8, color: '#445' }}>ש׳</div>
-                            </div>
-                            <div style={{ textAlign: 'center' }}>
-                              <div style={{ fontSize: 9, color: '#556' }}>שנה</div>
-                              <div style={{ fontSize: 15, fontWeight: 700, color: '#667', lineHeight: 1 }}>{totalOncallHrsYear}</div>
-                              <div style={{ fontSize: 8, color: '#445' }}>ש׳</div>
-                            </div>
-                          </div>
+                        <div style={{ marginBottom: 6, paddingBottom: 6, borderBottom: '1px solid rgba(255,255,255,0.07)', textAlign: 'center' }}>
+                          <div style={{ fontSize: 9, color: '#e67e22', fontWeight: 700, marginBottom: 4 }}>כוננות</div>
+                          <div style={{ fontSize: 22, fontWeight: 700, color: totalOncallHrsMonth > 0 ? '#e67e22' : '#445', lineHeight: 1 }}>{totalOncallHrsMonth}</div>
+                          <div style={{ fontSize: 9, color: '#556', marginTop: 2 }}>שעות</div>
                         </div>
                         {/* שתפ"א */}
-                        <div>
-                          <div style={{ fontSize: 9, color: '#16a085', fontWeight: 700, textAlign: 'center', marginBottom: 3 }}>שתפ״א</div>
-                          <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-                            <div style={{ textAlign: 'center' }}>
-                              <div style={{ fontSize: 9, color: '#556' }}>חודש</div>
-                              <div style={{ fontSize: 15, fontWeight: 700, color: totalAwayDaysMonth > 0 ? '#16a085' : '#445', lineHeight: 1 }}>{totalAwayDaysMonth}</div>
-                              <div style={{ fontSize: 8, color: '#445' }}>ימים</div>
-                            </div>
-                            <div style={{ textAlign: 'center' }}>
-                              <div style={{ fontSize: 9, color: '#556' }}>שנה</div>
-                              <div style={{ fontSize: 15, fontWeight: 700, color: '#667', lineHeight: 1 }}>{totalAwayDaysYear}</div>
-                              <div style={{ fontSize: 8, color: '#445' }}>ימים</div>
-                            </div>
-                          </div>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 9, color: '#16a085', fontWeight: 700, marginBottom: 4 }}>שתפ״א</div>
+                          <div style={{ fontSize: 22, fontWeight: 700, color: totalAwayDaysMonth > 0 ? '#16a085' : '#445', lineHeight: 1 }}>{totalAwayDaysMonth}</div>
+                          <div style={{ fontSize: 9, color: '#556', marginTop: 2 }}>ימים</div>
                         </div>
                       </div>
                     );
@@ -5157,6 +5194,13 @@ const ABSENCE_TYPES = [
   { code: "כש",  label: "כוננות שבת",        color: "#d35400" },
 ];
 
+// Format YYYY-MM-DD → DD/MM/YYYY for display
+function fmtDateIL(iso) {
+  if (!iso || iso.length < 10) return iso;
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
 function AbsenceModal({ data, annualData, onClose, onSave }) {
   const mob = useContext(MobileCtx);
   const allPeople = getAllPeople(data);
@@ -5246,13 +5290,23 @@ function AbsenceModal({ data, annualData, onClose, onSave }) {
           <div style={{ display: "flex", gap: 10 }}>
             <div style={{ flex: 1 }}>
               <label style={lbl}>מתאריך</label>
-              <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); if (e.target.value > toDate) setToDate(e.target.value); }}
-                style={inp} />
+              <div style={{ position: "relative" }}>
+                <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); if (e.target.value > toDate) setToDate(e.target.value); }}
+                  style={{ ...inp, color: "transparent", caretColor: "transparent" }} />
+                <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", paddingRight: 12, fontSize: 14, color: "#ccd6f6", pointerEvents: "none", fontFamily: "monospace", letterSpacing: 1 }}>
+                  {fmtDateIL(fromDate)}
+                </span>
+              </div>
             </div>
             <div style={{ flex: 1 }}>
               <label style={lbl}>עד תאריך</label>
-              <input type="date" value={toDate} min={fromDate} onChange={e => setToDate(e.target.value)}
-                style={inp} />
+              <div style={{ position: "relative" }}>
+                <input type="date" value={toDate} min={fromDate} onChange={e => setToDate(e.target.value)}
+                  style={{ ...inp, color: "transparent", caretColor: "transparent" }} />
+                <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", paddingRight: 12, fontSize: 14, color: "#ccd6f6", pointerEvents: "none", fontFamily: "monospace", letterSpacing: 1 }}>
+                  {fmtDateIL(toDate)}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -5263,7 +5317,7 @@ function AbsenceModal({ data, annualData, onClose, onSave }) {
                 <span style={{ color: "#4a9eff" }}>{person}</span> — <span style={{ background: selType.color, color: "#fff", borderRadius: 5, padding: "1px 8px", fontSize: 12, fontWeight: 700 }}>{selType.label}</span>
               </div>
               <div style={{ fontSize: 12, color: "#8892b0" }}>
-                {fromDate === toDate ? `יום אחד: ${fromDate}` : `${dayCount} ימים: ${fromDate} עד ${toDate}`}
+                {fromDate === toDate ? `יום אחד: ${fmtDateIL(fromDate)}` : `${dayCount} ימים: ${fmtDateIL(fromDate)} עד ${fmtDateIL(toDate)}`}
               </div>
               {preview.length > 0 && (
                 <div style={{ marginTop: 8, fontSize: 11, color: "#e67e22" }}>
