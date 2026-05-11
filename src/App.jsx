@@ -3716,12 +3716,16 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data }
   const today    = `${todayD.getFullYear()}-${String(todayD.getMonth()+1).padStart(2,'0')}-${String(todayD.getDate()).padStart(2,'0')}`;
   const isoLocal = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 
-  const STATUS_OPTIONS = [
-    '', 'י', 'ל', 'Y', 'L', 'כ', 'כש', 'כמ', 'כמש',
+  // Derive status options from legend groups so order + codes always match the legend.
+  // Falls back to hardcoded list only if legend is empty (first run / no legend set yet).
+  const _lgGroups = (() => { try { return JSON.parse(localStorage.getItem('legendGroups') || '[]'); } catch { return []; } })();
+  const _lgCodes  = _lgGroups.flatMap(g => g.codes || []);
+  const STATUS_OPTIONS = ['', ...(_lgCodes.length ? _lgCodes : [
+    'י', 'ל', 'Y', 'L', 'כ', 'כש', 'כמ', 'כמש',
     'ח', 'מיל', 'מ', 'פ', 'מנוחה', 'ק',
     'חיפה', 'הרצליה', 'ראש פינה', 'רמון',
     'ב. חשמל', 'ב. כללית', 'השתלמות', 'ניקיון תחנות',
-  ];
+  ])];
 
   function navDay(delta) {
     const d = new Date(selDate + 'T12:00:00'); // noon avoids UTC-offset date shift
