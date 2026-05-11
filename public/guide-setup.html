@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>מדריך התחלה מהירה — מערכת שיבוצים</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f4f6fb;
+      color: #1a1a2e;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    .page {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 36px 24px 60px;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #1a237e, #283593);
+      color: #fff;
+      border-radius: 18px;
+      padding: 32px 36px;
+      margin-bottom: 36px;
+      text-align: center;
+      box-shadow: 0 6px 32px rgba(26,35,126,0.18);
+    }
+    .header .logo { font-size: 48px; margin-bottom: 10px; }
+    .header h1 { font-size: 26px; font-weight: 800; margin-bottom: 6px; }
+    .header p { font-size: 14px; opacity: 0.82; }
+
+    /* Section title */
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 19px;
+      font-weight: 800;
+      color: #1a237e;
+      margin: 36px 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 3px solid #3f51b5;
+    }
+    .section-title .icon { font-size: 22px; }
+
+    /* Step card */
+    .steps { display: flex; flex-direction: column; gap: 14px; }
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      background: #fff;
+      border-radius: 14px;
+      padding: 16px 18px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+      border-right: 5px solid #3f51b5;
+    }
+    .step.green  { border-right-color: #2e7d32; }
+    .step.orange { border-right-color: #e65100; }
+    .step.purple { border-right-color: #6a1b9a; }
+    .step.red    { border-right-color: #c62828; }
+
+    .step-num {
+      min-width: 34px;
+      height: 34px;
+      background: #3f51b5;
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+    .step.green  .step-num { background: #2e7d32; }
+    .step.orange .step-num { background: #e65100; }
+    .step.purple .step-num { background: #6a1b9a; }
+    .step.red    .step-num { background: #c62828; }
+
+    .step-body h3 { font-size: 15px; font-weight: 700; margin-bottom: 4px; color: #1a1a2e; }
+    .step-body p  { font-size: 13.5px; color: #444; }
+    .step-body .note {
+      margin-top: 6px;
+      background: #e8eaf6;
+      border-radius: 7px;
+      padding: 6px 10px;
+      font-size: 12.5px;
+      color: #3949ab;
+      font-weight: 600;
+    }
+    .step.green  .step-body .note { background: #e8f5e9; color: #2e7d32; }
+    .step.orange .step-body .note { background: #fff3e0; color: #e65100; }
+    .step.purple .step-body .note { background: #f3e5f5; color: #6a1b9a; }
+    .step.red    .step-body .note { background: #ffebee; color: #c62828; }
+
+    /* OS split */
+    .os-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 560px) { .os-grid { grid-template-columns: 1fr; } }
+
+    .os-card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+    }
+    .os-card h3 {
+      font-size: 16px;
+      font-weight: 800;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .os-card.iphone h3 { color: #1565c0; }
+    .os-card.android h3 { color: #1b5e20; }
+
+    .os-card ol { padding-right: 18px; }
+    .os-card ol li {
+      font-size: 13.5px;
+      color: #333;
+      margin-bottom: 8px;
+      padding-right: 4px;
+    }
+    .os-card ol li strong { color: #1a1a2e; }
+
+    /* Tip box */
+    .tip {
+      background: linear-gradient(135deg, #e3f2fd, #e8eaf6);
+      border: 1.5px solid #90caf9;
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin: 20px 0;
+      font-size: 13.5px;
+      color: #1565c0;
+    }
+    .tip strong { display: block; margin-bottom: 4px; font-size: 14px; }
+
+    .warning {
+      background: #fff8e1;
+      border: 1.5px solid #ffcc02;
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin: 20px 0;
+      font-size: 13.5px;
+      color: #7a5c00;
+    }
+    .warning strong { display: block; margin-bottom: 4px; }
+
+    /* Badge demo */
+    .badge {
+      display: inline-block;
+      background: #3f51b5;
+      color: #fff;
+      border-radius: 6px;
+      padding: 2px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      vertical-align: middle;
+    }
+
+    /* Divider */
+    hr { border: none; border-top: 2px dashed #c5cae9; margin: 32px 0; }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      margin-top: 48px;
+      font-size: 12px;
+      color: #999;
+      padding-top: 16px;
+      border-top: 1px solid #e0e0e0;
+    }
+
+    /* Print */
+    @media print {
+      body { background: #fff; }
+      .page { padding: 20px; }
+      .header { border-radius: 10px; }
+      .step, .os-card { box-shadow: none; border: 1px solid #ddd; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">📋</div>
+    <h1>מדריך התחלה מהירה</h1>
+    <p>התקנת האפליקציה על מסך הבית · בחירת שם · הפעלת התראות</p>
+  </div>
+
+  <!-- ── PART 1: Install ── -->
+  <div class="section-title"><span class="icon">📲</span> שלב 1 — הוספת האפליקציה למסך הבית</div>
+
+  <div class="tip">
+    <strong>💡 למה כדאי?</strong>
+    האפליקציה תיפתח כמו כל אפליקציה רגילה — ללא כתובת URL, ללא פס הכתובות, ועם טעינה מהירה יותר.
+  </div>
+
+  <div class="os-grid">
+    <!-- iPhone -->
+    <div class="os-card iphone">
+      <h3>🍎 iPhone (iOS)</h3>
+      <ol>
+        <li>פתחו את האתר ב־<strong>Safari</strong> דווקא (לא Chrome)</li>
+        <li>לחצו על כפתור השיתוף <strong>⬆️</strong> בתחתית המסך</li>
+        <li>גללו מטה ובחרו <strong>"הוסף למסך הבית"</strong></li>
+        <li>אשרו את השם ולחצו <strong>"הוסף"</strong> בפינה הימנית העליונה</li>
+        <li>האייקון יופיע על מסך הבית ✅</li>
+      </ol>
+    </div>
+
+    <!-- Android -->
+    <div class="os-card android">
+      <h3>🤖 Android</h3>
+      <ol>
+        <li>פתחו את האתר ב־<strong>Chrome</strong></li>
+        <li>לחצו על <strong>תפריט ⋮</strong> (שלוש נקודות) בפינה הימנית העליונה</li>
+        <li>בחרו <strong>"הוסף למסך הבית"</strong> או <strong>"התקן אפליקציה"</strong></li>
+        <li>לחצו <strong>"התקן"</strong> / <strong>"הוסף"</strong></li>
+        <li>האייקון יופיע על מסך הבית ✅</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="warning">
+    <strong>⚠️ שימו לב</strong>
+    באייפון יש להשתמש ב־Safari בלבד. Chrome באייפון אינו תומך בהוספה למסך הבית.
+  </div>
+
+  <hr />
+
+  <!-- ── PART 2: Name setup ── -->
+  <div class="section-title"><span class="icon">👤</span> שלב 2 — בחירת השם שלכם</div>
+
+  <div class="tip">
+    <strong>🔑 חשוב!</strong>
+    בחירת השם מקשרת בין הטלפון שלכם לבין השיבוצים שלכם. ללא בחירת שם — לא תראו את "השיבוצים שלי".
+  </div>
+
+  <div class="steps">
+    <div class="step green">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h3>פתחו את האפליקציה</h3>
+        <p>בפתיחה הראשונה תופיע חלונית קטנה בתחתית המסך עם השאלה "מי אתה?"</p>
+      </div>
+    </div>
+    <div class="step green">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h3>בחרו את שמכם מהרשימה</h3>
+        <p>תופיע רשימת כל אנשי הצוות — מצאו את שמכם ולחצו עליו.</p>
+        <div class="note">אם שמכם לא מופיע — פנו למנהל להוסיף אתכם למערכת.</div>
+      </div>
+    </div>
+    <div class="step green">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h3>אשרו</h3>
+        <p>לחצו <strong>"אישור"</strong> ומעכשיו הטאב <strong>"שלי"</strong> יציג את השיבוצים שלכם בלבד.</p>
+        <div class="note">ניתן לשנות שם בכל עת דרך הכפתור "שנה שם" בטאב שלי.</div>
+      </div>
+    </div>
+  </div>
+
+  <hr />
+
+  <!-- ── PART 3: Notifications ── -->
+  <div class="section-title"><span class="icon">🔔</span> שלב 3 — הפעלת התראות (חשוב מאוד!)</div>
+
+  <div class="tip">
+    <strong>📢 למה חשוב?</strong>
+    כשמנהל משבץ אתכם לתפקיד — תקבלו הודעה מיידית לטלפון. ללא הפעלת התראות — לא תקבלו שום עדכון על שיבוצים חדשים.
+  </div>
+
+  <div class="steps">
+    <div class="step purple">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h3>לכו לטאב "שלי"</h3>
+        <p>לחצו על הטאב <span class="badge">שלי</span> בתחתית המסך.</p>
+      </div>
+    </div>
+    <div class="step purple">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h3>לחצו "הפעל התראות"</h3>
+        <p>בכרטיס הפרטים שלכם יופיע כפתור כחול <strong>"הפעל התראות 🔔"</strong> — לחצו עליו.</p>
+      </div>
+    </div>
+    <div class="step purple">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h3>אשרו את הבקשה מהדפדפן</h3>
+        <p>הדפדפן ישאל האם לאפשר התראות — בחרו <strong>"אפשר"</strong> / <strong>"Allow"</strong>.</p>
+        <div class="note">⚠️ אם לחצתם "חסום" בטעות — ראו הוראות למטה לביטול הסגירה.</div>
+      </div>
+    </div>
+    <div class="step purple">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <h3>הכפתור יהפוך ל"מנוי פעיל ✅"</h3>
+        <p>ההתראות פעילות! מעכשיו תקבלו הודעה לכל שיבוץ חדש.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="os-grid" style="margin-top:16px;">
+    <div class="os-card iphone">
+      <h3>🍎 ביטול חסימה — iPhone</h3>
+      <ol>
+        <li>פתחו <strong>הגדרות</strong> → <strong>Safari</strong></li>
+        <li>בחרו <strong>"הגדרות לאתרים"</strong> → <strong>"התראות"</strong></li>
+        <li>מצאו את האתר ושנו ל־<strong>"אפשר"</strong></li>
+      </ol>
+    </div>
+    <div class="os-card android">
+      <h3>🤖 ביטול חסימה — Android</h3>
+      <ol>
+        <li>לחצו על <strong>המנעול 🔒</strong> ליד כתובת האתר</li>
+        <li>בחרו <strong>"הרשאות"</strong> → <strong>"התראות"</strong></li>
+        <li>הפעילו את ההרשאה לאפשר</li>
+      </ol>
+    </div>
+  </div>
+
+  <hr />
+
+  <!-- ── Summary ── -->
+  <div class="section-title"><span class="icon">✅</span> סיכום — מה לעשות בסדר</div>
+
+  <div class="steps">
+    <div class="step red">
+      <div class="step-num">①</div>
+      <div class="step-body">
+        <h3>פתחו את האתר בדפדפן</h3>
+        <p>Safari באייפון · Chrome באנדרואיד</p>
+      </div>
+    </div>
+    <div class="step red">
+      <div class="step-num">②</div>
+      <div class="step-body">
+        <h3>הוסיפו למסך הבית</h3>
+        <p>פעולה חד פעמית — מהיום תפתחו ישירות מהאייקון</p>
+      </div>
+    </div>
+    <div class="step red">
+      <div class="step-num">③</div>
+      <div class="step-body">
+        <h3>בחרו את שמכם</h3>
+        <p>כדי לראות את "השיבוצים שלי" ולקבל התראות אישיות</p>
+      </div>
+    </div>
+    <div class="step red">
+      <div class="step-num">④</div>
+      <div class="step-body">
+        <h3>הפעילו התראות</h3>
+        <p>בטאב "שלי" → לחצו "הפעל התראות" ואשרו — <strong>שלב קריטי!</strong></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    מערכת שיבוצים · מדריך משתמש | לסיוע פנו למנהל הישיר
+  </div>
+
+</div>
+</body>
+</html>
