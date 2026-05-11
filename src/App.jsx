@@ -801,9 +801,12 @@ export default function App() {
             </nav>
           )}
           {mob && (
-            <span style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", fontWeight: 700, fontSize: 15, color: "#fff", pointerEvents: "none", whiteSpace: "nowrap" }}>
-              {TABS.find(t => t.id === tab)?.label}
-            </span>
+            <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 8, pointerEvents: "none" }}>
+              <img src="/logo.png" alt="" aria-hidden="true" style={{ width: 32, height: 32, borderRadius: 7, objectFit: "cover", opacity: 0.18, flexShrink: 0 }} />
+              <span style={{ fontWeight: 700, fontSize: 15, color: "#fff", whiteSpace: "nowrap" }}>
+                {TABS.find(t => t.id === tab)?.label}
+              </span>
+            </div>
           )}
 
           {/* ── LEFT side ── */}
