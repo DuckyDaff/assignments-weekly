@@ -614,7 +614,20 @@ export default function App() {
     return { ...nd, activityLog: log };
   };
 
-  const weekA = data ? data.assignments.filter(a => a.week === wk) : [];
+  // Sort assignments by earliest assigned day (all-week first, then Sun→Sat)
+  const DAY_ORDER = Object.fromEntries(DAYS.map((d, i) => [d.key, i]));
+  const sortByDay = arr => [...arr].sort((a, b) => {
+    const daysA = a.days?.length ? a.days : [];
+    const daysB = b.days?.length ? b.days : [];
+    if (!daysA.length && !daysB.length) return 0;
+    if (!daysA.length) return -1;   // all-week before specific days
+    if (!daysB.length) return 1;
+    const minA = Math.min(...daysA.map(k => DAY_ORDER[k] ?? 99));
+    const minB = Math.min(...daysB.map(k => DAY_ORDER[k] ?? 99));
+    return minA - minB;
+  });
+
+  const weekA = sortByDay(data ? data.assignments.filter(a => a.week === wk) : []);
   const prevA  = data ? data.assignments.filter(a => a.week === adjW(wk, -1)) : [];
 
   const copyFromPrev = () => {
