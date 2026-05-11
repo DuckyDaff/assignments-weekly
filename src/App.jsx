@@ -3932,9 +3932,13 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data }
                                 <div key={person} style={{ display: 'flex', alignItems: 'center', gap: 6, background: isMe ? 'rgba(74,158,255,0.07)' : 'rgba(255,255,255,0.03)', border: isMe ? '1px solid rgba(74,158,255,0.22)' : '1px solid rgba(255,255,255,0.07)', borderRadius: 8, padding: '5px 9px', flexWrap: isEd ? 'wrap' : 'nowrap', maxWidth: isEd ? 340 : 'none' }}>
                                   <span style={{ fontSize: 12, color: isMe ? '#4a9eff' : '#8892b0', whiteSpace: 'nowrap' }}>{person}</span>
                                   {mgr && (isEd ? (
-                                    <>{STATUS_OPTIONS.map(opt => (
-                                      <button key={opt||'__none'} onClick={() => { saveStatus(person, opt); setEditCell(null); }} style={{ padding:'2px 7px', fontSize:10, borderRadius:4, border:'none', cursor:'pointer', background: opt==='' ? 'rgba(255,255,255,0.08)' : (statusStyle(opt)?.bg||'rgba(255,255,255,0.08)'), color: '#fff', fontWeight:700, margin:'1px' }}>{opt||'—'}</button>
-                                    ))}<button onClick={() => setEditCell(null)} style={{ padding:'2px 6px', fontSize:10, borderRadius:4, border:'1px solid #333', background:'transparent', color:'#556', cursor:'pointer' }}>✕</button></>
+                                    <>{STATUS_OPTIONS.map(opt => {
+                                      const _st = opt ? statusStyle(opt) : null;
+                                      const _cur = opt === (editCell?.code ?? '');
+                                      return (
+                                        <button key={opt||'__none'} onClick={() => { saveStatus(person, opt); setEditCell(null); }} style={{ padding:'2px 7px', fontSize:10, borderRadius:4, cursor:'pointer', background: _st?.bg||'rgba(255,255,255,0.09)', color: _st?'#fff':'#778', fontWeight:700, margin:'1px', border: _cur?'2px solid #fff':'2px solid transparent', boxShadow: _cur?`0 0 0 2px ${_st?.bg||'#4a9eff'}`:'none' }}>{opt||'—'}</button>
+                                      );
+                                    })}<button onClick={() => setEditCell(null)} style={{ padding:'2px 6px', fontSize:10, borderRadius:4, border:'1px solid #333', background:'transparent', color:'#556', cursor:'pointer' }}>✕</button></>
                                   ) : (
                                     <button onClick={() => setEditCell({ person })} style={{ background:'rgba(255,255,255,0.06)', border:'none', borderRadius:5, padding:'3px 9px', fontSize:11, color:'#445', cursor:'pointer', fontWeight:700, minWidth:30 }}>—</button>
                                   ))}
@@ -3966,12 +3970,16 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data }
                       {mgr ? (
                         isEd ? (
                           <>
-                            {STATUS_OPTIONS.map(opt => (
-                              <button key={opt || '__none'} onClick={() => { saveStatus(person, opt); setEditCell(null); }}
-                                style={{ padding: '2px 7px', fontSize: 10, borderRadius: 4, border: 'none', cursor: 'pointer', background: opt === code ? (statusStyle(opt)?.bg || '#4a9eff') : 'rgba(255,255,255,0.08)', color: opt === code ? '#fff' : '#8892b0', fontWeight: opt === code ? 700 : 400, margin: '1px' }}>
-                                {opt || '—'}
-                              </button>
-                            ))}
+                            {STATUS_OPTIONS.map(opt => {
+                              const _st = opt ? statusStyle(opt) : null;
+                              const _cur = opt === code;
+                              return (
+                                <button key={opt || '__none'} onClick={() => { saveStatus(person, opt); setEditCell(null); }}
+                                  style={{ padding: '2px 7px', fontSize: 10, borderRadius: 4, cursor: 'pointer', background: _st?.bg || 'rgba(255,255,255,0.09)', color: _st ? '#fff' : '#778', fontWeight: 700, margin: '1px', border: _cur ? '2px solid #fff' : '2px solid transparent', boxShadow: _cur ? `0 0 0 2px ${_st?.bg || '#4a9eff'}` : 'none' }}>
+                                  {opt || '—'}
+                                </button>
+                              );
+                            })}
                             <button onClick={() => setEditCell(null)} style={{ padding: '2px 6px', fontSize: 10, borderRadius: 4, border: '1px solid #333', background: 'transparent', color: '#556', cursor: 'pointer' }}>✕</button>
                           </>
                         ) : (
@@ -4071,12 +4079,16 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data }
                           {mgr ? (
                             isEd ? (
                               <>
-                                {STATUS_OPTIONS.map(opt => (
-                                  <button key={opt || '__none'} onClick={() => { saveStatus(person, opt); setEditCell(null); }}
-                                    style={{ padding: '2px 7px', fontSize: 10, borderRadius: 4, border: 'none', cursor: 'pointer', background: opt === code ? (statusStyle(opt)?.bg || '#4a9eff') : 'rgba(255,255,255,0.08)', color: opt === code ? '#fff' : '#8892b0', fontWeight: opt === code ? 700 : 400, margin: '1px' }}>
-                                    {opt || '—'}
-                                  </button>
-                                ))}
+                                {STATUS_OPTIONS.map(opt => {
+                                  const _st = opt ? statusStyle(opt) : null;
+                                  const _cur = opt === code;
+                                  return (
+                                    <button key={opt || '__none'} onClick={() => { saveStatus(person, opt); setEditCell(null); }}
+                                      style={{ padding: '2px 7px', fontSize: 10, borderRadius: 4, cursor: 'pointer', background: _st?.bg || 'rgba(255,255,255,0.09)', color: _st ? '#fff' : '#778', fontWeight: 700, margin: '1px', border: _cur ? '2px solid #fff' : '2px solid transparent', boxShadow: _cur ? `0 0 0 2px ${_st?.bg || '#4a9eff'}` : 'none' }}>
+                                      {opt || '—'}
+                                    </button>
+                                  );
+                                })}
                                 <button onClick={() => setEditCell(null)} style={{ padding: '2px 6px', fontSize: 10, borderRadius: 4, border: '1px solid #333', background: 'transparent', color: '#556', cursor: 'pointer' }}>✕</button>
                               </>
                             ) : (
