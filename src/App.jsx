@@ -4555,8 +4555,8 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
 
               {/* ── People × Days grid ── */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                {/* Outer wrapper: visual border/radius only — overflowX clip keeps radius, overflowY visible keeps thead sticky */}
-                <div style={{ borderRadius: 12, border: `1px solid ${sc.accent}55`, boxShadow: `0 0 0 1px rgba(0,0,0,0.4)`, overflowX: 'clip', overflowY: 'visible' }}>
+                {/* Outer wrapper: visual border/radius only — overflow clip keeps radius without creating scroll container */}
+                <div style={{ borderRadius: 12, border: `1px solid ${sc.accent}55`, boxShadow: `0 0 0 1px rgba(0,0,0,0.4)`, overflow: 'clip' }}>
                 {/* Inner: horizontal scroll only */}
                 <div style={{ overflowX: 'auto' }}>
                   {/* COL_W = colPri primary + 28px secondary per person. date col = 68px. */}
@@ -4575,22 +4575,22 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
                         </Fragment>
                       ))}
                     </colgroup>
-                    <thead style={{ position: 'sticky', top: 56, zIndex: 4 }}>
+                    <thead>
                       {/* Person name headers — colSpan=2 (primary + secondary) */}
-                      <tr style={{ background: `#0d1628` }}>
-                        <th rowSpan={2} style={{ padding: '8px 10px', fontSize: 12, color: sc.accent, textAlign: 'right', borderBottom: `2px solid ${sc.accent}66`, borderLeft: `1px solid rgba(255,255,255,0.1)`, position: 'sticky', right: 0, background: `#0d1628`, zIndex: 6, willChange: 'transform' }}>יום</th>
+                      <tr>
+                        <th rowSpan={2} style={{ padding: '8px 10px', fontSize: 12, color: sc.accent, textAlign: 'right', borderBottom: `2px solid ${sc.accent}66`, borderLeft: `1px solid rgba(255,255,255,0.1)`, position: 'sticky', top: 56, right: 0, background: `#0d1628`, zIndex: 6, willChange: 'transform' }}>יום</th>
                         {people.map((person) => {
                           const isVacant = person.includes('תקן');
                           const [firstName, ...rest] = person.split(' ');
                           const lastName = rest.join(' ');
                           const isMe = person === myName;
                           if (isVacant) return (
-                            <th key={person} colSpan={2} style={{ padding: '6px 4px 2px', fontSize: 11, color: '#445', borderBottom: `1px solid ${sc.accent}44`, borderLeft: `1px solid rgba(255,255,255,0.08)`, textAlign: 'center', fontWeight: 400, verticalAlign: 'bottom', borderRight: '3px dashed rgba(255,255,255,0.15)', background: '#0d1628' }}>
+                            <th key={person} colSpan={2} style={{ padding: '6px 4px 2px', fontSize: 11, color: '#445', borderBottom: `1px solid ${sc.accent}44`, borderLeft: `1px solid rgba(255,255,255,0.08)`, textAlign: 'center', fontWeight: 400, verticalAlign: 'bottom', borderRight: '3px dashed rgba(255,255,255,0.15)', background: '#0d1628', position: 'sticky', top: 56, zIndex: 3 }}>
                               <div style={{ lineHeight: 1.4, fontStyle: 'italic', opacity: 0.5 }}>—</div>
                             </th>
                           );
                           return (
-                            <th key={person} colSpan={2} style={{ padding: '6px 4px 2px', fontSize: 12, color: isMe ? '#4a9eff' : '#dde8ff', borderBottom: `1px solid ${sc.accent}44`, borderLeft: `1px solid rgba(255,255,255,0.08)`, textAlign: 'center', fontWeight: isMe ? 700 : 600, verticalAlign: 'bottom', background: '#0d1628' }}>
+                            <th key={person} colSpan={2} style={{ padding: '6px 4px 2px', fontSize: 12, color: isMe ? '#4a9eff' : '#dde8ff', borderBottom: `1px solid ${sc.accent}44`, borderLeft: `1px solid rgba(255,255,255,0.08)`, textAlign: 'center', fontWeight: isMe ? 700 : 600, verticalAlign: 'bottom', background: '#0d1628', position: 'sticky', top: 56, zIndex: 3 }}>
                               <div style={{ lineHeight: 1.4 }}>
                                 <div>{firstName}</div>
                                 {lastName && <div style={{ opacity: 0.75, fontSize: 10 }}>{lastName}</div>}
@@ -4600,15 +4600,15 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
                         })}
                       </tr>
                       {/* Slot sub-headers */}
-                      <tr style={{ background: `#0d1628` }}>
+                      <tr>
                         {people.map((person) => person.includes('תקן') ? (
                           <Fragment key={person}>
-                            <th colSpan={2} style={{ borderBottom: `2px solid ${sc.accent}88`, borderRight: '3px dashed rgba(255,255,255,0.15)', background: '#0d1628' }} />
+                            <th colSpan={2} style={{ borderBottom: `2px solid ${sc.accent}88`, borderRight: '3px dashed rgba(255,255,255,0.15)', background: '#0d1628', position: 'sticky', top: 96, zIndex: 3 }} />
                           </Fragment>
                         ) : (
                           <Fragment key={person}>
-                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#778', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `3px solid rgba(255,255,255,0.55)`, textAlign: 'center', letterSpacing: 0.3, background: '#0d1628' }}>{isShiftSec ? 'אחר' : 'ראשי'}</th>
-                            <th style={{ padding: '3px 2px', fontSize: 9, color: isShiftSec ? sc.accent : '#667', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `1px solid rgba(255,255,255,0.13)`, textAlign: 'center', letterSpacing: 0.3, background: '#0d1628' }}>{isShiftSec ? 'מש׳/כ׳' : 'מש׳'}</th>
+                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#778', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `3px solid rgba(255,255,255,0.55)`, textAlign: 'center', letterSpacing: 0.3, background: '#0d1628', position: 'sticky', top: 96, zIndex: 3 }}>{isShiftSec ? 'אחר' : 'ראשי'}</th>
+                            <th style={{ padding: '3px 2px', fontSize: 9, color: isShiftSec ? sc.accent : '#667', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `1px solid rgba(255,255,255,0.13)`, textAlign: 'center', letterSpacing: 0.3, background: '#0d1628', position: 'sticky', top: 96, zIndex: 3 }}>{isShiftSec ? 'מש׳/כ׳' : 'מש׳'}</th>
                           </Fragment>
                         ))}
                       </tr>
