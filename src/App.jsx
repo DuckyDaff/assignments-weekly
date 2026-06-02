@@ -4720,7 +4720,7 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
                     const COL_PRI = colPriFor(sec.name);
                     const tblW = COL_DATE + people.length * (COL_PRI + COL_SEC);
                   return (
-                  <table style={{ borderCollapse: 'collapse', width: tblW, direction: 'rtl', tableLayout: 'fixed' }}>
+                  <table style={{ borderCollapse: 'collapse', width: tblW, margin: '0 auto', direction: 'rtl', tableLayout: 'fixed' }}>
                     <colgroup>
                       <col width={COL_DATE} />
                       {people.map(p => (
