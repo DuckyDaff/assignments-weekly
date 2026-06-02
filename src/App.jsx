@@ -3908,8 +3908,15 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
   const [paintCode,  setPaintCode]  = useState(null); // null=off, ''=erase, 'י'=paint
   const [shiftModal, setShiftModal] = useState(false);
   const [vehiclePick, setVehiclePick] = useState(null); // { date, site } | null — vehicle override picker
+  // Monthly grid column widths.
+  // Secondary (slot 2 / oncall) cell is a fixed 28px square. The primary column must
+  // always stay clearly wider than that so it never collapses into a square — even in
+  // משמרת sections where its content is sparse. MIN_PRI is the floor; DEFAULT_PRI the
+  // uniform default applied to every section when no custom width is saved.
+  const MIN_PRI = 44, DEFAULT_PRI = 48;
   // Read col widths fresh from localStorage every render — avoids stale state on remount
   const getColWidths = () => { try { return JSON.parse(localStorage.getItem('monthlyColWidths') || '{}'); } catch { return {}; } };
+  const colPriFor = (secName) => Math.max(MIN_PRI, getColWidths()[secName] ?? DEFAULT_PRI);
   const [colWidthsTick, setColWidthsTick] = useState(0); // just a re-render trigger
   const saveColWidth = (secName, pri) => {
     const next = { ...getColWidths(), [secName]: pri };
@@ -3951,6 +3958,17 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
   }, []);
   // Reset clear-month confirmation when navigating away
   useEffect(() => { setClearMonthConfirm(false); }, [selMonth, selSecIdx]);
+
+  // One-time migration: clear old per-section column widths that caused inconsistent
+  // widths across sections. After this, every section starts at the uniform DEFAULT_PRI;
+  // managers can still re-tune individual sections (clamped to MIN_PRI so never a square).
+  useEffect(() => {
+    if (localStorage.getItem('monthlyColWidthsReset_v2') !== 'done') {
+      localStorage.removeItem('monthlyColWidths');
+      localStorage.setItem('monthlyColWidthsReset_v2', 'done');
+      setColWidthsTick(t => t + 1);
+    }
+  }, []);
 
   // Monthly table sticky headers — dynamically compute --mst CSS var so that
   // position:sticky top works correctly even inside an overflow-x:auto container
@@ -4697,7 +4715,7 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
                 <div ref={monthlyScrollRef} style={{ overflowX: 'auto' }}>
                   {/* COL_W = colPri primary + 28px secondary per person. date col = 68px. */}
                   {(() => { const COL_SEC = 28, COL_DATE = 68;
-                    const COL_PRI = Math.max(28, getColWidths()[sec.name] ?? 44);
+                    const COL_PRI = colPriFor(sec.name);
                     const tblW = COL_DATE + people.length * (COL_PRI + COL_SEC);
                     const pct = v => `${(v / tblW * 100).toFixed(3)}%`;
                   return (
@@ -4969,13 +4987,14 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
                       onMouseDown={e => {
                         e.preventDefault();
                         const COL_SEC = 28, COL_DATE = 68;
-                        const curPri = Math.max(28, getColWidths()[sec.name] ?? 44);
+                        const curPri = colPriFor(sec.name);
                         const startTblW = COL_DATE + people.length * (curPri + COL_SEC);
                         resizeDrag.current = { startX: e.clientX, startTblW, secName: sec.name, count: people.length };
                         const onMove = ev => {
                           const { startX, startTblW: stw, secName, count } = resizeDrag.current;
                           const delta = ev.clientX - startX;
-                          const newPri = Math.max(28, Math.round((stw + delta - COL_DATE - count * COL_SEC) / count));
+                          // Clamp to MIN_PRI so the primary column can never be dragged down to a square
+                          const newPri = Math.max(MIN_PRI, Math.round((stw + delta - COL_DATE - count * COL_SEC) / count));
                           saveColWidth(secName, newPri);
                         };
                         const onUp = () => {
