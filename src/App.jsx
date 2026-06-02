@@ -617,8 +617,10 @@ export default function App() {
       const days = { ...prev.days };
       const from = new Date(fromDate + "T00:00:00");
       const to   = new Date(toDate   + "T00:00:00");
+      // Format from LOCAL date parts — toISOString() would shift to UTC and
+      // roll back a day in Israel (UTC+2/+3), saving the range one day early.
       for (const d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-        const iso = d.toISOString().slice(0, 10);
+        const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
         const dayData  = days[iso] || {};
         const statuses = { ...(dayData.statuses || {}) };
         if (code) statuses[person] = code; else delete statuses[person];
@@ -3692,7 +3694,7 @@ function PersonChip({ person, code, isMe }) {
 function DashboardView({ annualData, weekA, data, sysMap, myName, mgr, onView, setTab }) {
   const mob = useContext(MobileCtx);
   useContext(LegendCtx); // re-render when legend colors change
-  const today   = new Date().toISOString().slice(0, 10);
+  const today   = todayISO();
   const todayD  = new Date(today + 'T00:00:00');
   const todayDow = todayD.getDay();
   const todayNum = todayD.getDate();
@@ -3900,7 +3902,7 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
   useContext(LegendCtx); // re-render when legend colors change
   // lens: 'daily' | 'monthly' | 'personal'
   const [lens,      setLens]      = useState('daily');
-  const [selDate,   setSelDate]   = useState(() => new Date().toISOString().slice(0, 10));
+  const [selDate,   setSelDate]   = useState(() => todayISO());
   const [selMonth,  setSelMonth]  = useState(() => new Date().getMonth());
   const [selPerson, setSelPerson] = useState(myName || '');
   const [selSecIdx, setSelSecIdx] = useState(0);
@@ -5257,6 +5259,13 @@ const ABSENCE_TYPES = [
   { code: "כש",  label: "כוננות שבת",        color: "#d35400" },
 ];
 
+// Today's date as YYYY-MM-DD using LOCAL parts.
+// (new Date().toISOString() returns UTC, which rolls back a day in Israel after midnight.)
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
 // Format YYYY-MM-DD → DD/MM/YYYY for display
 function fmtDateIL(iso) {
   if (!iso || iso.length < 10) return iso;
@@ -5267,7 +5276,7 @@ function fmtDateIL(iso) {
 function AbsenceModal({ data, annualData, onClose, onSave }) {
   const mob = useContext(MobileCtx);
   const allPeople = getAllPeople(data);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
 
   const [person,   setPerson]   = useState("");
   const [code,     setCode]     = useState("ח");
@@ -5290,7 +5299,8 @@ function AbsenceModal({ data, annualData, onClose, onSave }) {
     const to   = new Date(toDate   + "T00:00:00");
     const out  = [];
     for (const d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-      const iso      = d.toISOString().slice(0, 10);
+      // Local date parts — toISOString() would shift a day back in Israel (UTC+2/+3)
+      const iso      = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
       const existing = annualData.days?.[iso]?.statuses?.[person] || "";
       if (existing && existing !== code) out.push({ iso, existing });
     }
