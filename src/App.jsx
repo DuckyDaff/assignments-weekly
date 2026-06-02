@@ -2202,50 +2202,89 @@ const HOL_TYPE_STYLE = {
   custom:   { color: '#2ecc71', label: 'מותאם אישית' },
 };
 
+// Compute Gregorian dates for all Jewish holidays/fasts/national days in a given
+// Gregorian year via the Intl Hebrew calendar + official postponement rules.
+// Returns { holidayName: "YYYY-MM-DD" }.
+function computeHolidays(gyear) {
+  const map = {}; // "HebMonth|Day" → first ISO date in the year
+  const enc = new Intl.DateTimeFormat('en-u-ca-hebrew', { day: 'numeric', month: 'long' });
+  for (let d = new Date(Date.UTC(gyear, 0, 1)); d <= new Date(Date.UTC(gyear, 11, 31)); d.setUTCDate(d.getUTCDate() + 1)) {
+    const parts = enc.formatToParts(d);
+    const mo = parts.find(p => p.type === 'month').value;
+    const dy = parts.find(p => p.type === 'day').value;
+    const key = mo + '|' + dy;
+    if (!(key in map)) map[key] = d.toISOString().slice(0, 10);
+  }
+  const get = (month, day) => map[`${month}|${day}`] || (month === 'Adar' ? map[`Adar II|${day}`] : null) || null;
+  const dow = iso => iso ? new Date(iso + 'T12:00:00').getDay() : -1;
+  const addD = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const out = {};
+  const set = (name, iso) => { if (iso) out[name] = iso; };
+
+  // Fixed holidays
+  set('ראש השנה א׳', get('Tishri', 1));
+  set('ראש השנה ב׳', get('Tishri', 2));
+  set('ערב ראש השנה', get('Elul', 29));
+  set('ערב יום כיפור', get('Tishri', 9));
+  set('יום כיפור', get('Tishri', 10));
+  set('סוכות (חג ראשון)', get('Tishri', 15));
+  set('שמיני עצרת / שמחת תורה', get('Tishri', 22));
+  set('ערב פסח', get('Nisan', 14));
+  set('פסח א׳', get('Nisan', 15));
+  set('פסח ב׳', get('Nisan', 16));
+  set('שביעי של פסח', get('Nisan', 21));
+  set('אחרון של פסח', get('Nisan', 22));
+  set('שבועות א׳', get('Sivan', 6));
+  set('שבועות ב׳', get('Sivan', 7));
+  set('פורים', get('Adar', 14));
+  set('שושן פורים', get('Adar', 15));
+
+  // Fasts — postponed off Shabbat (Esther moved earlier to Thursday)
+  let gd = get('Tishri', 3); if (gd && dow(gd) === 6) gd = get('Tishri', 4); set('צום גדליה', gd);
+  set('צום עשרה בטבת', get('Tevet', 10)); // never falls on Shabbat
+  let es = get('Adar', 13); if (es && dow(es) === 6) es = get('Adar', 11); set('תענית אסתר', es);
+  let tz = get('Tammuz', 17); if (tz && dow(tz) === 6) tz = get('Tammuz', 18); set('שבעה עשר בתמוז', tz);
+  let av = get('Av', 9); if (av && dow(av) === 6) av = get('Av', 10); set('תשעה באב', av);
+
+  // National days — base Zikaron 4 Iyar / Atzmaut 5 Iyar, with Knesset adjustments
+  const z4 = get('Iyar', 4);
+  if (z4) {
+    const wd = dow(z4);
+    let zik, atz;
+    if (wd === 0)      { zik = addD(z4, 1);  atz = addD(z4, 2);  } // Sun → +1
+    else if (wd === 4) { zik = addD(z4, -1); atz = z4;           } // Thu → -1
+    else if (wd === 5) { zik = addD(z4, -2); atz = addD(z4, -1); } // Fri → -2
+    else               { zik = z4;           atz = addD(z4, 1);  } // Mon/Tue/Wed → none
+    set('יום הזיכרון', zik);
+    set('יום העצמאות', atz);
+  }
+  set('יום ירושלים', get('Iyar', 28));
+
+  return out;
+}
+
 function HolidaysEditor({ annualData, onSave, toast }) {
   const savedHolidays = annualData?.holidays || {};
-  // Local state: map of name → date string (yyyy-mm-dd)
   const [dates, setDates] = useState(() => {
-    // Build reverse map: date → name, then name → date
     const nameToDate = {};
     for (const [iso, name] of Object.entries(savedHolidays)) nameToDate[name] = iso;
     return nameToDate;
   });
   const [customName, setCustomName] = useState('');
   const [customDate, setCustomDate] = useState('');
+  const [fillYear, setFillYear]     = useState(annualData?.year || new Date().getFullYear());
+  const [openGroups, setOpenGroups] = useState({});
 
-  const buildHolidaysObj = (d) => {
-    const obj = {};
-    for (const [name, iso] of Object.entries(d)) { if (iso) obj[iso] = name; }
-    return obj;
-  };
+  const buildHolidaysObj = d => { const o = {}; for (const [name, iso] of Object.entries(d)) if (iso) o[iso] = name; return o; };
+  const setDate = (name, iso) => setDates(prev => { const n = { ...prev, [name]: iso }; if (!iso) delete n[name]; return n; });
+  const doSave = () => { onSave(buildHolidaysObj(dates)); toast('חגים ומועדים עודכנו ✓'); };
+  const addCustom = () => { if (!customName.trim() || !customDate) return; setDates(prev => ({ ...prev, [customName.trim()]: customDate })); setCustomName(''); setCustomDate(''); };
+  const autoFill = () => { const c = computeHolidays(Number(fillYear)); setDates(prev => ({ ...prev, ...c })); toast(`מולאו ${Object.keys(c).length} מועדים לשנת ${fillYear} — בדוק ולחץ שמור 💾`); };
+  const clearAll = () => setDates({});
 
-  const setDate = (name, iso) => {
-    setDates(prev => {
-      const next = { ...prev, [name]: iso };
-      if (!iso) delete next[name];
-      return next;
-    });
-  };
-
-  const doSave = () => {
-    onSave(buildHolidaysObj(dates));
-    toast('חגים ומועדים עודכנו ✓');
-  };
-
-  const addCustom = () => {
-    if (!customName.trim() || !customDate) return;
-    setDates(prev => ({ ...prev, [customName.trim()]: customDate }));
-    setCustomName(''); setCustomDate('');
-  };
-
-  // custom entries = dates not in JEWISH_HOLIDAYS list
   const knownNames = new Set(JEWISH_HOLIDAYS.map(h => h.name));
   const customEntries = Object.entries(dates).filter(([name]) => !knownNames.has(name));
-
-  const sep = (label, color) => (
-    <div style={{ fontSize: 10, color, fontWeight: 700, marginTop: 14, marginBottom: 6, borderBottom: `1px solid ${color}33`, paddingBottom: 4, letterSpacing: 0.5 }}>{label}</div>
-  );
+  const dowLabel = iso => iso ? DAY_SHORT[new Date(iso + 'T12:00:00').getDay()] : '';
 
   const groups = [
     { type: 'holiday',  items: JEWISH_HOLIDAYS.filter(h => h.type === 'holiday') },
@@ -2253,68 +2292,71 @@ function HolidaysEditor({ annualData, onSave, toast }) {
     { type: 'fast',     items: JEWISH_HOLIDAYS.filter(h => h.type === 'fast') },
     { type: 'eve',      items: JEWISH_HOLIDAYS.filter(h => h.type === 'eve') },
   ];
+  const baseY = annualData?.year || new Date().getFullYear();
+  const yearOpts = []; for (let y = baseY - 1; y <= baseY + 5; y++) yearOpts.push(y);
+
+  const row = (name, iso, color) => (
+    <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: `1px solid ${iso ? color + '33' : 'rgba(255,255,255,0.06)'}` }}>
+      <span style={{ flex: 1, fontSize: 12, color: iso ? '#ccd6f6' : '#6a7a9a' }}>{name}</span>
+      {iso && <span style={{ fontSize: 10, color: '#8892b0', fontWeight: 700, minWidth: 12, textAlign: 'center' }}>{dowLabel(iso)}</span>}
+      <input type="date" value={iso || ''} onChange={e => setDate(name, e.target.value)}
+        style={{ ...inp, padding: '3px 6px', fontSize: 11, width: 130, textAlign: 'center', colorScheme: 'dark' }} />
+      {iso && <button onClick={() => setDate(name, '')} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px' }}>✕</button>}
+    </div>
+  );
 
   return (
     <div style={{ marginTop: 28, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 20 }}>
       <div style={{ fontWeight: 700, fontSize: 14, color: '#ccd6f6', marginBottom: 6 }}>✡️ חגים ומועדים</div>
       <div style={{ fontSize: 12, color: '#8892b0', marginBottom: 14, lineHeight: 1.6 }}>
-        הגדר תאריכים לחגים — הימים יסומנו אוטומטית באפור בטבלה החודשית ושם החג יופיע בהערות.
+        בחר שנה ולחץ <strong style={{ color: '#2ecc71' }}>מלא אוטומטית</strong> — כל החגים, הצומות וימי הזיכרון/עצמאות יחושבו לפי הלוח העברי (כולל דחיות). אפשר לערוך ידנית, להוסיף אירועים, ובסוף ללחוץ שמור.
       </div>
 
+      {/* Auto-fill control card */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', background: 'rgba(46,204,113,0.06)', border: '1px solid rgba(46,204,113,0.25)', borderRadius: 10, padding: '10px 12px', marginBottom: 16 }}>
+        <span style={{ fontSize: 12, color: '#ccd6f6', fontWeight: 600 }}>שנה:</span>
+        <select value={fillYear} onChange={e => setFillYear(e.target.value)} style={{ padding: '5px 10px', fontSize: 13, fontWeight: 700, width: 'auto' }}>
+          {yearOpts.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <PillBtn onClick={autoFill} color="#2ecc71">⚡ מלא אוטומטית</PillBtn>
+        <button onClick={clearAll} style={{ background: 'none', border: '1px solid rgba(231,76,60,0.4)', borderRadius: 8, color: '#e74c3c', fontSize: 12, padding: '6px 12px', cursor: 'pointer', marginRight: 'auto' }}>נקה הכל</button>
+      </div>
+
+      {/* Collapsible groups */}
       {groups.map(({ type, items }) => {
         const ts = HOL_TYPE_STYLE[type];
+        const filled = items.filter(h => dates[h.name]).length;
+        const open = openGroups[type] ?? true;
         return (
-          <div key={type}>
-            {sep(ts.label, ts.color)}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              {items.map(h => (
-                <div key={h.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: `1px solid ${dates[h.name] ? ts.color + '33' : 'rgba(255,255,255,0.06)'}` }}>
-                  <span style={{ flex: 1, fontSize: 12, color: dates[h.name] ? '#ccd6f6' : '#6a7a9a' }}>{h.name}</span>
-                  <input
-                    type="date"
-                    value={dates[h.name] || ''}
-                    onChange={e => setDate(h.name, e.target.value)}
-                    style={{ ...inp, padding: '3px 6px', fontSize: 11, width: 130, textAlign: 'center', colorScheme: 'dark' }}
-                  />
-                  {dates[h.name] && (
-                    <button onClick={() => setDate(h.name, '')}
-                      style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px' }}>✕</button>
-                  )}
-                </div>
-              ))}
-            </div>
+          <div key={type} style={{ marginBottom: 8 }}>
+            <button onClick={() => setOpenGroups(p => ({ ...p, [type]: !open }))}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0', borderBottom: `1px solid ${ts.color}33` }}>
+              <span style={{ fontSize: 11, color: ts.color, fontWeight: 700, letterSpacing: 0.5 }}>{open ? '▾' : '▸'} {ts.label}</span>
+              <span style={{ fontSize: 10, color: '#667', marginRight: 'auto' }}>{filled}/{items.length}</span>
+            </button>
+            {open && <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 6 }}>{items.map(h => row(h.name, dates[h.name], ts.color))}</div>}
           </div>
         );
       })}
 
       {/* Custom entries */}
       {customEntries.length > 0 && (
-        <>
-          {sep('מותאם אישית', HOL_TYPE_STYLE.custom.color)}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {customEntries.map(([name, iso]) => (
-              <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: `1px solid ${HOL_TYPE_STYLE.custom.color}33` }}>
-                <span style={{ flex: 1, fontSize: 12, color: '#ccd6f6' }}>{name}</span>
-                <input type="date" value={iso} onChange={e => setDate(name, e.target.value)}
-                  style={{ ...inp, padding: '3px 6px', fontSize: 11, width: 130, colorScheme: 'dark' }} />
-                <button onClick={() => setDate(name, '')}
-                  style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px' }}>✕</button>
-              </div>
-            ))}
-          </div>
-        </>
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: HOL_TYPE_STYLE.custom.color, fontWeight: 700, padding: '6px 0', borderBottom: `1px solid ${HOL_TYPE_STYLE.custom.color}33`, marginBottom: 6 }}>מותאם אישית</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>{customEntries.map(([name, iso]) => row(name, iso, HOL_TYPE_STYLE.custom.color))}</div>
+        </div>
       )}
 
       {/* Add custom */}
       <div style={{ marginTop: 12, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        <input value={customName} onChange={e => setCustomName(e.target.value)} placeholder="שם חג / אירוע מותאם"
+        <input value={customName} onChange={e => setCustomName(e.target.value)} placeholder="שם אירוע מותאם"
           style={{ ...inp, flex: 1, minWidth: 120, padding: '5px 8px', fontSize: 12 }} />
         <input type="date" value={customDate} onChange={e => setCustomDate(e.target.value)}
           style={{ ...inp, padding: '5px 6px', fontSize: 11, width: 130, colorScheme: 'dark' }} />
         <PillBtn onClick={addCustom} color="#2ecc71">+ הוסף</PillBtn>
       </div>
 
-      <div style={{ marginTop: 14 }}>
+      <div style={{ marginTop: 16 }}>
         <PillBtn onClick={doSave} color="#4a9eff">💾 שמור חגים ומועדים</PillBtn>
       </div>
     </div>
