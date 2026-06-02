@@ -234,8 +234,8 @@ const CONFLICT_CODES = new Set([
   'חיפה','הרצליה','ראש פינה','רמון',
   // הכשרות
   'ב. חשמל','ב. כללית','השתלמות','ניקיון תחנות','ב. שמיעה','ס. רפואי','ר. גובה','ר. מלגזה','ע. ראשונה',
-  // משמרת — shift/oncall codes (slot 2 for shift sections)
-  'י','ל','Y','L','כ','כש','כמ','כמש',
+  // משמרת — shift codes (slot 2 for shift sections). כונן codes are NOT blocking — person on-call can still be assigned.
+  'י','ל','Y','L',
 ]);
 function statusStyle(code) {
   if (!code) return null;
@@ -802,7 +802,7 @@ export default function App() {
           )}
           {mob && (
             <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 8, pointerEvents: "none" }}>
-              <img src="/logo.png" alt="" aria-hidden="true" style={{ width: 32, height: 32, borderRadius: 7, objectFit: "cover", opacity: 0.18, flexShrink: 0 }} />
+              <img src="/logo.png" alt="" aria-hidden="true" style={{ width: 32, height: 32, borderRadius: 7, objectFit: "cover", opacity: 0.07, flexShrink: 0 }} />
               <span style={{ fontWeight: 700, fontSize: 15, color: "#fff", whiteSpace: "nowrap" }}>
                 {TABS.find(t => t.id === tab)?.label}
               </span>
@@ -860,7 +860,7 @@ export default function App() {
       </div>
       {modal?.t === "assign" && <AssignModal mode={modal.mode} a={modal.a} wk={wk} data={data} sysMap={sysColorMap} onClose={() => setModal(null)} onSave={upsertAssign} />}
       {modal?.t === "auth"   && <AuthModal pin={data.pin} managers={data.managers||[]} onOk={(name) => { setMgr(true); setMgrName(name); setModal(null); toast(`ברוך הבא, ${name}`, "info"); }} onClose={() => setModal(null)} />}
-      {viewAssign && <AssignDetailModal a={viewAssign} sysMap={sysColorMap} mgr={mgr} onClose={() => setViewAssign(null)} onEdit={() => { setModal({ t: "assign", mode: "edit", a: viewAssign }); setViewAssign(null); }} onDelete={() => { deleteAssign(viewAssign.id); setViewAssign(null); }} />}
+      {viewAssign && <AssignDetailModal a={viewAssign} sysMap={sysColorMap} mgr={mgr} onClose={() => setViewAssign(null)} onEdit={() => { setModal({ t: "assign", mode: "edit", a: viewAssign }); setViewAssign(null); }} onDelete={() => { deleteAssign(viewAssign.id); setViewAssign(null); }} onSave={updated => { upsertAssign(updated); setViewAssign(updated); }} />}
       {planner && <PlannerView wk={wk} data={data} sysMap={sysColorMap} weekA={weekA} annualData={annualData} onClose={() => setPlanner(false)} onSave={(assignments, planWk) => { const nd = addLog({ ...data, assignments }, "תכנן שבוע", `שבוע ${planWk||wk}`); save(nd, "שבוע תוכנן ✓"); }} />}
       {showWelcome && data && <WelcomeModal data={data} myName={myName} onSelect={n => { setMyName(n); localStorage.setItem("myName", n); setShowWelcome(false); }} onSkip={() => setShowWelcome(false)} />}
       {showAbsenceModal && <AbsenceModal data={data} annualData={annualData} onClose={() => setShowAbsenceModal(false)} onSave={async (range) => { await saveAbsenceRange(range); setShowAbsenceModal(false); toast(`✓ עודכן ${range.person} — ${fmtDateIL(range.fromDate)} עד ${fmtDateIL(range.toDate)}`); }} />}
@@ -1056,6 +1056,8 @@ function BoardCard({ a, col, mgr, onEdit, onDelete, onView }) {
           <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
             <span style={{ fontWeight: 700, fontSize: 14, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.system}</span>
             {activeToday && <span style={{ background: `${col.accent}33`, color: col.accent, border: `1px solid ${col.accent}55`, borderRadius: 20, padding: "1px 7px", fontSize: 9, fontWeight: 700, flexShrink: 0 }}>פעיל היום</span>}
+            {a.completion?.status === 'done' && <span style={{ background: 'rgba(39,174,96,0.2)', color: '#27ae60', border: '1px solid rgba(39,174,96,0.4)', borderRadius: 20, padding: "1px 7px", fontSize: 9, fontWeight: 700, flexShrink: 0 }}>✓ בוצע</span>}
+            {a.completion?.status === 'not_done' && <span title={a.completion.reason} style={{ background: 'rgba(231,76,60,0.2)', color: '#e74c3c', border: '1px solid rgba(231,76,60,0.4)', borderRadius: 20, padding: "1px 7px", fontSize: 9, fontWeight: 700, flexShrink: 0 }}>✗ לא בוצע</span>}
           </div>
           {days && <div style={{ fontSize: 10, color: col.accent, marginTop: 2, opacity: .85 }}>{days.join(" · ")}</div>}
         </div>
@@ -1871,15 +1873,16 @@ function ReportsEditor({ data, annualData }) {
     .sort();
 
   const computeStats = (person, isos) => {
-    let oncall = 0, away = 0;
+    let oncall = 0, away = 0, miluim = 0;
     for (const iso of isos) {
       const d = days[iso] || {};
       // Check both slot 2 (after migration) and slot 1 (legacy)
       const code = d.statuses2?.[person] || d.statuses?.[person] || '';
       oncall += ONCALL_HRS[code] || 0;
       if (classifyStatus(code) === 'away') away++;
+      if (code === 'מיל') miluim++;
     }
-    return { oncall, away };
+    return { oncall, away, miluim };
   };
 
   const accentOncall = '#e67e22';
@@ -1925,13 +1928,15 @@ function ReportsEditor({ data, annualData }) {
         const rows = people.map(p => ({ person: p, ...computeStats(p, isos) }));
 
         // Totals row
-        const totOncall = rows.reduce((s, r) => s + r.oncall, 0);
-        const totAway   = rows.reduce((s, r) => s + r.away,   0);
+        const totOncall  = rows.reduce((s, r) => s + r.oncall,  0);
+        const totAway    = rows.reduce((s, r) => s + r.away,    0);
+        const totMiluim  = rows.reduce((s, r) => s + r.miluim,  0);
+        const accentMil  = '#922b21';
 
         return (
           <div key={sec.name} style={{ marginBottom: 18, background: 'rgba(255,255,255,0.02)', border: `1px solid ${sc.accent}22`, borderRadius: 12, overflow: 'hidden' }}>
             {/* Section header */}
-            <div style={{ background: `${sc.accent}12`, padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: `1px solid ${sc.accent}22` }}>
+            <div style={{ background: `${sc.accent}12`, padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: `1px solid ${sc.accent}22`, flexWrap: 'wrap' }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: sc.accent }} />
               <span style={{ fontWeight: 700, fontSize: 13, color: sc.accent }}>{sec.name}</span>
               <span style={{ marginRight: 'auto', fontSize: 11, color: '#556' }}>
@@ -1940,29 +1945,33 @@ function ReportsEditor({ data, annualData }) {
               <span style={{ fontSize: 11, color: accentOncall, fontWeight: 600 }}>{totOncall}ש׳ כוננות</span>
               <span style={{ fontSize: 11, color: '#334' }}>·</span>
               <span style={{ fontSize: 11, color: accentAway,   fontWeight: 600 }}>{totAway} יציאות שתפ״א</span>
+              {totMiluim > 0 && <><span style={{ fontSize: 11, color: '#334' }}>·</span><span style={{ fontSize: 11, color: accentMil, fontWeight: 600 }}>{totMiluim} ימי מילואים</span></>}
             </div>
 
             {/* Column headers */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 100px', padding: '6px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.15)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 90px 80px', padding: '6px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.15)' }}>
               <div style={{ fontSize: 10, color: '#556', fontWeight: 700 }}>עובד</div>
               <div style={{ textAlign: 'center', fontSize: 10, color: accentOncall, fontWeight: 700 }}>כוננות (שעות)</div>
               <div style={{ textAlign: 'center', fontSize: 10, color: accentAway,   fontWeight: 700 }}>שתפ״א (ימים)</div>
+              <div style={{ textAlign: 'center', fontSize: 10, color: accentMil,    fontWeight: 700 }}>מילואים</div>
             </div>
 
             {/* Person rows */}
-            {rows.map(({ person, oncall, away }, ri) => (
-              <div key={person} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 100px', padding: '8px 14px', borderBottom: ri < rows.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', background: ri % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.012)', alignItems: 'center' }}>
+            {rows.map(({ person, oncall, away, miluim }, ri) => (
+              <div key={person} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 90px 80px', padding: '8px 14px', borderBottom: ri < rows.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', background: ri % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.012)', alignItems: 'center' }}>
                 <div style={{ fontSize: 13, color: '#ccd6f6' }}>{person}</div>
-                <div style={{ textAlign: 'center' }}><StatCell val={oncall} unit="ש׳" accent={accentOncall} /></div>
-                <div style={{ textAlign: 'center' }}><StatCell val={away}   unit="י׳" accent={accentAway}   /></div>
+                <div style={{ textAlign: 'center' }}><StatCell val={oncall}  unit="ש׳" accent={accentOncall} /></div>
+                <div style={{ textAlign: 'center' }}><StatCell val={away}    unit="י׳" accent={accentAway}   /></div>
+                <div style={{ textAlign: 'center' }}><StatCell val={miluim}  unit="י׳" accent={accentMil}    /></div>
               </div>
             ))}
 
             {/* Totals row */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 100px', padding: '7px 14px', background: 'rgba(0,0,0,0.25)', borderTop: `1px solid ${sc.accent}22` }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 90px 80px', padding: '7px 14px', background: 'rgba(0,0,0,0.25)', borderTop: `1px solid ${sc.accent}22` }}>
               <div style={{ fontSize: 11, color: '#8892b0', fontWeight: 700 }}>סה״כ</div>
-              <div style={{ textAlign: 'center' }}><StatCell val={totOncall} unit="ש׳" accent={accentOncall} /></div>
-              <div style={{ textAlign: 'center' }}><StatCell val={totAway}   unit="י׳" accent={accentAway}   /></div>
+              <div style={{ textAlign: 'center' }}><StatCell val={totOncall}  unit="ש׳" accent={accentOncall} /></div>
+              <div style={{ textAlign: 'center' }}><StatCell val={totAway}    unit="י׳" accent={accentAway}   /></div>
+              <div style={{ textAlign: 'center' }}><StatCell val={totMiluim}  unit="י׳" accent={accentMil}    /></div>
             </div>
           </div>
         );
@@ -2735,6 +2744,18 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
         return;
       }
     }
+    // Check if person is already assigned to a different system on the same day
+    const dupSys = Object.entries(grid).find(([k, ps]) => {
+      const [kSys, kCol] = k.split('__');
+      return kCol === col && kSys !== sys && ps.includes(p);
+    });
+    if (dupSys) {
+      const [dupKey] = dupSys;
+      const [existSys] = dupKey.split('__');
+      setConflict({ sys, col, person: p, code: '', label: existSys, iso, duplicate: true });
+      return;
+    }
+
     doAdd(sys, col, p);
   };
 
@@ -2779,14 +2800,20 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
       {/* ── Conflict warning overlay ── */}
       {conflict && (
         <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(4px)" }}>
-          <div dir="rtl" style={{ background: "#0f1525", border: `1px solid ${conflict.shiftRequired ? 'rgba(230,126,34,0.4)' : 'rgba(231,76,60,0.4)'}`, borderRadius: 18, padding: "26px 24px", maxWidth: 380, width: "100%", boxShadow: "0 24px 60px rgba(0,0,0,0.8)" }}>
-            <div style={{ fontSize: 32, textAlign: "center", marginBottom: 10 }}>{conflict.shiftRequired ? '🚫' : '⚠️'}</div>
+          <div dir="rtl" style={{ background: "#0f1525", border: `1px solid ${conflict.shiftRequired ? 'rgba(230,126,34,0.4)' : conflict.duplicate ? 'rgba(230,126,34,0.5)' : 'rgba(231,76,60,0.4)'}`, borderRadius: 18, padding: "26px 24px", maxWidth: 380, width: "100%", boxShadow: "0 24px 60px rgba(0,0,0,0.8)" }}>
+            <div style={{ fontSize: 32, textAlign: "center", marginBottom: 10 }}>{conflict.shiftRequired ? '🚫' : conflict.duplicate ? '⛔' : '⚠️'}</div>
             <div style={{ fontWeight: 700, fontSize: 16, color: "#fff", textAlign: "center", marginBottom: 6 }}>
-              {conflict.shiftRequired ? 'לא ניתן לשבץ' : 'עובד לא זמין'}
+              {conflict.shiftRequired ? 'לא ניתן לשבץ' : conflict.duplicate ? 'שיבוץ כפול' : 'עובד לא זמין'}
             </div>
             <div style={{ textAlign: "center", marginBottom: 16 }}>
               <span style={{ fontWeight: 700, color: "#4a9eff" }}>{conflict.person}</span>
-              {conflict.shiftRequired ? (
+              {conflict.duplicate ? (
+                <>
+                  <span style={{ color: "#8892b0" }}> כבר משובץ ביום זה למערכת </span>
+                  <span style={{ fontWeight: 700, color: "#e67e22" }}>{conflict.label}</span>
+                  <div style={{ fontSize: 12, color: "#556", marginTop: 6 }}>לא ניתן לשבץ אותו לשתי מערכות באותו יום</div>
+                </>
+              ) : conflict.shiftRequired ? (
                 <>
                   <span style={{ color: "#8892b0" }}> אינו/ה במשמרת בתאריך זה</span>
                   {conflict.code
@@ -2800,21 +2827,23 @@ function PlannerView({ wk, data, sysMap, weekA, annualData, onClose, onSave }) {
                   <span style={{ display: "inline-block", background: statusStyle(conflict.code)?.bg || "#e74c3c", color: "#fff", borderRadius: 6, padding: "2px 10px", fontSize: 13, fontWeight: 700, margin: "0 4px" }}>{conflict.label}</span>
                 </>
               )}
-              <div style={{ fontSize: 12, color: "#556", marginTop: 6 }}>{conflict.iso}</div>
+              {!conflict.duplicate && <div style={{ fontSize: 12, color: "#556", marginTop: 6 }}>{conflict.iso}</div>}
             </div>
-            <div style={{ fontSize: 13, color: "#8892b0", textAlign: "center", marginBottom: 20 }}>
-              {conflict.shiftRequired ? 'ניתן לשבץ עובדי משמרת רק ביום שיש להם משמרת (י/ל/Y/L)' : 'האם לשבץ בכל זאת?'}
-            </div>
+            {!conflict.duplicate && (
+              <div style={{ fontSize: 13, color: "#8892b0", textAlign: "center", marginBottom: 20 }}>
+                {conflict.shiftRequired ? 'ניתן לשבץ עובדי משמרת רק ביום שיש להם משמרת (י/ל/Y/L)' : 'האם לשבץ בכל זאת?'}
+              </div>
+            )}
             <div style={{ display: "flex", gap: 8 }}>
-              {!conflict.shiftRequired && (
+              {!conflict.shiftRequired && !conflict.duplicate && (
                 <button onClick={() => { doAdd(conflict.sys, conflict.col, conflict.person); setConflict(null); }}
                   style={{ flex: 1, padding: "11px", background: "rgba(231,76,60,0.15)", border: "1px solid rgba(231,76,60,0.4)", borderRadius: 10, color: "#e74c3c", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
                   שבץ בכל זאת
                 </button>
               )}
               <button onClick={() => setConflict(null)}
-                style={{ flex: conflict.shiftRequired ? undefined : 1, width: conflict.shiftRequired ? '100%' : undefined, padding: "11px", background: "linear-gradient(135deg,#4a9eff,#3d7fc4)", border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-                {conflict.shiftRequired ? 'הבנתי' : 'ביטול'}
+                style={{ flex: (conflict.shiftRequired || conflict.duplicate) ? undefined : 1, width: (conflict.shiftRequired || conflict.duplicate) ? '100%' : undefined, padding: "11px", background: "linear-gradient(135deg,#4a9eff,#3d7fc4)", border: "none", borderRadius: 10, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                {(conflict.shiftRequired || conflict.duplicate) ? 'הבנתי' : 'ביטול'}
               </button>
             </div>
           </div>
@@ -3087,10 +3116,27 @@ const PTH = { padding: "14px 10px", textAlign: "center", borderRadius: 7, fontWe
 const PTD = { padding: "10px 9px", borderRadius: 8, fontSize: 14 };
 
 /* ── ASSIGN DETAIL MODAL ── */
-function AssignDetailModal({ a, sysMap, mgr, onClose, onEdit, onDelete }) {
+function AssignDetailModal({ a, sysMap, mgr, onClose, onEdit, onDelete, onSave }) {
   const [confirmDel, setConfirmDel] = useState(false);
+  const [showReasonInput, setShowReasonInput] = useState(false);
+  const [reason, setReason] = useState('');
   const col = sysMap[a.system] || pal(0);
   const days = a.days && a.days.length > 0 ? DAYS.filter(d => a.days.includes(d.key)).map(d => d.long) : DAYS.map(d => d.long);
+  const completion = a.completion || null; // { status: 'done'|'not_done', reason: '' }
+
+  const markDone = () => {
+    onSave?.({ ...a, completion: { status: 'done', reason: '' } });
+  };
+  const markNotDone = () => {
+    if (!reason.trim()) return;
+    onSave?.({ ...a, completion: { status: 'not_done', reason: reason.trim() } });
+    setShowReasonInput(false);
+    setReason('');
+  };
+  const clearCompletion = () => {
+    onSave?.({ ...a, completion: null });
+  };
+
   return (
     <Overlay onClose={onClose}>
       <div style={{ background: "#0f1525", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 18, overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,.8)" }}>
@@ -3099,7 +3145,16 @@ function AssignDetailModal({ a, sysMap, mgr, onClose, onEdit, onDelete }) {
             <div style={{ fontWeight: 800, fontSize: 18, color: col.accent }}>{a.system}</div>
             <div style={{ fontSize: 11, color: "#8892b0", marginTop: 3 }}>שבוע {a.week?.split("-W")[1]}</div>
           </div>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 8, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#8892b0" }}><I n="x" s={16} /></button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* Completion badge in header */}
+            {completion?.status === 'done' && (
+              <span style={{ background: 'rgba(39,174,96,0.2)', border: '1px solid rgba(39,174,96,0.5)', color: '#27ae60', borderRadius: 10, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>✓ בוצע</span>
+            )}
+            {completion?.status === 'not_done' && (
+              <span title={completion.reason} style={{ background: 'rgba(231,76,60,0.2)', border: '1px solid rgba(231,76,60,0.5)', color: '#e74c3c', borderRadius: 10, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>✗ לא בוצע</span>
+            )}
+            <button onClick={onClose} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 8, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#8892b0" }}><I n="x" s={16} /></button>
+          </div>
         </div>
         <div style={{ padding: "18px 20px", display: "flex", flexDirection: "column", gap: 16, maxHeight: "65dvh", overflowY: "auto" }}>
           <div>
@@ -3142,23 +3197,67 @@ function AssignDetailModal({ a, sysMap, mgr, onClose, onEdit, onDelete }) {
               <div style={{ padding: "10px 13px", background: "rgba(255,255,255,0.04)", borderRadius: 9, borderRight: `3px solid ${col.accent}55`, fontSize: 13, color: "#a0aabb", lineHeight: 1.6 }}>{a.notes}</div>
             </div>
           )}
-          {!(a.tasks || []).length && !a.notes && <div style={{ fontSize: 12, color: "#445", fontStyle: "italic", textAlign: "center", padding: "8px 0" }}>אין משימות או הערות לשיבוץ זה</div>}
+          {completion?.status === 'not_done' && completion.reason && (
+            <div>
+              <div style={{ fontSize: 10, color: "#e74c3c", fontWeight: 700, letterSpacing: .7, marginBottom: 7, textTransform: "uppercase" }}>סיבת אי-ביצוע</div>
+              <div style={{ padding: "10px 13px", background: "rgba(231,76,60,0.08)", borderRadius: 9, borderRight: "3px solid rgba(231,76,60,0.5)", fontSize: 13, color: "#e8a0a0", lineHeight: 1.6 }}>{completion.reason}</div>
+            </div>
+          )}
+          {/* Reason input when marking as not done */}
+          {showReasonInput && (
+            <div style={{ background: "rgba(231,76,60,0.07)", border: "1px solid rgba(231,76,60,0.3)", borderRadius: 10, padding: "12px 14px" }}>
+              <div style={{ fontSize: 12, color: "#e74c3c", fontWeight: 700, marginBottom: 8 }}>סיבת אי-ביצוע (חובה)</div>
+              <textarea
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                placeholder="פרט את הסיבה..."
+                rows={2}
+                style={{ width: "100%", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(231,76,60,0.4)", borderRadius: 8, color: "#ccd6f6", fontSize: 13, padding: "8px 10px", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }}
+              />
+              <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                <button onClick={markNotDone} disabled={!reason.trim()}
+                  style={{ flex: 1, padding: "8px", background: reason.trim() ? "rgba(231,76,60,0.2)" : "rgba(255,255,255,0.04)", border: `1px solid ${reason.trim() ? "rgba(231,76,60,0.5)" : "rgba(255,255,255,0.08)"}`, borderRadius: 8, color: reason.trim() ? "#e74c3c" : "#556", fontWeight: 700, fontSize: 13, cursor: reason.trim() ? "pointer" : "not-allowed" }}>
+                  ✗ אשר
+                </button>
+                <button onClick={() => { setShowReasonInput(false); setReason(''); }}
+                  style={{ padding: "8px 14px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#8892b0", fontSize: 13, cursor: "pointer" }}>
+                  ביטול
+                </button>
+              </div>
+            </div>
+          )}
+          {!(a.tasks || []).length && !a.notes && !completion && <div style={{ fontSize: 12, color: "#445", fontStyle: "italic", textAlign: "center", padding: "8px 0" }}>אין משימות או הערות לשיבוץ זה</div>}
         </div>
-        {mgr && (
-          <div style={{ padding: "12px 20px", borderTop: "1px solid rgba(255,255,255,0.07)", display: "flex", gap: 8 }}>
-            {confirmDel
-              ? <>
+        <div style={{ padding: "12px 20px", borderTop: "1px solid rgba(255,255,255,0.07)", display: "flex", flexDirection: "column", gap: 8 }}>
+          {/* Completion buttons — always visible */}
+          {!showReasonInput && (
+            <div style={{ display: "flex", gap: 6, marginBottom: 2 }}>
+              <button
+                onClick={completion?.status === 'done' ? clearCompletion : markDone}
+                style={{ flex: 1, padding: "9px 6px", background: completion?.status === 'done' ? "rgba(39,174,96,0.25)" : "rgba(39,174,96,0.08)", border: `2px solid ${completion?.status === 'done' ? "rgba(39,174,96,0.7)" : "rgba(39,174,96,0.3)"}`, borderRadius: 10, color: "#27ae60", fontWeight: 700, fontSize: 14, cursor: "pointer", transition: "all .12s" }}>
+                ✓ בוצע
+              </button>
+              <button
+                onClick={completion?.status === 'not_done' ? clearCompletion : () => { setShowReasonInput(true); setTimeout(() => {}, 0); }}
+                style={{ flex: 1, padding: "9px 6px", background: completion?.status === 'not_done' ? "rgba(231,76,60,0.25)" : "rgba(231,76,60,0.08)", border: `2px solid ${completion?.status === 'not_done' ? "rgba(231,76,60,0.7)" : "rgba(231,76,60,0.3)"}`, borderRadius: 10, color: "#e74c3c", fontWeight: 700, fontSize: 14, cursor: "pointer", transition: "all .12s" }}>
+                ✗ לא בוצע
+              </button>
+            </div>
+          )}
+          {/* Manager actions */}
+          {mgr && (
+            confirmDel
+              ? <div style={{ display: "flex", gap: 8 }}>
                   <span style={{ fontSize: 13, color: "#e74c3c", display: "flex", alignItems: "center", flex: 1 }}>למחוק את השיבוץ?</span>
                   <PillBtn onClick={onDelete} color="#e74c3c" small>מחק</PillBtn>
                   <PillBtn ghost onClick={() => setConfirmDel(false)} small>ביטול</PillBtn>
-                </>
-              : <>
+                </div>
+              : <div style={{ display: "flex", gap: 8 }}>
                   <PillBtn onClick={onEdit} color={col.accent} small><I n="edit" s={13} />עריכה</PillBtn>
                   <PillBtn ghost onClick={() => setConfirmDel(true)} small><I n="trash" s={13} />מחיקה</PillBtn>
-                </>
-            }
-          </div>
-        )}
+                </div>
+          )}
+        </div>
       </div>
     </Overlay>
   );
@@ -3753,11 +3852,22 @@ function DashboardView({ annualData, weekA, data, sysMap, myName, mgr, onView, s
           <PanelHeader emoji="📋" label="שיבוצים השבוע" target="board" />
           {allWeekA.length === 0
             ? <div style={{ color: '#445', fontSize: 12, fontStyle: 'italic' }}>אין שיבוצים לשבוע זה</div>
-            : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
-                {allWeekA.map(a => (
-                  <BoardCard key={a.id} a={a} col={sysMap[a.system] || pal(0)} mgr={false} onEdit={() => {}} onDelete={() => {}} onView={() => onView(a)} />
-                ))}
-              </div>
+            : (() => {
+                // Group by system in data.systems order
+                const sysOrder = (data?.systems || []);
+                const sorted = [...allWeekA].sort((a, b) => {
+                  const ai = sysOrder.indexOf(a.system);
+                  const bi = sysOrder.indexOf(b.system);
+                  return (ai < 0 ? 9999 : ai) - (bi < 0 ? 9999 : bi);
+                });
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
+                    {sorted.map(a => (
+                      <BoardCard key={a.id} a={a} col={sysMap[a.system] || pal(0)} mgr={false} onEdit={() => {}} onDelete={() => {}} onView={() => onView(a)} />
+                    ))}
+                  </div>
+                );
+              })()
           }
         </div>
       </div>
@@ -4603,12 +4713,12 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
                       <tr>
                         {people.map((person) => person.includes('תקן') ? (
                           <Fragment key={person}>
-                            <th colSpan={2} style={{ borderBottom: `2px solid ${sc.accent}88`, borderRight: '3px dashed rgba(255,255,255,0.15)', background: '#0d1628', position: 'sticky', top: 96, zIndex: 3 }} />
+                            <th colSpan={2} style={{ borderBottom: `2px solid ${sc.accent}88`, borderRight: '3px dashed rgba(255,255,255,0.15)', background: '#0d1628', position: 'sticky', top: 93, zIndex: 3 }} />
                           </Fragment>
                         ) : (
                           <Fragment key={person}>
-                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#778', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `3px solid rgba(255,255,255,0.55)`, textAlign: 'center', letterSpacing: 0.3, background: '#0d1628', position: 'sticky', top: 96, zIndex: 3 }}>{isShiftSec ? 'אחר' : 'ראשי'}</th>
-                            <th style={{ padding: '3px 2px', fontSize: 9, color: isShiftSec ? sc.accent : '#667', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `1px solid rgba(255,255,255,0.13)`, textAlign: 'center', letterSpacing: 0.3, background: '#0d1628', position: 'sticky', top: 96, zIndex: 3 }}>{isShiftSec ? 'מש׳/כ׳' : 'מש׳'}</th>
+                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#778', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `3px solid rgba(255,255,255,0.55)`, textAlign: 'center', letterSpacing: 0.3, background: '#0d1628', position: 'sticky', top: 93, zIndex: 3 }}>{isShiftSec ? 'אחר' : 'ראשי'}</th>
+                            <th style={{ padding: '3px 2px', fontSize: 9, color: isShiftSec ? sc.accent : '#667', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `1px solid rgba(255,255,255,0.13)`, textAlign: 'center', letterSpacing: 0.3, background: '#0d1628', position: 'sticky', top: 93, zIndex: 3 }}>{isShiftSec ? 'מש׳/כ׳' : 'מש׳'}</th>
                           </Fragment>
                         ))}
                       </tr>
