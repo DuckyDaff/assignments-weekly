@@ -5308,18 +5308,28 @@ function _zipStore(parts) {
   return out;
 }
 
-const _XLSX_STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+// Build styles.xml. Base xfs 0..7 are fixed; one extra centered+colored xf is
+// appended per status color (index 8+i) so code cells get their legend color.
+const _xlsxNorm = h => (h || '').replace('#', '').toUpperCase();
+function _xlsxStyles(colorList) {
+  const baseFills = `<fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F3A5F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDCE6F1"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFECECEC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFDE9D9"/><bgColor indexed="64"/></patternFill></fill>`;
+  const colorFills = colorList.map(h => `<fill><patternFill patternType="solid"><fgColor rgb="FF${h}"/><bgColor indexed="64"/></patternFill></fill>`).join('');
+  const baseXfs = `<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right"/></xf><xf numFmtId="0" fontId="1" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right"/></xf><xf numFmtId="0" fontId="3" fillId="5" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center"/></xf><xf numFmtId="0" fontId="0" fillId="4" borderId="0" xfId="0" applyFill="1" applyAlignment="1"><alignment horizontal="center"/></xf>`;
+  // colored code cells: white bold font (2), thin border (1), centered
+  const colorXfs = colorList.map((_, i) => `<xf numFmtId="0" fontId="2" fillId="${6 + i}" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`).join('');
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <fonts count="4"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFC0504D"/><sz val="11"/><name val="Calibri"/></font></fonts>
-<fills count="6"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F3A5F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDCE6F1"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFECECEC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFDE9D9"/><bgColor indexed="64"/></patternFill></fill></fills>
+<fills count="${6 + colorList.length}">${baseFills}${colorFills}</fills>
 <borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="8"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right"/></xf><xf numFmtId="0" fontId="1" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right"/></xf><xf numFmtId="0" fontId="3" fillId="5" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center"/></xf><xf numFmtId="0" fontId="0" fillId="4" borderId="0" xfId="0" applyFill="1" applyAlignment="1"><alignment horizontal="center"/></xf></cellXfs>
+<cellXfs count="${8 + colorList.length}">${baseXfs}${colorXfs}</cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
-// style indices: 1=sec 2=per 3=day 4=dayWe 5=hol 6=cell 7=cellWe
+}
+// base style indices: 1=sec 2=per 3=day 4=dayWe 5=hol 6=cell 7=cellWe ; 8+=colored codes
 
-function _xlsxSheet(annualData, sections, m) {
+function _xlsxSheet(annualData, sections, m, colorToXf) {
   const year = annualData.year || new Date().getFullYear();
   const days = annualData.days || {}, holidays = annualData.holidays || {};
   const nPeople = sections.reduce((n, s) => n + s.people.length, 0);
@@ -5350,7 +5360,14 @@ function _xlsxSheet(annualData, sections, m) {
     let r = cell('A' + rn, dayStyle, `${d} ${DAY_SHORT[dow]}${hol ? ' · ' + hol : ''}`); col = 2;
     for (const s of sections) for (const p of s.people) {
       const a = st1[p] || '', b = st2[p] || '';
-      r += cell(_colLetter(col) + rn, we ? 7 : 6, a && b ? `${a} / ${b}` : (b || a || '')); col++;
+      const codeForColor = a || b;             // primary code drives the cell color
+      const val = a && b ? `${a} / ${b}` : (b || a || '');
+      let style = we ? 7 : 6;
+      if (codeForColor) {
+        const xf = colorToXf[_xlsxNorm(statusStyle(codeForColor)?.bg)];
+        if (xf != null) style = xf;
+      }
+      r += cell(_colLetter(col) + rn, style, val); col++;
     }
     rows += `<row r="${rn}">${r}</row>`;
   }
@@ -5372,6 +5389,19 @@ function exportAnnualExcel(annualData) {
     .map(s => ({ name: s.name, people: (s.people || []).filter(p => !p.includes('נוסף')) }))
     .filter(s => s.people.length > 0);
 
+  // Collect every status color actually used → one fill/xf per color
+  const daysAll = annualData.days || {};
+  const colorSet = new Set();
+  for (const iso in daysAll) {
+    const dd = daysAll[iso], st1 = dd.statuses || {}, st2 = dd.statuses2 || {};
+    for (const s of sections) for (const p of s.people) {
+      const c = st1[p] || st2[p];
+      if (c) { const bg = _xlsxNorm(statusStyle(c)?.bg); if (bg) colorSet.add(bg); }
+    }
+  }
+  const colorList = [...colorSet];
+  const colorToXf = {}; colorList.forEach((c, i) => { colorToXf[c] = 8 + i; });
+
   const parts = [];
   parts.push(['[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -5390,8 +5420,8 @@ ${MONTHS_HE.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml"
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 ${MONTHS_HE.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}
 <Relationship Id="rId100" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`]);
-  parts.push(['xl/styles.xml', _XLSX_STYLES]);
-  for (let m = 0; m < 12; m++) parts.push([`xl/worksheets/sheet${m + 1}.xml`, _xlsxSheet(annualData, sections, m)]);
+  parts.push(['xl/styles.xml', _xlsxStyles(colorList)]);
+  for (let m = 0; m < 12; m++) parts.push([`xl/worksheets/sheet${m + 1}.xml`, _xlsxSheet(annualData, sections, m, colorToXf)]);
 
   const bytes = _zipStore(parts);
   const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
