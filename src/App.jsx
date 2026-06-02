@@ -363,6 +363,8 @@ input::placeholder,textarea::placeholder{color:#445!important}
 select{background:#0d1628!important;color:#ccd6f6!important;border:1px solid rgba(255,255,255,0.12)!important;border-radius:8px!important;outline:none!important;cursor:pointer}
 select option{background:#0d1628!important;color:#ccd6f6!important}
 select optgroup{background:#0a1020!important;color:#4a9eff!important;font-weight:700}
+input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.85);cursor:pointer;opacity:0.75}
+input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:#111}
 ::-webkit-scrollbar-thumb{background:#334;border-radius:3px}
@@ -5353,8 +5355,8 @@ function AbsenceModal({ data, annualData, onClose, onSave }) {
               <label style={lbl}>מתאריך</label>
               <div style={{ position: "relative" }}>
                 <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); if (e.target.value > toDate) setToDate(e.target.value); }}
-                  style={{ ...inp, color: "transparent", caretColor: "transparent" }} />
-                <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", paddingRight: 12, fontSize: 14, color: "#ccd6f6", pointerEvents: "none", fontFamily: "monospace", letterSpacing: 1 }}>
+                  style={{ ...inp, color: "transparent", caretColor: "transparent", direction: "ltr" }} />
+                <span style={{ position: "absolute", top: 0, bottom: 0, left: 13, right: 34, display: "flex", alignItems: "center", justifyContent: "flex-start", fontSize: 14, color: "#ccd6f6", pointerEvents: "none", fontFamily: "monospace", letterSpacing: 1 }}>
                   {fmtDateIL(fromDate)}
                 </span>
               </div>
@@ -5363,8 +5365,8 @@ function AbsenceModal({ data, annualData, onClose, onSave }) {
               <label style={lbl}>עד תאריך</label>
               <div style={{ position: "relative" }}>
                 <input type="date" value={toDate} min={fromDate} onChange={e => setToDate(e.target.value)}
-                  style={{ ...inp, color: "transparent", caretColor: "transparent" }} />
-                <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", paddingRight: 12, fontSize: 14, color: "#ccd6f6", pointerEvents: "none", fontFamily: "monospace", letterSpacing: 1 }}>
+                  style={{ ...inp, color: "transparent", caretColor: "transparent", direction: "ltr" }} />
+                <span style={{ position: "absolute", top: 0, bottom: 0, left: 13, right: 34, display: "flex", alignItems: "center", justifyContent: "flex-start", fontSize: 14, color: "#ccd6f6", pointerEvents: "none", fontFamily: "monospace", letterSpacing: 1 }}>
                   {fmtDateIL(toDate)}
                 </span>
               </div>
