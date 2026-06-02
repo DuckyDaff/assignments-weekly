@@ -4136,6 +4136,13 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
             </button>
           ))}
         </div>
+        {mgr && lens === 'monthly' && (
+          <button onClick={() => exportAnnualExcel(annualData)}
+            title="ייצוא לאקסל — כל השנה (ינואר–דצמבר)"
+            style={{ padding: '8px 12px', background: 'rgba(39,174,96,0.12)', border: '1px solid rgba(39,174,96,0.35)', borderRadius: 10, color: '#27ae60', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all .15s', flexShrink: 0 }}>
+            📊 ייצוא Excel
+          </button>
+        )}
         {isMainMgr && (
           <button onClick={() => setShiftModal(true)}
             title="שיבוץ אוטומטי למשמרת מסלולים"
@@ -5271,6 +5278,85 @@ function fmtDateIL(iso) {
   if (!iso || iso.length < 10) return iso;
   const [y, m, d] = iso.split('-');
   return `${d}/${m}/${y}`;
+}
+
+// Export the full-year monthly plan to an Excel file (SpreadsheetML 2003 —
+// real multi-sheet .xls, one worksheet per month, no external dependency).
+function exportAnnualExcel(annualData) {
+  if (!annualData) return;
+  const year     = annualData.year || new Date().getFullYear();
+  const days     = annualData.days || {};
+  const holidays = annualData.holidays || {};
+  const xmlEsc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  // Real people per section (drop placeholder "נוסף" columns); skip empty sections
+  const sections = (annualData.sections || [])
+    .map(s => ({ name: s.name, people: (s.people || []).filter(p => !p.includes('נוסף')) }))
+    .filter(s => s.people.length > 0);
+
+  const styles = `<Styles>
+    <Style ss:ID="sec"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#1F3A5F" ss:Pattern="Solid"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous"/><Border ss:Position="Right" ss:LineStyle="Continuous"/><Border ss:Position="Left" ss:LineStyle="Continuous"/></Borders></Style>
+    <Style ss:ID="per"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:Bold="1"/><Interior ss:Color="#DCE6F1" ss:Pattern="Solid"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous"/><Border ss:Position="Right" ss:LineStyle="Continuous"/></Borders></Style>
+    <Style ss:ID="day"><Font ss:Bold="1"/><Alignment ss:Horizontal="Right"/><Borders><Border ss:Position="Right" ss:LineStyle="Continuous"/></Borders></Style>
+    <Style ss:ID="dayWe"><Font ss:Bold="1" ss:Color="#666666"/><Alignment ss:Horizontal="Right"/><Interior ss:Color="#ECECEC" ss:Pattern="Solid"/><Borders><Border ss:Position="Right" ss:LineStyle="Continuous"/></Borders></Style>
+    <Style ss:ID="hol"><Font ss:Bold="1" ss:Color="#C0504D"/><Alignment ss:Horizontal="Right"/><Interior ss:Color="#FDE9D9" ss:Pattern="Solid"/><Borders><Border ss:Position="Right" ss:LineStyle="Continuous"/></Borders></Style>
+    <Style ss:ID="cell"><Alignment ss:Horizontal="Center"/></Style>
+    <Style ss:ID="cellWe"><Alignment ss:Horizontal="Center"/><Interior ss:Color="#ECECEC" ss:Pattern="Solid"/></Style>
+  </Styles>`;
+
+  let sheets = '';
+  for (let m = 0; m < 12; m++) {
+    const dim = new Date(year, m + 1, 0).getDate();
+
+    // Row 1 — section headers (יום spans 2 rows; each section spans its people)
+    let row1 = `<Row><Cell ss:MergeDown="1" ss:StyleID="sec"><Data ss:Type="String">יום</Data></Cell>`;
+    for (const s of sections)
+      row1 += `<Cell ss:MergeAcross="${s.people.length - 1}" ss:StyleID="sec"><Data ss:Type="String">${xmlEsc(s.name)}</Data></Cell>`;
+    row1 += `</Row>`;
+
+    // Row 2 — person names (col 1 is covered by MergeDown → start at index 2)
+    let row2 = `<Row>`;
+    let first = true;
+    for (const s of sections) for (const p of s.people) {
+      row2 += `<Cell ${first ? 'ss:Index="2" ' : ''}ss:StyleID="per"><Data ss:Type="String">${xmlEsc(p)}</Data></Cell>`;
+      first = false;
+    }
+    row2 += `</Row>`;
+
+    // Day rows
+    let body = '';
+    for (let d = 1; d <= dim; d++) {
+      const iso = `${year}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dow = new Date(year, m, d).getDay();
+      const we  = dow === 5 || dow === 6;
+      const hol = holidays[iso];
+      const dd  = days[iso] || {};
+      const st1 = dd.statuses || {}, st2 = dd.statuses2 || {};
+      const dayStyle = hol ? 'hol' : we ? 'dayWe' : 'day';
+      const dayLabel = `${d} ${DAY_SHORT[dow]}${hol ? ' · ' + hol : ''}`;
+      let r = `<Row><Cell ss:StyleID="${dayStyle}"><Data ss:Type="String">${xmlEsc(dayLabel)}</Data></Cell>`;
+      for (const s of sections) for (const p of s.people) {
+        const a = st1[p] || '', b = st2[p] || '';
+        const val = a && b ? `${a} / ${b}` : (b || a || '');
+        r += `<Cell ss:StyleID="${we ? 'cellWe' : 'cell'}"><Data ss:Type="String">${xmlEsc(val)}</Data></Cell>`;
+      }
+      body += r + `</Row>`;
+    }
+
+    sheets += `<Worksheet ss:Name="${xmlEsc(MONTHS_HE[m])}"><Table>${row1}${row2}${body}</Table>`
+      + `<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"><DisplayRightToLeft/></WorksheetOptions></Worksheet>`;
+  }
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<?mso-application progid="Excel.Sheet"?>\n`
+    + `<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" xmlns:html="http://www.w3.org/TR/REC-html40">`
+    + styles + sheets + `</Workbook>`;
+
+  const blob = new Blob(['﻿' + xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `תוכנית_שנתית_${year}.xls`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
 function AbsenceModal({ data, annualData, onClose, onSave }) {
