@@ -5280,81 +5280,124 @@ function fmtDateIL(iso) {
   return `${d}/${m}/${y}`;
 }
 
-// Export the full-year monthly plan to an Excel file (SpreadsheetML 2003 —
-// real multi-sheet .xls, one worksheet per month, no external dependency).
+// ── Excel (.xlsx / OOXML) export helpers ──────────────────────────
+const _xlsxEsc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function _colLetter(n) { let s = ''; while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); } return s; }
+const _CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c >>> 0; } return t; })();
+function _crc32(bytes) { let c = 0xFFFFFFFF; for (let i = 0; i < bytes.length; i++) c = _CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+
+// Minimal store-only ZIP writer (parts = [[name, string], ...]) → Uint8Array
+function _zipStore(parts) {
+  const enc = new TextEncoder();
+  const files = parts.map(([name, str]) => ({ name, data: enc.encode(str) }));
+  const chunks = [], central = []; let offset = 0;
+  const u16 = n => [n & 0xff, (n >> 8) & 0xff], u32 = n => [n & 0xff, (n >> 8) & 0xff, (n >> 16) & 0xff, (n >>> 24) & 0xff];
+  for (const f of files) {
+    const nameB = enc.encode(f.name), crc = _crc32(f.data), sz = f.data.length;
+    const local = [0x50, 0x4b, 0x03, 0x04, ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0), ...u32(crc), ...u32(sz), ...u32(sz), ...u16(nameB.length), ...u16(0)];
+    chunks.push(new Uint8Array(local), nameB, f.data);
+    const cen = [0x50, 0x4b, 0x01, 0x02, ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0), ...u32(crc), ...u32(sz), ...u32(sz), ...u16(nameB.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(offset)];
+    central.push(new Uint8Array(cen), nameB);
+    offset += local.length + nameB.length + sz;
+  }
+  let cenSize = 0; for (const c of central) cenSize += c.length;
+  const end = new Uint8Array([0x50, 0x4b, 0x05, 0x06, ...u16(0), ...u16(0), ...u16(files.length), ...u16(files.length), ...u32(cenSize), ...u32(offset), ...u16(0)]);
+  const all = [...chunks, ...central, end];
+  let total = 0; for (const c of all) total += c.length;
+  const out = new Uint8Array(total); let p = 0; for (const c of all) { out.set(c, p); p += c.length; }
+  return out;
+}
+
+const _XLSX_STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<fonts count="4"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFC0504D"/><sz val="11"/><name val="Calibri"/></font></fonts>
+<fills count="6"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F3A5F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDCE6F1"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFECECEC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFDE9D9"/><bgColor indexed="64"/></patternFill></fill></fills>
+<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="8"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right"/></xf><xf numFmtId="0" fontId="1" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right"/></xf><xf numFmtId="0" fontId="3" fillId="5" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center"/></xf><xf numFmtId="0" fontId="0" fillId="4" borderId="0" xfId="0" applyFill="1" applyAlignment="1"><alignment horizontal="center"/></xf></cellXfs>
+<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`;
+// style indices: 1=sec 2=per 3=day 4=dayWe 5=hol 6=cell 7=cellWe
+
+function _xlsxSheet(annualData, sections, m) {
+  const year = annualData.year || new Date().getFullYear();
+  const days = annualData.days || {}, holidays = annualData.holidays || {};
+  const nPeople = sections.reduce((n, s) => n + s.people.length, 0);
+  const dim = new Date(year, m + 1, 0).getDate();
+  const cell = (ref, style, val) => (val === '' || val == null)
+    ? `<c r="${ref}" s="${style}"/>`
+    : `<c r="${ref}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${_xlsxEsc(val)}</t></is></c>`;
+
+  const merges = ['A1:A2'];
+  let r1 = cell('A1', 1, 'יום'), col = 2;
+  for (const s of sections) {
+    const start = col, end = col + s.people.length - 1;
+    r1 += cell(_colLetter(start) + '1', 1, s.name);
+    for (let c = start + 1; c <= end; c++) r1 += cell(_colLetter(c) + '1', 1, '');
+    if (end > start) merges.push(`${_colLetter(start)}1:${_colLetter(end)}1`);
+    col = end + 1;
+  }
+  let r2 = cell('A2', 1, ''); col = 2;
+  for (const s of sections) for (const p of s.people) { r2 += cell(_colLetter(col) + '2', 2, p); col++; }
+
+  let rows = `<row r="1">${r1}</row><row r="2">${r2}</row>`;
+  for (let d = 1; d <= dim; d++) {
+    const rn = d + 2;
+    const iso = `${year}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const dow = new Date(year, m, d).getDay(), we = dow === 5 || dow === 6, hol = holidays[iso];
+    const dd = days[iso] || {}, st1 = dd.statuses || {}, st2 = dd.statuses2 || {};
+    const dayStyle = hol ? 5 : we ? 4 : 3;
+    let r = cell('A' + rn, dayStyle, `${d} ${DAY_SHORT[dow]}${hol ? ' · ' + hol : ''}`); col = 2;
+    for (const s of sections) for (const p of s.people) {
+      const a = st1[p] || '', b = st2[p] || '';
+      r += cell(_colLetter(col) + rn, we ? 7 : 6, a && b ? `${a} / ${b}` : (b || a || '')); col++;
+    }
+    rows += `<row r="${rn}">${r}</row>`;
+  }
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<sheetViews><sheetView rightToLeft="1" workbookViewId="0"/></sheetViews>
+<sheetFormatPr defaultRowHeight="15"/>
+<cols><col min="1" max="1" width="16" customWidth="1"/><col min="2" max="${nPeople + 1}" width="7" customWidth="1"/></cols>
+<sheetData>${rows}</sheetData>
+<mergeCells count="${merges.length}">${merges.map(x => `<mergeCell ref="${x}"/>`).join('')}</mergeCells>
+</worksheet>`;
+}
+
+// Export the full-year monthly plan to a real .xlsx (OOXML), every sheet RTL.
 function exportAnnualExcel(annualData) {
   if (!annualData) return;
-  const year     = annualData.year || new Date().getFullYear();
-  const days     = annualData.days || {};
-  const holidays = annualData.holidays || {};
-  const xmlEsc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-  // Real people per section (drop placeholder "נוסף" columns); skip empty sections
+  const year = annualData.year || new Date().getFullYear();
   const sections = (annualData.sections || [])
     .map(s => ({ name: s.name, people: (s.people || []).filter(p => !p.includes('נוסף')) }))
     .filter(s => s.people.length > 0);
 
-  const styles = `<Styles>
-    <Style ss:ID="sec"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#1F3A5F" ss:Pattern="Solid"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous"/><Border ss:Position="Right" ss:LineStyle="Continuous"/><Border ss:Position="Left" ss:LineStyle="Continuous"/></Borders></Style>
-    <Style ss:ID="per"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:Bold="1"/><Interior ss:Color="#DCE6F1" ss:Pattern="Solid"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous"/><Border ss:Position="Right" ss:LineStyle="Continuous"/></Borders></Style>
-    <Style ss:ID="day"><Font ss:Bold="1"/><Alignment ss:Horizontal="Right"/><Borders><Border ss:Position="Right" ss:LineStyle="Continuous"/></Borders></Style>
-    <Style ss:ID="dayWe"><Font ss:Bold="1" ss:Color="#666666"/><Alignment ss:Horizontal="Right"/><Interior ss:Color="#ECECEC" ss:Pattern="Solid"/><Borders><Border ss:Position="Right" ss:LineStyle="Continuous"/></Borders></Style>
-    <Style ss:ID="hol"><Font ss:Bold="1" ss:Color="#C0504D"/><Alignment ss:Horizontal="Right"/><Interior ss:Color="#FDE9D9" ss:Pattern="Solid"/><Borders><Border ss:Position="Right" ss:LineStyle="Continuous"/></Borders></Style>
-    <Style ss:ID="cell"><Alignment ss:Horizontal="Center"/></Style>
-    <Style ss:ID="cellWe"><Alignment ss:Horizontal="Center"/><Interior ss:Color="#ECECEC" ss:Pattern="Solid"/></Style>
-  </Styles>`;
+  const parts = [];
+  parts.push(['[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+${MONTHS_HE.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}
+</Types>`]);
+  parts.push(['_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`]);
+  parts.push(['xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheets>${MONTHS_HE.map((nm, i) => `<sheet name="${_xlsxEsc(nm)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`]);
+  parts.push(['xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+${MONTHS_HE.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}
+<Relationship Id="rId100" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`]);
+  parts.push(['xl/styles.xml', _XLSX_STYLES]);
+  for (let m = 0; m < 12; m++) parts.push([`xl/worksheets/sheet${m + 1}.xml`, _xlsxSheet(annualData, sections, m)]);
 
-  let sheets = '';
-  for (let m = 0; m < 12; m++) {
-    const dim = new Date(year, m + 1, 0).getDate();
-
-    // Row 1 — section headers (יום spans 2 rows; each section spans its people)
-    let row1 = `<Row><Cell ss:MergeDown="1" ss:StyleID="sec"><Data ss:Type="String">יום</Data></Cell>`;
-    for (const s of sections)
-      row1 += `<Cell ss:MergeAcross="${s.people.length - 1}" ss:StyleID="sec"><Data ss:Type="String">${xmlEsc(s.name)}</Data></Cell>`;
-    row1 += `</Row>`;
-
-    // Row 2 — person names (col 1 is covered by MergeDown → start at index 2)
-    let row2 = `<Row>`;
-    let first = true;
-    for (const s of sections) for (const p of s.people) {
-      row2 += `<Cell ${first ? 'ss:Index="2" ' : ''}ss:StyleID="per"><Data ss:Type="String">${xmlEsc(p)}</Data></Cell>`;
-      first = false;
-    }
-    row2 += `</Row>`;
-
-    // Day rows
-    let body = '';
-    for (let d = 1; d <= dim; d++) {
-      const iso = `${year}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const dow = new Date(year, m, d).getDay();
-      const we  = dow === 5 || dow === 6;
-      const hol = holidays[iso];
-      const dd  = days[iso] || {};
-      const st1 = dd.statuses || {}, st2 = dd.statuses2 || {};
-      const dayStyle = hol ? 'hol' : we ? 'dayWe' : 'day';
-      const dayLabel = `${d} ${DAY_SHORT[dow]}${hol ? ' · ' + hol : ''}`;
-      let r = `<Row><Cell ss:StyleID="${dayStyle}"><Data ss:Type="String">${xmlEsc(dayLabel)}</Data></Cell>`;
-      for (const s of sections) for (const p of s.people) {
-        const a = st1[p] || '', b = st2[p] || '';
-        const val = a && b ? `${a} / ${b}` : (b || a || '');
-        r += `<Cell ss:StyleID="${we ? 'cellWe' : 'cell'}"><Data ss:Type="String">${xmlEsc(val)}</Data></Cell>`;
-      }
-      body += r + `</Row>`;
-    }
-
-    sheets += `<Worksheet ss:Name="${xmlEsc(MONTHS_HE[m])}"><Table>${row1}${row2}${body}</Table>`
-      + `<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"><DisplayRightToLeft/></WorksheetOptions></Worksheet>`;
-  }
-
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<?mso-application progid="Excel.Sheet"?>\n`
-    + `<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" xmlns:html="http://www.w3.org/TR/REC-html40">`
-    + styles + sheets + `</Workbook>`;
-
-  const blob = new Blob(['﻿' + xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = `תוכנית_שנתית_${year}.xls`;
+  const bytes = _zipStore(parts);
+  const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `תוכנית_שנתית_${year}.xlsx`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
