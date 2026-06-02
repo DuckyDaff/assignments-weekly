@@ -6,3 +6,9 @@ dist/
 *.log
 
 .vercel
+
+# working / generated files
+__pycache__/
+_annual_backup_*.json
+_merge_report.txt
+_excel_check.txt

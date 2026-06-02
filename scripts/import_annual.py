@@ -135,7 +135,7 @@ def parse_sheet(ws, year):
     return month_num, days
 
 
-def build_annual(xlsx_path, year=2026):
+def build_annual(xlsx_path, year=2026, month_min=1, month_max=12):
     wb = openpyxl.load_workbook(xlsx_path, data_only=True)
 
     # Build sections list (people per section) from first available month sheet
@@ -166,6 +166,9 @@ def build_annual(xlsx_path, year=2026):
         month_num, days = parse_sheet(ws, year)
         if month_num is None:
             continue
+        # Only import months within the requested range (e.g. Jan–June)
+        if month_num < month_min or month_num > month_max:
+            continue
         for d in days:
             all_days[d["date"]] = {k: v for k, v in d.items() if k != "date"}
 
@@ -182,10 +185,13 @@ def main():
     parser.add_argument("--year", type=int, default=2026)
     parser.add_argument("--url", default="https://assignments-weekly.vercel.app")
     parser.add_argument("--upload", action="store_true")
+    parser.add_argument("--month-min", type=int, default=1, help="first month to import (1-12)")
+    parser.add_argument("--month-max", type=int, default=12, help="last month to import (1-12)")
     args = parser.parse_args()
 
     print(f"Reading {args.xlsx} ...")
-    data = build_annual(args.xlsx, args.year)
+    print(f"Month range: {args.month_min}–{args.month_max}")
+    data = build_annual(args.xlsx, args.year, args.month_min, args.month_max)
 
     day_count = len(data["days"])
     sec_info = ", ".join(f"{s['name']} ({len(s['people'])} אנשים)" for s in data["sections"])
