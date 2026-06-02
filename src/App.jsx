@@ -2162,49 +2162,29 @@ function NominalHoursEditor({ annualData, onSave, toast }) {
 }
 
 /* ── HOLIDAYS EDITOR ── */
-const JEWISH_HOLIDAYS = [
-  // ימים טובים
-  { name: 'ראש השנה א׳',              type: 'holiday' },
-  { name: 'ראש השנה ב׳',              type: 'holiday' },
-  { name: 'יום כיפור',                type: 'holiday' },
-  { name: 'סוכות (חג ראשון)',          type: 'holiday' },
-  { name: 'שמיני עצרת / שמחת תורה',   type: 'holiday' },
-  { name: 'פסח א׳',                   type: 'holiday' },
-  { name: 'פסח ב׳',                   type: 'holiday' },
-  { name: 'שביעי של פסח',             type: 'holiday' },
-  { name: 'אחרון של פסח',             type: 'holiday' },
-  { name: 'שבועות א׳',                type: 'holiday' },
-  { name: 'שבועות ב׳',                type: 'holiday' },
-  // ימי זכרון ואומה
-  { name: 'יום הזיכרון',              type: 'memorial' },
-  { name: 'יום העצמאות',              type: 'memorial' },
-  { name: 'יום ירושלים',              type: 'memorial' },
-  // פורים
-  { name: 'פורים',                    type: 'holiday' },
-  { name: 'שושן פורים',               type: 'holiday' },
-  // צומות
-  { name: 'צום גדליה',                type: 'fast' },
-  { name: 'צום עשרה בטבת',            type: 'fast' },
-  { name: 'תענית אסתר',               type: 'fast' },
-  { name: 'שבעה עשר בתמוז',           type: 'fast' },
-  { name: 'תשעה באב',                 type: 'fast' },
-  // ערבי חג
-  { name: 'ערב ראש השנה',             type: 'eve' },
-  { name: 'ערב יום כיפור',            type: 'eve' },
-  { name: 'ערב פסח',                  type: 'eve' },
-];
-
 const HOL_TYPE_STYLE = {
-  holiday:  { color: '#e67e22', label: 'חג' },
-  memorial: { color: '#4a9eff', label: 'זיכרון / לאום' },
-  fast:     { color: '#8e44ad', label: 'צום' },
-  eve:      { color: '#7f8c8d', label: 'ערב חג' },
+  holiday:  { color: '#e67e22', label: 'חגים וימים טובים' },
+  memorial: { color: '#4a9eff', label: 'ימי זיכרון ולאום' },
+  minor:    { color: '#16a085', label: 'מועדים' },
+  fast:     { color: '#8e44ad', label: 'צומות' },
+  eve:      { color: '#7f8c8d', label: 'ערבי חג' },
   custom:   { color: '#2ecc71', label: 'מותאם אישית' },
 };
+const HOL_GROUP_ORDER = ['holiday', 'memorial', 'minor', 'fast', 'eve', 'custom'];
+// Static name → type map (Israeli calendar) for grouping saved/computed entries
+const HOL_NAME_TYPE = {
+  'ערב ראש השנה': 'eve', 'ראש השנה א׳': 'holiday', 'ראש השנה ב׳': 'holiday', 'צום גדליה': 'fast',
+  'ערב יום כיפור': 'eve', 'יום כיפור': 'holiday', 'ערב סוכות': 'eve', 'סוכות א׳': 'holiday',
+  'חול המועד סוכות': 'holiday', 'הושענא רבה': 'holiday', 'שמחת תורה': 'holiday', 'חנוכה': 'holiday',
+  'צום עשרה בטבת': 'fast', 'ט"ו בשבט': 'minor', 'תענית אסתר': 'fast', 'פורים': 'holiday', 'שושן פורים': 'holiday',
+  'ערב פסח': 'eve', 'פסח א׳': 'holiday', 'חול המועד פסח': 'holiday', 'שביעי של פסח': 'holiday',
+  'יום השואה': 'memorial', 'יום הזיכרון': 'memorial', 'יום העצמאות': 'memorial', 'ל"ג בעומר': 'minor',
+  'יום ירושלים': 'memorial', 'ערב שבועות': 'eve', 'שבועות': 'holiday', 'שבעה עשר בתמוז': 'fast', 'תשעה באב': 'fast',
+};
 
-// Compute Gregorian dates for all Jewish holidays/fasts/national days in a given
-// Gregorian year via the Intl Hebrew calendar + official postponement rules.
-// Returns { holidayName: "YYYY-MM-DD" }.
+// Compute Gregorian dates for the full Israeli holiday calendar in a given year
+// via the Intl Hebrew calendar + official postponement rules. Returns an array of
+// { iso, name, type } (multi-day holidays expanded into one entry per day).
 function computeHolidays(gyear) {
   const map = {}; // "HebMonth|Day" → first ISO date in the year
   const enc = new Intl.DateTimeFormat('en-u-ca-hebrew', { day: 'numeric', month: 'long' });
@@ -2218,98 +2198,125 @@ function computeHolidays(gyear) {
   const get = (month, day) => map[`${month}|${day}`] || (month === 'Adar' ? map[`Adar II|${day}`] : null) || null;
   const dow = iso => iso ? new Date(iso + 'T12:00:00').getDay() : -1;
   const addD = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-  const out = {};
-  const set = (name, iso) => { if (iso) out[name] = iso; };
+  const list = [];
+  const one = (name, type, iso) => { if (iso) list.push({ iso, name, type }); };
+  const range = (name, type, startIso, count) => { if (startIso) for (let i = 0; i < count; i++) list.push({ iso: addD(startIso, i), name, type }); };
 
-  // Fixed holidays
-  set('ראש השנה א׳', get('Tishri', 1));
-  set('ראש השנה ב׳', get('Tishri', 2));
-  set('ערב ראש השנה', get('Elul', 29));
-  set('ערב יום כיפור', get('Tishri', 9));
-  set('יום כיפור', get('Tishri', 10));
-  set('סוכות (חג ראשון)', get('Tishri', 15));
-  set('שמיני עצרת / שמחת תורה', get('Tishri', 22));
-  set('ערב פסח', get('Nisan', 14));
-  set('פסח א׳', get('Nisan', 15));
-  set('פסח ב׳', get('Nisan', 16));
-  set('שביעי של פסח', get('Nisan', 21));
-  set('אחרון של פסח', get('Nisan', 22));
-  set('שבועות א׳', get('Sivan', 6));
-  set('שבועות ב׳', get('Sivan', 7));
-  set('פורים', get('Adar', 14));
-  set('שושן פורים', get('Adar', 15));
-
-  // Fasts — postponed off Shabbat (Esther moved earlier to Thursday)
-  let gd = get('Tishri', 3); if (gd && dow(gd) === 6) gd = get('Tishri', 4); set('צום גדליה', gd);
-  set('צום עשרה בטבת', get('Tevet', 10)); // never falls on Shabbat
-  let es = get('Adar', 13); if (es && dow(es) === 6) es = get('Adar', 11); set('תענית אסתר', es);
-  let tz = get('Tammuz', 17); if (tz && dow(tz) === 6) tz = get('Tammuz', 18); set('שבעה עשר בתמוז', tz);
-  let av = get('Av', 9); if (av && dow(av) === 6) av = get('Av', 10); set('תשעה באב', av);
-
-  // National days — base Zikaron 4 Iyar / Atzmaut 5 Iyar, with Knesset adjustments
+  // ── Tishri (autumn) ──
+  one('ערב ראש השנה', 'eve', get('Elul', 29));
+  one('ראש השנה א׳', 'holiday', get('Tishri', 1));
+  one('ראש השנה ב׳', 'holiday', get('Tishri', 2));
+  let gd = get('Tishri', 3); if (gd && dow(gd) === 6) gd = get('Tishri', 4); one('צום גדליה', 'fast', gd);
+  one('ערב יום כיפור', 'eve', get('Tishri', 9));
+  one('יום כיפור', 'holiday', get('Tishri', 10));
+  one('ערב סוכות', 'eve', get('Tishri', 14));
+  one('סוכות א׳', 'holiday', get('Tishri', 15));
+  range('חול המועד סוכות', 'holiday', get('Tishri', 16), 5);   // 16–20
+  one('הושענא רבה', 'holiday', get('Tishri', 21));
+  one('שמחת תורה', 'holiday', get('Tishri', 22));
+  // ── Kislev–Tevet (winter) ──
+  range('חנוכה', 'holiday', get('Kislev', 25), 8);             // crosses into Tevet automatically
+  one('צום עשרה בטבת', 'fast', get('Tevet', 10));              // never falls on Shabbat
+  one('ט"ו בשבט', 'minor', get('Shevat', 15));
+  // ── Adar (Purim) ──
+  let es = get('Adar', 13); if (es && dow(es) === 6) es = get('Adar', 11); one('תענית אסתר', 'fast', es);
+  one('פורים', 'holiday', get('Adar', 14));
+  one('שושן פורים', 'holiday', get('Adar', 15));
+  // ── Nisan (Pesach) ──
+  one('ערב פסח', 'eve', get('Nisan', 14));
+  one('פסח א׳', 'holiday', get('Nisan', 15));
+  range('חול המועד פסח', 'holiday', get('Nisan', 16), 5);      // 16–20
+  one('שביעי של פסח', 'holiday', get('Nisan', 21));
+  // Yom HaShoah 27 Nisan: Fri → Thu (26), Sun → Mon (28)
+  let sh = get('Nisan', 27); if (sh) { const w = dow(sh); if (w === 5) sh = get('Nisan', 26); else if (w === 0) sh = get('Nisan', 28); } one('יום השואה', 'memorial', sh);
+  // ── Iyar (national days) ──
   const z4 = get('Iyar', 4);
   if (z4) {
-    const wd = dow(z4);
-    let zik, atz;
+    const wd = dow(z4); let zik, atz;
     if (wd === 0)      { zik = addD(z4, 1);  atz = addD(z4, 2);  } // Sun → +1
     else if (wd === 4) { zik = addD(z4, -1); atz = z4;           } // Thu → -1
     else if (wd === 5) { zik = addD(z4, -2); atz = addD(z4, -1); } // Fri → -2
     else               { zik = z4;           atz = addD(z4, 1);  } // Mon/Tue/Wed → none
-    set('יום הזיכרון', zik);
-    set('יום העצמאות', atz);
+    one('יום הזיכרון', 'memorial', zik);
+    one('יום העצמאות', 'memorial', atz);
   }
-  set('יום ירושלים', get('Iyar', 28));
+  one('ל"ג בעומר', 'minor', get('Iyar', 18));
+  one('יום ירושלים', 'memorial', get('Iyar', 28));
+  // ── Sivan (Shavuot) ──
+  one('ערב שבועות', 'eve', get('Sivan', 5));
+  one('שבועות', 'holiday', get('Sivan', 6));
+  // ── Tammuz–Av (fasts) ──
+  let tz = get('Tammuz', 17); if (tz && dow(tz) === 6) tz = get('Tammuz', 18); one('שבעה עשר בתמוז', 'fast', tz);
+  let av = get('Av', 9); if (av && dow(av) === 6) av = get('Av', 10); one('תשעה באב', 'fast', av);
 
-  return out;
+  list.sort((a, b) => a.iso < b.iso ? -1 : a.iso > b.iso ? 1 : 0);
+  return list;
 }
 
 function HolidaysEditor({ annualData, onSave, toast }) {
   const savedHolidays = annualData?.holidays || {};
-  const [dates, setDates] = useState(() => {
-    const nameToDate = {};
-    for (const [iso, name] of Object.entries(savedHolidays)) nameToDate[name] = iso;
-    return nameToDate;
-  });
+  const baseY = annualData?.year || new Date().getFullYear();
+  const typeOf = name => HOL_NAME_TYPE[name] || 'custom';
+
+  // entries: [{ iso, name }]
+  const [entries, setEntries] = useState(() => Object.entries(savedHolidays).map(([iso, name]) => ({ iso, name })));
+  const [fillYear, setFillYear] = useState(baseY);
   const [customName, setCustomName] = useState('');
   const [customDate, setCustomDate] = useState('');
-  const [fillYear, setFillYear]     = useState(annualData?.year || new Date().getFullYear());
   const [openGroups, setOpenGroups] = useState({});
 
-  const buildHolidaysObj = d => { const o = {}; for (const [name, iso] of Object.entries(d)) if (iso) o[iso] = name; return o; };
-  const setDate = (name, iso) => setDates(prev => { const n = { ...prev, [name]: iso }; if (!iso) delete n[name]; return n; });
-  const doSave = () => { onSave(buildHolidaysObj(dates)); toast('חגים ומועדים עודכנו ✓'); };
-  const addCustom = () => { if (!customName.trim() || !customDate) return; setDates(prev => ({ ...prev, [customName.trim()]: customDate })); setCustomName(''); setCustomDate(''); };
-  const autoFill = () => { const c = computeHolidays(Number(fillYear)); setDates(prev => ({ ...prev, ...c })); toast(`מולאו ${Object.keys(c).length} מועדים לשנת ${fillYear} — בדוק ולחץ שמור 💾`); };
-  const clearAll = () => setDates({});
+  const autoFill = () => {
+    // Replace the whole list with the clean computed calendar (no leftover variants).
+    const computed = computeHolidays(Number(fillYear)).map(({ iso, name }) => ({ iso, name }));
+    setEntries(computed);
+    toast(`מולאו ${computed.length} תאריכי חגים לשנת ${fillYear} — בדוק ולחץ שמור 💾`);
+  };
+  const clearAll = () => setEntries([]);
+  const removeByName = name => setEntries(prev => prev.filter(e => e.name !== name));
+  const updateSingle = (name, iso) => setEntries(prev => prev.map(e => e.name === name ? { ...e, iso } : e));
+  const addCustom = () => { if (!customName.trim() || !customDate) return; setEntries(prev => [...prev, { iso: customDate, name: customName.trim() }]); setCustomName(''); setCustomDate(''); };
+  const doSave = () => { const o = {}; for (const e of entries) if (e.iso) o[e.iso] = e.name; onSave(o); toast('חגים ומועדים עודכנו ✓'); };
 
-  const knownNames = new Set(JEWISH_HOLIDAYS.map(h => h.name));
-  const customEntries = Object.entries(dates).filter(([name]) => !knownNames.has(name));
   const dowLabel = iso => iso ? DAY_SHORT[new Date(iso + 'T12:00:00').getDay()] : '';
+  const fmtShort = iso => { const [, m, d] = iso.split('-'); return `${d}/${m}`; };
 
-  const groups = [
-    { type: 'holiday',  items: JEWISH_HOLIDAYS.filter(h => h.type === 'holiday') },
-    { type: 'memorial', items: JEWISH_HOLIDAYS.filter(h => h.type === 'memorial') },
-    { type: 'fast',     items: JEWISH_HOLIDAYS.filter(h => h.type === 'fast') },
-    { type: 'eve',      items: JEWISH_HOLIDAYS.filter(h => h.type === 'eve') },
-  ];
-  const baseY = annualData?.year || new Date().getFullYear();
+  // Collapse entries by name (multi-day → one row with a date range)
+  const byName = {};
+  for (const e of entries) { (byName[e.name] ||= { name: e.name, isos: [] }).isos.push(e.iso); }
+  const rows = Object.values(byName).map(r => ({ name: r.name, type: typeOf(r.name), isos: r.isos.filter(Boolean).sort() }));
+  const groupsMap = {};
+  for (const r of rows) (groupsMap[r.type] ||= []).push(r);
+  for (const t in groupsMap) groupsMap[t].sort((a, b) => (a.isos[0] || '') < (b.isos[0] || '') ? -1 : 1);
+
   const yearOpts = []; for (let y = baseY - 1; y <= baseY + 5; y++) yearOpts.push(y);
 
-  const row = (name, iso, color) => (
-    <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: `1px solid ${iso ? color + '33' : 'rgba(255,255,255,0.06)'}` }}>
-      <span style={{ flex: 1, fontSize: 12, color: iso ? '#ccd6f6' : '#6a7a9a' }}>{name}</span>
-      {iso && <span style={{ fontSize: 10, color: '#8892b0', fontWeight: 700, minWidth: 12, textAlign: 'center' }}>{dowLabel(iso)}</span>}
-      <input type="date" value={iso || ''} onChange={e => setDate(name, e.target.value)}
-        style={{ ...inp, padding: '3px 6px', fontSize: 11, width: 130, textAlign: 'center', colorScheme: 'dark' }} />
-      {iso && <button onClick={() => setDate(name, '')} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px' }}>✕</button>}
-    </div>
-  );
+  const rowView = r => {
+    const color = HOL_TYPE_STYLE[r.type]?.color || '#2ecc71';
+    const single = r.isos.length === 1;
+    return (
+      <div key={r.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: `1px solid ${color}33` }}>
+        <span style={{ flex: 1, fontSize: 12, color: '#ccd6f6' }}>{r.name}</span>
+        {single ? (
+          <>
+            <span style={{ fontSize: 10, color: '#8892b0', fontWeight: 700, minWidth: 12, textAlign: 'center' }}>{dowLabel(r.isos[0])}</span>
+            <input type="date" value={r.isos[0]} onChange={e => updateSingle(r.name, e.target.value)}
+              style={{ ...inp, padding: '3px 6px', fontSize: 11, width: 130, textAlign: 'center', colorScheme: 'dark' }} />
+          </>
+        ) : (
+          <span style={{ fontSize: 12, color: '#aab', fontFamily: 'monospace' }}>
+            {fmtShort(r.isos[0])}–{fmtShort(r.isos[r.isos.length - 1])}<span style={{ fontSize: 9, color: '#667' }}> ({r.isos.length} ימים)</span>
+          </span>
+        )}
+        <button onClick={() => removeByName(r.name)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px' }}>✕</button>
+      </div>
+    );
+  };
 
   return (
     <div style={{ marginTop: 28, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 20 }}>
       <div style={{ fontWeight: 700, fontSize: 14, color: '#ccd6f6', marginBottom: 6 }}>✡️ חגים ומועדים</div>
       <div style={{ fontSize: 12, color: '#8892b0', marginBottom: 14, lineHeight: 1.6 }}>
-        בחר שנה ולחץ <strong style={{ color: '#2ecc71' }}>מלא אוטומטית</strong> — כל החגים, הצומות וימי הזיכרון/עצמאות יחושבו לפי הלוח העברי (כולל דחיות). אפשר לערוך ידנית, להוסיף אירועים, ובסוף ללחוץ שמור.
+        בחר שנה ולחץ <strong style={{ color: '#2ecc71' }}>מלא אוטומטית</strong> — כל הלוח הישראלי (חגים, חול המועד, חנוכה, צומות, ימי זיכרון ועצמאות) יחושב לפי הלוח העברי כולל דחיות. אפשר לערוך, להוסיף אירועים, ובסוף ללחוץ שמור.
       </div>
 
       {/* Auto-fill control card */}
@@ -2322,34 +2329,31 @@ function HolidaysEditor({ annualData, onSave, toast }) {
         <button onClick={clearAll} style={{ background: 'none', border: '1px solid rgba(231,76,60,0.4)', borderRadius: 8, color: '#e74c3c', fontSize: 12, padding: '6px 12px', cursor: 'pointer', marginRight: 'auto' }}>נקה הכל</button>
       </div>
 
+      {entries.length === 0 && (
+        <div style={{ textAlign: 'center', color: '#667', fontSize: 12, fontStyle: 'italic', padding: '20px 0' }}>אין מועדים — לחץ ״מלא אוטומטית״ כדי לחשב את כל הלוח לשנה הנבחרת</div>
+      )}
+
       {/* Collapsible groups */}
-      {groups.map(({ type, items }) => {
+      {HOL_GROUP_ORDER.map(type => {
+        const grp = groupsMap[type];
+        if (!grp || !grp.length) return null;
         const ts = HOL_TYPE_STYLE[type];
-        const filled = items.filter(h => dates[h.name]).length;
         const open = openGroups[type] ?? true;
         return (
           <div key={type} style={{ marginBottom: 8 }}>
             <button onClick={() => setOpenGroups(p => ({ ...p, [type]: !open }))}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0', borderBottom: `1px solid ${ts.color}33` }}>
               <span style={{ fontSize: 11, color: ts.color, fontWeight: 700, letterSpacing: 0.5 }}>{open ? '▾' : '▸'} {ts.label}</span>
-              <span style={{ fontSize: 10, color: '#667', marginRight: 'auto' }}>{filled}/{items.length}</span>
+              <span style={{ fontSize: 10, color: '#667', marginRight: 'auto' }}>{grp.length}</span>
             </button>
-            {open && <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 6 }}>{items.map(h => row(h.name, dates[h.name], ts.color))}</div>}
+            {open && <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 6 }}>{grp.map(rowView)}</div>}
           </div>
         );
       })}
 
-      {/* Custom entries */}
-      {customEntries.length > 0 && (
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 11, color: HOL_TYPE_STYLE.custom.color, fontWeight: 700, padding: '6px 0', borderBottom: `1px solid ${HOL_TYPE_STYLE.custom.color}33`, marginBottom: 6 }}>מותאם אישית</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>{customEntries.map(([name, iso]) => row(name, iso, HOL_TYPE_STYLE.custom.color))}</div>
-        </div>
-      )}
-
       {/* Add custom */}
-      <div style={{ marginTop: 12, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        <input value={customName} onChange={e => setCustomName(e.target.value)} placeholder="שם אירוע מותאם"
+      <div style={{ marginTop: 14, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input value={customName} onChange={e => setCustomName(e.target.value)} placeholder="הוסף אירוע מותאם"
           style={{ ...inp, flex: 1, minWidth: 120, padding: '5px 8px', fontSize: 12 }} />
         <input type="date" value={customDate} onChange={e => setCustomDate(e.target.value)}
           style={{ ...inp, padding: '5px 6px', fontSize: 11, width: 130, colorScheme: 'dark' }} />
