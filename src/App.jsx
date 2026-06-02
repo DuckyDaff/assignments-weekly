@@ -2171,17 +2171,20 @@ const HOL_TYPE_STYLE = {
   custom:   { color: '#2ecc71', label: 'מותאם אישית' },
 };
 const HOL_GROUP_ORDER = ['holiday', 'memorial', 'minor', 'fast', 'custom'];
-// Eves are shown inside the holidays group (next to their holiday by date)
-const holGroupKey = t => (t === 'eve' ? 'holiday' : t);
+// Eves default into the holidays group; these override into another group so each
+// eve sits next to its day (e.g. ערב יום הזיכרון among the memorial days).
+const HOL_EVE_GROUP = { 'ערב יום השואה': 'memorial', 'ערב יום הזיכרון': 'memorial', 'ערב תשעה באב': 'fast' };
+// Group an entry: eves follow their override (or holidays); others by type.
+const holGroupOf = (name, type) => type === 'eve' ? (HOL_EVE_GROUP[name] || 'holiday') : type;
 // Static name → type map (Israeli calendar) for grouping saved/computed entries
 const HOL_NAME_TYPE = {
   'ערב ראש השנה': 'eve', 'ראש השנה א׳': 'holiday', 'ראש השנה ב׳': 'holiday', 'צום גדליה': 'fast',
   'ערב יום כיפור': 'eve', 'יום כיפור': 'holiday', 'ערב סוכות': 'eve', 'סוכות א׳': 'holiday',
   'חול המועד סוכות': 'holiday', 'הושענא רבה': 'holiday', 'שמחת תורה': 'holiday', 'חנוכה': 'holiday',
   'צום עשרה בטבת': 'fast', 'ט"ו בשבט': 'minor', 'תענית אסתר': 'fast', 'פורים': 'holiday', 'שושן פורים': 'holiday',
-  'ערב פסח': 'eve', 'פסח א׳': 'holiday', 'חול המועד פסח': 'holiday', 'שביעי של פסח': 'holiday',
-  'יום השואה': 'memorial', 'יום הזיכרון': 'memorial', 'יום העצמאות': 'memorial', 'ל"ג בעומר': 'minor',
-  'יום ירושלים': 'memorial', 'ערב שבועות': 'eve', 'שבועות': 'holiday', 'שבעה עשר בתמוז': 'fast', 'תשעה באב': 'fast',
+  'ערב פסח': 'eve', 'פסח א׳': 'holiday', 'חול המועד פסח': 'holiday', 'שביעי של פסח': 'holiday', 'אחרון של פסח': 'holiday',
+  'ערב יום השואה': 'eve', 'יום השואה': 'memorial', 'ערב יום הזיכרון': 'eve', 'יום הזיכרון': 'memorial', 'יום העצמאות': 'memorial', 'ל"ג בעומר': 'minor',
+  'יום ירושלים': 'memorial', 'ערב שבועות': 'eve', 'שבועות': 'holiday', 'ערב תשעה באב': 'eve', 'שבעה עשר בתמוז': 'fast', 'תשעה באב': 'fast',
 };
 
 // Compute Gregorian dates for the full Israeli holiday calendar in a given year
@@ -2229,8 +2232,11 @@ function computeHolidays(gyear) {
   one('פסח א׳', 'holiday', get('Nisan', 15));
   range('חול המועד פסח', 'holiday', get('Nisan', 16), 5);      // 16–20
   one('שביעי של פסח', 'holiday', get('Nisan', 21));
+  one('אחרון של פסח', 'holiday', get('Nisan', 22));
   // Yom HaShoah 27 Nisan: Fri → Thu (26), Sun → Mon (28)
-  let sh = get('Nisan', 27); if (sh) { const w = dow(sh); if (w === 5) sh = get('Nisan', 26); else if (w === 0) sh = get('Nisan', 28); } one('יום השואה', 'memorial', sh);
+  let sh = get('Nisan', 27); if (sh) { const w = dow(sh); if (w === 5) sh = get('Nisan', 26); else if (w === 0) sh = get('Nisan', 28); }
+  if (sh) one('ערב יום השואה', 'eve', addD(sh, -1));
+  one('יום השואה', 'memorial', sh);
   // ── Iyar (national days) ──
   const z4 = get('Iyar', 4);
   if (z4) {
@@ -2239,6 +2245,7 @@ function computeHolidays(gyear) {
     else if (wd === 4) { zik = addD(z4, -1); atz = z4;           } // Thu → -1
     else if (wd === 5) { zik = addD(z4, -2); atz = addD(z4, -1); } // Fri → -2
     else               { zik = z4;           atz = addD(z4, 1);  } // Mon/Tue/Wed → none
+    one('ערב יום הזיכרון', 'eve', addD(zik, -1));
     one('יום הזיכרון', 'memorial', zik);
     one('יום העצמאות', 'memorial', atz);
   }
@@ -2249,7 +2256,9 @@ function computeHolidays(gyear) {
   one('שבועות', 'holiday', get('Sivan', 6));
   // ── Tammuz–Av (fasts) ──
   let tz = get('Tammuz', 17); if (tz && dow(tz) === 6) tz = get('Tammuz', 18); one('שבעה עשר בתמוז', 'fast', tz);
-  let av = get('Av', 9); if (av && dow(av) === 6) av = get('Av', 10); one('תשעה באב', 'fast', av);
+  let av = get('Av', 9); if (av && dow(av) === 6) av = get('Av', 10);
+  if (av) one('ערב תשעה באב', 'eve', addD(av, -1));
+  one('תשעה באב', 'fast', av);
 
   list.sort((a, b) => a.iso < b.iso ? -1 : a.iso > b.iso ? 1 : 0);
   return list;
@@ -2287,7 +2296,7 @@ function HolidaysEditor({ annualData, onSave, toast }) {
   for (const e of entries) { (byName[e.name] ||= { name: e.name, isos: [] }).isos.push(e.iso); }
   const rows = Object.values(byName).map(r => ({ name: r.name, type: typeOf(r.name), isos: r.isos.filter(Boolean).sort() }));
   const groupsMap = {};
-  for (const r of rows) (groupsMap[holGroupKey(r.type)] ||= []).push(r);
+  for (const r of rows) (groupsMap[holGroupOf(r.name, r.type)] ||= []).push(r);
   for (const t in groupsMap) groupsMap[t].sort((a, b) => (a.isos[0] || '') < (b.isos[0] || '') ? -1 : 1);
 
   const yearOpts = []; for (let y = baseY - 1; y <= baseY + 5; y++) yearOpts.push(y);
