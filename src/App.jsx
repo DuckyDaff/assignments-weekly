@@ -2170,7 +2170,9 @@ const HOL_TYPE_STYLE = {
   eve:      { color: '#7f8c8d', label: 'ערבי חג' },
   custom:   { color: '#2ecc71', label: 'מותאם אישית' },
 };
-const HOL_GROUP_ORDER = ['holiday', 'memorial', 'minor', 'fast', 'eve', 'custom'];
+const HOL_GROUP_ORDER = ['holiday', 'memorial', 'minor', 'fast', 'custom'];
+// Eves are shown inside the holidays group (next to their holiday by date)
+const holGroupKey = t => (t === 'eve' ? 'holiday' : t);
 // Static name → type map (Israeli calendar) for grouping saved/computed entries
 const HOL_NAME_TYPE = {
   'ערב ראש השנה': 'eve', 'ראש השנה א׳': 'holiday', 'ראש השנה ב׳': 'holiday', 'צום גדליה': 'fast',
@@ -2285,7 +2287,7 @@ function HolidaysEditor({ annualData, onSave, toast }) {
   for (const e of entries) { (byName[e.name] ||= { name: e.name, isos: [] }).isos.push(e.iso); }
   const rows = Object.values(byName).map(r => ({ name: r.name, type: typeOf(r.name), isos: r.isos.filter(Boolean).sort() }));
   const groupsMap = {};
-  for (const r of rows) (groupsMap[r.type] ||= []).push(r);
+  for (const r of rows) (groupsMap[holGroupKey(r.type)] ||= []).push(r);
   for (const t in groupsMap) groupsMap[t].sort((a, b) => (a.isos[0] || '') < (b.isos[0] || '') ? -1 : 1);
 
   const yearOpts = []; for (let y = baseY - 1; y <= baseY + 5; y++) yearOpts.push(y);
