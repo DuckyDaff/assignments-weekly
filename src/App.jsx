@@ -2254,8 +2254,8 @@ function computeHolidays(gyear) {
   // ── Sivan (Shavuot) ──
   one('ערב שבועות', 'eve', get('Sivan', 5));
   one('שבועות', 'holiday', get('Sivan', 6));
-  // ── Tammuz–Av (fasts) ──
-  let tz = get('Tammuz', 17); if (tz && dow(tz) === 6) tz = get('Tammuz', 18); one('שבעה עשר בתמוז', 'fast', tz);
+  // ── Tamuz–Av (fasts) ── (Intl spells it "Tamuz" with one m)
+  let tz = get('Tamuz', 17); if (tz && dow(tz) === 6) tz = get('Tamuz', 18); one('שבעה עשר בתמוז', 'fast', tz);
   let av = get('Av', 9); if (av && dow(av) === 6) av = get('Av', 10);
   if (av) one('ערב תשעה באב', 'eve', addD(av, -1));
   one('תשעה באב', 'fast', av);
