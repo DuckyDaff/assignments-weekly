@@ -3929,9 +3929,10 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
   const undoFnRef = useRef(null);
   const redoFnRef = useRef(null);
 
-  const dragCode   = useRef(null);
-  const dragSource = useRef(null); // { iso, person, slot } — source cell when dragging from table
-  const resizeDrag = useRef(null); // { startX, startTblW, secName, people }
+  const dragCode         = useRef(null);
+  const dragSource       = useRef(null); // { iso, person, slot } — source cell when dragging from table
+  const resizeDrag       = useRef(null); // { startX, startTblW, secName, people }
+  const monthlyScrollRef = useRef(null); // inner overflow-x:auto div for monthly table sticky
   const [legendGroups] = useState(() => {
     try { return JSON.parse(localStorage.getItem("legendGroups")) || DEFAULT_LEGEND; } catch { return DEFAULT_LEGEND; }
   });
@@ -3950,6 +3951,31 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
   }, []);
   // Reset clear-month confirmation when navigating away
   useEffect(() => { setClearMonthConfirm(false); }, [selMonth, selSecIdx]);
+
+  // Monthly table sticky headers — dynamically compute --mst CSS var so that
+  // position:sticky top works correctly even inside an overflow-x:auto container
+  // (overflow-x:auto creates its own sticking context, making top:56 relative to
+  // the div's top rather than the viewport — this JS approach corrects that)
+  useEffect(() => {
+    if (lens !== 'monthly') return;
+    const HDR = 56; // app header height px
+    const ROW1 = 37; // first thead row height px (name row)
+    const updateStickyTop = () => {
+      const div = monthlyScrollRef.current;
+      if (!div) return;
+      const t = div.getBoundingClientRect().top;
+      const base = Math.max(0, HDR - t);
+      div.style.setProperty('--mst',  `${base}px`);
+      div.style.setProperty('--mst2', `${base + ROW1}px`);
+    };
+    window.addEventListener('scroll', updateStickyTop, { passive: true });
+    window.addEventListener('resize', updateStickyTop, { passive: true });
+    updateStickyTop();
+    return () => {
+      window.removeEventListener('scroll', updateStickyTop);
+      window.removeEventListener('resize', updateStickyTop);
+    };
+  }, [lens, selSecIdx, selMonth]); // recompute when table changes
 
   if (!annualData) {
     return (
@@ -4667,8 +4693,8 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
               <div style={{ flex: 1, minWidth: 0 }}>
                 {/* Outer wrapper: visual border/radius only — overflow clip keeps radius without creating scroll container */}
                 <div style={{ borderRadius: 12, border: `1px solid ${sc.accent}55`, boxShadow: `0 0 0 1px rgba(0,0,0,0.4)`, overflow: 'clip' }}>
-                {/* Inner: horizontal scroll only */}
-                <div style={{ overflowX: 'auto' }}>
+                {/* Inner: horizontal scroll only — ref used for JS sticky-top calculation */}
+                <div ref={monthlyScrollRef} style={{ overflowX: 'auto' }}>
                   {/* COL_W = colPri primary + 28px secondary per person. date col = 68px. */}
                   {(() => { const COL_SEC = 28, COL_DATE = 68;
                     const COL_PRI = Math.max(28, getColWidths()[sec.name] ?? 44);
@@ -4688,19 +4714,19 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
                     <thead>
                       {/* Person name headers — colSpan=2 (primary + secondary) */}
                       <tr>
-                        <th rowSpan={2} style={{ padding: '8px 10px', fontSize: 12, color: sc.accent, textAlign: 'right', borderBottom: `2px solid ${sc.accent}66`, borderLeft: `1px solid rgba(255,255,255,0.1)`, position: 'sticky', top: 56, right: 0, background: `#0d1628`, zIndex: 6, willChange: 'transform' }}>יום</th>
+                        <th rowSpan={2} style={{ padding: '8px 10px', fontSize: 12, color: sc.accent, textAlign: 'right', borderBottom: `2px solid ${sc.accent}66`, borderLeft: `1px solid rgba(255,255,255,0.1)`, position: 'sticky', top: 'var(--mst, 0px)', right: 0, background: `#0d1628`, zIndex: 6, willChange: 'transform' }}>יום</th>
                         {people.map((person) => {
                           const isVacant = person.includes('תקן');
                           const [firstName, ...rest] = person.split(' ');
                           const lastName = rest.join(' ');
                           const isMe = person === myName;
                           if (isVacant) return (
-                            <th key={person} colSpan={2} style={{ padding: '6px 4px 2px', fontSize: 11, color: '#445', borderBottom: `1px solid ${sc.accent}44`, borderLeft: `1px solid rgba(255,255,255,0.08)`, textAlign: 'center', fontWeight: 400, verticalAlign: 'bottom', borderRight: '3px dashed rgba(255,255,255,0.15)', background: '#0d1628', position: 'sticky', top: 56, zIndex: 3 }}>
+                            <th key={person} colSpan={2} style={{ padding: '6px 4px 2px', fontSize: 11, color: '#445', borderBottom: `1px solid ${sc.accent}44`, borderLeft: `1px solid rgba(255,255,255,0.08)`, textAlign: 'center', fontWeight: 400, verticalAlign: 'bottom', borderRight: '3px dashed rgba(255,255,255,0.15)', background: '#0d1628', position: 'sticky', top: 'var(--mst, 0px)', zIndex: 3 }}>
                               <div style={{ lineHeight: 1.4, fontStyle: 'italic', opacity: 0.5 }}>—</div>
                             </th>
                           );
                           return (
-                            <th key={person} colSpan={2} style={{ padding: '6px 4px 2px', fontSize: 12, color: isMe ? '#4a9eff' : '#dde8ff', borderBottom: `1px solid ${sc.accent}44`, borderLeft: `1px solid rgba(255,255,255,0.08)`, textAlign: 'center', fontWeight: isMe ? 700 : 600, verticalAlign: 'bottom', background: '#0d1628', position: 'sticky', top: 56, zIndex: 3 }}>
+                            <th key={person} colSpan={2} style={{ padding: '6px 4px 2px', fontSize: 12, color: isMe ? '#4a9eff' : '#dde8ff', borderBottom: `1px solid ${sc.accent}44`, borderLeft: `1px solid rgba(255,255,255,0.08)`, textAlign: 'center', fontWeight: isMe ? 700 : 600, verticalAlign: 'bottom', background: '#0d1628', position: 'sticky', top: 'var(--mst, 0px)', zIndex: 3 }}>
                               <div style={{ lineHeight: 1.4 }}>
                                 <div>{firstName}</div>
                                 {lastName && <div style={{ opacity: 0.75, fontSize: 10 }}>{lastName}</div>}
@@ -4713,12 +4739,12 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
                       <tr>
                         {people.map((person) => person.includes('תקן') ? (
                           <Fragment key={person}>
-                            <th colSpan={2} style={{ borderBottom: `2px solid ${sc.accent}88`, borderRight: '3px dashed rgba(255,255,255,0.15)', background: '#0d1628', position: 'sticky', top: 93, zIndex: 3 }} />
+                            <th colSpan={2} style={{ borderBottom: `2px solid ${sc.accent}88`, borderRight: '3px dashed rgba(255,255,255,0.15)', background: '#0d1628', position: 'sticky', top: 'var(--mst2, 37px)', zIndex: 3 }} />
                           </Fragment>
                         ) : (
                           <Fragment key={person}>
-                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#778', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `3px solid rgba(255,255,255,0.55)`, textAlign: 'center', letterSpacing: 0.3, background: '#0d1628', position: 'sticky', top: 93, zIndex: 3 }}>{isShiftSec ? 'אחר' : 'ראשי'}</th>
-                            <th style={{ padding: '3px 2px', fontSize: 9, color: isShiftSec ? sc.accent : '#667', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `1px solid rgba(255,255,255,0.13)`, textAlign: 'center', letterSpacing: 0.3, background: '#0d1628', position: 'sticky', top: 93, zIndex: 3 }}>{isShiftSec ? 'מש׳/כ׳' : 'מש׳'}</th>
+                            <th style={{ padding: '3px 2px', fontSize: 9, color: '#778', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `3px solid rgba(255,255,255,0.55)`, textAlign: 'center', letterSpacing: 0.3, background: '#0d1628', position: 'sticky', top: 'var(--mst2, 37px)', zIndex: 3 }}>{isShiftSec ? 'אחר' : 'ראשי'}</th>
+                            <th style={{ padding: '3px 2px', fontSize: 9, color: isShiftSec ? sc.accent : '#667', fontWeight: 600, borderBottom: `2px solid ${sc.accent}88`, borderRight: `1px solid rgba(255,255,255,0.13)`, textAlign: 'center', letterSpacing: 0.3, background: '#0d1628', position: 'sticky', top: 'var(--mst2, 37px)', zIndex: 3 }}>{isShiftSec ? 'מש׳/כ׳' : 'מש׳'}</th>
                           </Fragment>
                         ))}
                       </tr>
