@@ -764,7 +764,7 @@ export default function App() {
     <MobileCtx.Provider value={mob}>
       <style>{CSS}</style>
       <div dir="rtl" style={{ minHeight: "100vh", background: "#080c18", color: "#dde2f0", fontFamily: "'Segoe UI','Arial Hebrew',Arial,sans-serif", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
-        <img src="/logo.png" alt="" aria-hidden="true" style={{ position: "fixed", left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: "min(55vw, 480px)", opacity: 0.22, pointerEvents: "none", userSelect: "none", zIndex: 0 }} />
+        <img src="/logo.png" alt="" aria-hidden="true" style={{ position: "fixed", left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: "min(55vw, 480px)", opacity: 0.1, pointerEvents: "none", userSelect: "none", zIndex: 0 }} />
         {saveErr && (
           <div style={{ background: "#3a0c0c", borderBottom: "1px solid #e74c3c44", padding: "6px 18px", fontSize: 12, color: "#e74c3c", textAlign: "center" }}>
             ⚠ שגיאת חיבור לשרת — השינויים לא נשמרים
