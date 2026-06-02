@@ -4134,7 +4134,7 @@ function AnnualView({ annualData, onSaveDay, mgr, mgrName, myName, toast, data, 
             </button>
           ))}
         </div>
-        {mgr && (
+        {isMainMgr && (
           <button onClick={() => setShiftModal(true)}
             title="שיבוץ אוטומטי למשמרת מסלולים"
             style={{ padding: '8px 12px', background: 'rgba(230,126,34,0.12)', border: '1px solid rgba(230,126,34,0.3)', borderRadius: 10, color: '#e67e22', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all .15s', flexShrink: 0 }}>
